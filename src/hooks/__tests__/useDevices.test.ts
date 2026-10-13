@@ -296,6 +296,72 @@ describe("useDevices", () => {
     expect(result.current.activeDevice).toBeUndefined()
   })
 
+  it("persists a new order through the order endpoint and adopts the returned list", async () => {
+    const other = { ...DEVICE, id: "dev_other", name: "Other" }
+    mocks.hubFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/hub/devices/order") {
+        expect(init?.method).toBe("PUT")
+        return Promise.resolve(json({ devices: [other, DEVICE] }))
+      }
+      return Promise.resolve(json({ devices: [DEVICE, other] }))
+    })
+    const { result } = renderHook(() => useDevices())
+    await waitFor(() => expect(result.current.devices).toHaveLength(2))
+
+    let outcome: Awaited<ReturnType<typeof result.current.reorderDevices>> | undefined
+    await act(async () => {
+      outcome = await result.current.reorderDevices(["dev_other", "dev_abc"])
+    })
+
+    expect(outcome).toEqual({ ok: true })
+    const call = mocks.hubFetch.mock.calls.find(([url]) => url === "/api/hub/devices/order")!
+    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({ ids: ["dev_other", "dev_abc"] })
+  })
+
+  it("keeps the newest drop when an older save settles after it", async () => {
+    const devices = ["a", "b", "c"].map((id) => ({ ...DEVICE, id: `dev_${id}`, name: id }))
+    const byOrder = (order: string[]) => order.map((id) => devices.find((d) => d.id === id)!)
+    const puts: { ids: string[]; settle: () => void }[] = []
+    let serverOrder = devices.map((d) => d.id)
+    mocks.hubFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url !== "/api/hub/devices/order") return Promise.resolve(json({ devices: byOrder(serverOrder) }))
+      const ids = JSON.parse(init!.body as string).ids as string[]
+      return new Promise((resolve) => {
+        puts.push({
+          ids,
+          settle: () => {
+            serverOrder = ids
+            resolve(json({ devices: byOrder(ids) }))
+          },
+        })
+      })
+    })
+    const { result } = renderHook(() => useDevices())
+    await waitFor(() => expect(result.current.devices).toHaveLength(3))
+
+    let first: Promise<unknown> = Promise.resolve()
+    let second: Promise<unknown> = Promise.resolve()
+    act(() => { first = result.current.reorderDevices(["dev_b", "dev_a", "dev_c"]) })
+    act(() => { second = result.current.reorderDevices(["dev_b", "dev_c", "dev_a"]) })
+
+    // Saves are sent one at a time, in drop order.
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(result.current.devices.map((d) => d.id)).toEqual(["dev_b", "dev_c", "dev_a"])
+    await act(async () => {
+      puts[0].settle()
+      await first
+    })
+    expect(result.current.devices.map((d) => d.id)).toEqual(["dev_b", "dev_c", "dev_a"])
+    await waitFor(() => expect(puts).toHaveLength(2))
+    await act(async () => {
+      puts[1].settle()
+      await second
+    })
+
+    expect(puts.map((put) => put.ids)).toEqual([["dev_b", "dev_a", "dev_c"], ["dev_b", "dev_c", "dev_a"]])
+    expect(result.current.devices.map((d) => d.id)).toEqual(["dev_b", "dev_c", "dev_a"])
+  })
+
   it.each(["cogpit-auth-changed", "cogpit-identity-changed"])(
     "re-fetches the root registry on %s",
     async (eventName) => {

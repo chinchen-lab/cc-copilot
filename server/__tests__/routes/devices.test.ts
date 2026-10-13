@@ -25,6 +25,7 @@ vi.mock("../../hub/registry", () => ({
   updateDevice: vi.fn(),
   updateDeviceIfConnectionMatches: vi.fn(),
   removeDevice: vi.fn(),
+  reorderDevices: vi.fn(),
   sameDeviceConnection: (a: Record<string, unknown>, b: Record<string, unknown>) => (
     a.id === b.id
     && a.host === b.host
@@ -67,6 +68,7 @@ import {
   updateDevice,
   updateDeviceIfConnectionMatches,
   removeDevice,
+  reorderDevices,
   validateDeviceHost,
   setDeviceRuntime,
 } from "../../hub/registry"
@@ -88,6 +90,7 @@ const mockedAddDevice = vi.mocked(addDevice)
 const mockedUpdateDevice = vi.mocked(updateDevice)
 const mockedUpdateDeviceIfConnectionMatches = vi.mocked(updateDeviceIfConnectionMatches)
 const mockedRemoveDevice = vi.mocked(removeDevice)
+const mockedReorderDevices = vi.mocked(reorderDevices)
 const mockedValidateDeviceHost = vi.mocked(validateDeviceHost)
 const mockedSetDeviceRuntime = vi.mocked(setDeviceRuntime)
 const mockedGetDeviceToken = vi.mocked(getDeviceToken)
@@ -909,6 +912,43 @@ describe("DELETE /api/hub/devices/:id", () => {
     expect(JSON.parse(res._getData()).code).toBe("UNKNOWN_DEVICE")
     expect(mockedInvalidateDeviceToken).not.toHaveBeenCalled()
     expect(mockedInvalidateDeviceConnections).not.toHaveBeenCalled()
+  })
+})
+
+describe("PUT /api/hub/devices/order", () => {
+  it("persists the order and returns the new list", async () => {
+    const reordered = [{ id: "dev_2" }, { id: "dev_1" }]
+    mockedReorderDevices.mockResolvedValue(reordered as never)
+
+    const { res } = await drive("PUT", "/order", { ids: ["dev_2", "dev_1"] })
+
+    expect(res._getStatus()).toBe(200)
+    expect(mockedReorderDevices).toHaveBeenCalledWith(["dev_2", "dev_1"])
+    expect(JSON.parse(res._getData()).devices).toEqual(reordered)
+  })
+
+  it("rejects a body without a string id array", async () => {
+    const { res } = await drive("PUT", "/order", { ids: [1, 2] })
+
+    expect(res._getStatus()).toBe(400)
+    expect(mockedReorderDevices).not.toHaveBeenCalled()
+  })
+
+  it("hands a persistence failure back to the router instead of leaving the request hanging", async () => {
+    const failure = new Error("disk full")
+    mockedReorderDevices.mockRejectedValue(failure)
+    const { req, res, next, sendBody } = createMockReqRes("PUT", "/order", { ids: ["dev_1"] })
+
+    const pending = getHandler()(req as never, res as never, next)
+    sendBody()
+
+    await expect(pending).rejects.toBe(failure)
+  })
+
+  it("requires the client header like every other mutation", async () => {
+    const { res } = await drive("PUT", "/order", { ids: [] }, {})
+
+    expect(res._getStatus()).toBe(403)
   })
 })
 

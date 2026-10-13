@@ -294,6 +294,29 @@ export async function updateDeviceIfConnectionMatches(
   })
 }
 
+/**
+ * Persist a new device order. `ids` is the order the caller saw; devices it did
+ * not name (added since) keep their relative order at the end and unknown ids
+ * are ignored, so a stale list can never drop or duplicate a device.
+ */
+export async function reorderDevices(ids: readonly string[]): Promise<PublicDevice[]> {
+  await commitDeviceMutation((draft) => {
+    const ordered = new Map<string, HubDevice>()
+    for (const id of ids) {
+      const device = draft.get(id)
+      if (device) ordered.set(id, device)
+    }
+    for (const [id, device] of draft) {
+      if (!ordered.has(id)) ordered.set(id, device)
+    }
+    const after = [...ordered.keys()]
+    const changed = [...draft.keys()].some((id, index) => id !== after[index])
+    if (changed) replaceAll(draft, ordered)
+    return { changed, value: undefined }
+  })
+  return listDevices()
+}
+
 export async function removeDevice(id: string): Promise<boolean> {
   return commitDeviceMutation((draft) => {
     if (!draft.delete(id)) return { changed: false, value: false }

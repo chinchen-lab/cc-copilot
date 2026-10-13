@@ -29,6 +29,7 @@ import {
   updateDevice,
   updateDeviceIfConnectionMatches,
   removeDevice,
+  reorderDevices,
   setDeviceRuntime,
   validateDeviceHost,
 } from "../../hub/registry"
@@ -271,6 +272,43 @@ describe("removeDevice", () => {
     expect(getDevice(id)).toBeUndefined()
     expect(listDevices()).toHaveLength(0)
     expect(await removeDevice(id)).toBe(false)
+  })
+})
+
+describe("reorderDevices", () => {
+  const add = (name: string) => addDevice({ name, host: `${name}.lan`, auth: "password", password: "hunter2secret" })
+
+  it("applies the given order and persists it across a reload", async () => {
+    const a = await add("a")
+    const b = await add("b")
+    const c = await add("c")
+
+    const result = await reorderDevices([c.id, a.id, b.id])
+
+    expect(result.map((d) => d.name)).toEqual(["c", "a", "b"])
+    await initDeviceRegistry(dir)
+    expect(listDevices().map((d) => d.name)).toEqual(["c", "a", "b"])
+  })
+
+  it("keeps devices the caller did not name and ignores unknown ids", async () => {
+    const a = await add("a")
+    const b = await add("b")
+    const c = await add("c")
+
+    const result = await reorderDevices([c.id, "dev_gone"])
+
+    expect(result.map((d) => d.id)).toEqual([c.id, a.id, b.id])
+  })
+
+  it("does not rewrite the file when the order is unchanged", async () => {
+    const a = await add("a")
+    const b = await add("b")
+    const write = vi.fn(atomicWrite.original!)
+    atomicWrite.implementation = write
+
+    await reorderDevices([a.id, b.id])
+
+    expect(write).not.toHaveBeenCalled()
   })
 })
 

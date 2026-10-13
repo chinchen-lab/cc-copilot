@@ -8,6 +8,7 @@ import {
   updateDevice,
   updateDeviceIfConnectionMatches,
   removeDevice,
+  reorderDevices,
   sameDeviceConnection,
   validateDeviceHost,
   setDeviceRuntime,
@@ -427,6 +428,15 @@ async function handlePatch(id: string, req: IncomingMessage, res: ServerResponse
   return sendJson(res, 200, { device: toPublic(updated) })
 }
 
+async function handleReorder(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJsonBody(req)
+  const ids = body?.ids
+  if (!Array.isArray(ids) || !ids.every((id): id is string => typeof id === "string")) {
+    return sendJson(res, 400, { error: "ids must be an array of device ids", code: "BAD_REQUEST" })
+  }
+  return sendJson(res, 200, { devices: await reorderDevices(ids) })
+}
+
 async function handleDelete(id: string, res: ServerResponse): Promise<void> {
   if (!getDevice(id)) {
     return sendJson(res, 404, { error: "Device not found", code: "UNKNOWN_DEVICE" })
@@ -565,6 +575,12 @@ export function registerDeviceRoutes(use: UseFn) {
     // Probe: /api/hub/devices/probe
     if (sub === "/probe") {
       if (method === "POST") return void handleProbe(req, res)
+      return next()
+    }
+
+    // Order: /api/hub/devices/order (device-switch slot n opens the nth device)
+    if (sub === "/order") {
+      if (method === "PUT") return handleReorder(req, res)
       return next()
     }
 

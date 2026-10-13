@@ -115,6 +115,8 @@ export interface UseDevices {
   addDevice: (input: AddDeviceInput) => Promise<MutationResult>
   updateDevice: (id: string, patch: UpdateDeviceInput) => Promise<MutationResult>
   removeDevice: (id: string) => Promise<RemoveResult>
+  /** Persist a new order; slot n of the device shortcut opens the nth device. */
+  reorderDevices: (ids: string[]) => Promise<RemoveResult>
   testDevice: (id: string) => Promise<TestResult>
 }
 
@@ -195,6 +197,8 @@ export function useDevices({ enabled = true }: { enabled?: boolean } = {}): UseD
   const [loading, setLoading] = useState(true)
   const [activeDeviceId, setActiveDeviceId] = useState<string>(() => getActiveDeviceId())
   const refreshSequence = useRef(0)
+  const reorderChain = useRef<Promise<void>>(Promise.resolve())
+  const reordersPending = useRef(0)
 
   const refresh = useCallback(async () => {
     const sequence = ++refreshSequence.current
@@ -212,6 +216,8 @@ export function useDevices({ enabled = true }: { enabled?: boolean } = {}): UseD
       if (sequence !== refreshSequence.current) return
       const list = Array.isArray(data?.devices) ? (data.devices as PublicDevice[]) : []
       for (const device of list) rememberDeviceRevision(device)
+      // A drop still being saved is newer than anything the server lists now.
+      if (reordersPending.current > 0) return
       setDevices(list)
       leaveUnlistedDevice(list)
     } catch {
@@ -376,6 +382,48 @@ export function useDevices({ enabled = true }: { enabled?: boolean } = {}): UseD
     }
   }, [])
 
+  const reorderDevices = useCallback(async (ids: string[]): Promise<RemoveResult> => {
+    // Apply the drop immediately so the row does not snap back during the
+    // round trip. Saves run one at a time and only the last one to settle
+    // decides the list, so an older response never undoes a newer drop.
+    const position = new Map(ids.map((id, index) => [id, index]))
+    const rank = (device: PublicDevice) => position.get(device.id) ?? ids.length
+    setDevices((current) => [...current].sort((a, b) => rank(a) - rank(b)))
+    reordersPending.current += 1
+
+    const save = async (): Promise<{ result: RemoveResult; devices?: PublicDevice[] }> => {
+      try {
+        const res = await hubFetch("/api/hub/devices/order", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ids }),
+        })
+        const data = await readJson(res)
+        if (res.ok && Array.isArray(data?.devices)) {
+          return { result: { ok: true }, devices: data.devices as PublicDevice[] }
+        }
+        const error = typeof data?.error === "string" ? data.error : "Could not reorder the devices."
+        return { result: { ok: false, error } }
+      } catch {
+        return { result: { ok: false, error: "Could not reorder the devices." } }
+      }
+    }
+
+    const saved = reorderChain.current.then(save)
+    reorderChain.current = saved.then(() => undefined)
+    const { result, devices: next } = await saved
+    reordersPending.current -= 1
+    if (reordersPending.current === 0) {
+      if (next) {
+        setDevices(next)
+        emitDevicesChanged("")
+      } else {
+        void refresh()
+      }
+    }
+    return result
+  }, [refresh])
+
   const testDevice = useCallback(async (id: string): Promise<TestResult> => {
     try {
       const res = await hubFetch(devicePath(id, "/test"), { method: "POST" })
@@ -396,6 +444,7 @@ export function useDevices({ enabled = true }: { enabled?: boolean } = {}): UseD
     addDevice,
     updateDevice,
     removeDevice,
+    reorderDevices,
     testDevice,
   }
 }

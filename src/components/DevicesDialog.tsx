@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   AlertTriangle,
   CheckCircle2,
+  GripVertical,
   KeyRound,
   Loader2,
   Pencil,
@@ -34,6 +35,8 @@ import { ConfirmActionDialog } from "@/components/shared/ConfirmActionDialog"
 import { InlineEditPanel } from "@/components/shared/InlineEditPanel"
 import { cn } from "@/lib/utils"
 import { switchDevice } from "@/lib/device"
+import { useDragReorder, type DragHandleProps } from "@/hooks/useDragReorder"
+import { shortcutLabel, type KeybindingCommand } from "@/lib/keybindings"
 import {
   deviceSignIn,
   deviceVersion,
@@ -51,8 +54,7 @@ const DEFAULT_PORT = 19384
 const DEFAULT_TLS_PORT = 443
 const PROBE_DEBOUNCE_MS = 450
 
-const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform || "")
-const SWITCH_TIP = `${IS_MAC ? "⌘⇧" : "Ctrl+Shift+"}1–9`
+const SWITCH_TIP = shortcutLabel("device.switch.1").replace(/1$/, "1–9")
 
 // Which field an add-error code belongs under.
 const PASSWORD_CODES = new Set(["BAD_PASSWORD", "PASSWORD_REQUIRED", "USERNAME_REQUIRES_PASSWORD"])
@@ -161,9 +163,24 @@ interface DeviceRowProps {
   onCredentials: (id: string, patch: UpdateDeviceInput) => Promise<MutationResult>
   onRemove: (id: string) => Promise<void>
   onTest: (id: string) => Promise<void>
+  /** Shortcut slot (1–9) this row opens; `this machine` always holds slot 1. */
+  slot: number
+  rowRef: (element: HTMLElement | null) => void
+  dragging: boolean
+  dragHandleProps: DragHandleProps
 }
 
-function DeviceRow({ device, onRename, onCredentials, onRemove, onTest }: DeviceRowProps) {
+function DeviceRow({
+  device,
+  onRename,
+  onCredentials,
+  onRemove,
+  onTest,
+  slot,
+  rowRef,
+  dragging,
+  dragHandleProps,
+}: DeviceRowProps) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(device.name)
   const [editingCredentials, setEditingCredentials] = useState(false)
@@ -184,6 +201,7 @@ function DeviceRow({ device, onRename, onCredentials, onRemove, onTest }: Device
   const version = deviceVersion(device)
   const skewed = version !== undefined && version !== HUB_VERSION
   const accountDevice = deviceSignIn(device) === "account"
+  const hasShortcut = slot <= 9
 
   async function saveName() {
     const trimmed = name.trim()
@@ -231,8 +249,26 @@ function DeviceRow({ device, onRename, onCredentials, onRemove, onTest }: Device
   }
 
   return (
-    <div className="rounded-lg border bg-card">
+    <div
+      ref={rowRef}
+      className={cn("rounded-lg border bg-card", dragging && "relative z-10 shadow-lg")}
+    >
       <div className="flex items-center gap-2.5 px-3 py-2">
+        <button
+          type="button"
+          aria-label={`Reorder ${device.name}`}
+          title="Drag to reorder (or use ↑ ↓)"
+          className="-ml-1 flex size-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+          {...dragHandleProps}
+        >
+          <GripVertical className="size-4" />
+        </button>
+        <span
+          className="w-4 shrink-0 text-center font-mono text-xs text-muted-foreground"
+          title={hasShortcut ? `${shortcutLabel(`device.switch.${slot}` as KeybindingCommand)} opens this device` : "No shortcut"}
+        >
+          {hasShortcut && slot}
+        </span>
         <span
           aria-label={`Status: ${device.runtime.authState}`}
           className={cn("size-2 shrink-0 rounded-full", AUTH_STATE_DOT[device.runtime.authState])}
@@ -400,7 +436,7 @@ function DeviceRow({ device, onRename, onCredentials, onRemove, onTest }: Device
 // ── Dialog ───────────────────────────────────────────────────────────────────
 
 export function DevicesDialog({ open, initialMode, onClose }: DevicesDialogProps) {
-  const { devices, refresh, probe, addDevice, updateDevice, removeDevice, testDevice } = useDevices()
+  const { devices, refresh, probe, addDevice, updateDevice, removeDevice, reorderDevices, testDevice } = useDevices()
 
   const [name, setName] = useState("")
   const [hostInput, setHostInput] = useState("")
@@ -516,6 +552,10 @@ export function DevicesDialog({ open, initialMode, onClose }: DevicesDialogProps
     },
     [removeDevice],
   )
+  const { order, draggingId, rowRef, handleProps } = useDragReorder(
+    devices.map((device) => device.id),
+    reorderDevices,
+  )
   const handleTest = useCallback(
     async (id: string) => {
       await testDevice(id)
@@ -534,22 +574,30 @@ export function DevicesDialog({ open, initialMode, onClose }: DevicesDialogProps
           <DialogTitle>Devices</DialogTitle>
           <DialogDescription>
             Control another Cogpit device from here. The active device is chosen from the header
-            switcher — {SWITCH_TIP} jumps between devices.
+            switcher — {SWITCH_TIP} jumps between devices. Drag a device by its handle to change its number; this machine is always 1.
           </DialogDescription>
         </DialogHeader>
 
         {devices.length > 0 && (
           <div className="flex flex-col gap-2">
-            {devices.map((device) => (
-              <DeviceRow
-                key={device.id}
-                device={device}
-                onRename={handleRename}
-                onCredentials={updateDevice}
-                onRemove={handleRemove}
-                onTest={handleTest}
-              />
-            ))}
+            {order.map((id, index) => {
+              const device = devices.find((candidate) => candidate.id === id)
+              if (!device) return null
+              return (
+                <DeviceRow
+                  key={device.id}
+                  device={device}
+                  slot={index + 2}
+                  rowRef={rowRef(device.id)}
+                  dragging={draggingId === device.id}
+                  dragHandleProps={handleProps(device.id)}
+                  onRename={handleRename}
+                  onCredentials={updateDevice}
+                  onRemove={handleRemove}
+                  onTest={handleTest}
+                />
+              )
+            })}
           </div>
         )}
 

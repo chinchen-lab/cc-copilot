@@ -41,6 +41,12 @@ function StatusDot({ state }: { state: PublicDevice["runtime"]["authState"] }) {
   )
 }
 
+/** The 1–9 shortcut slot a row answers to. */
+function SlotHint({ slot }: { slot: number }) {
+  if (slot > 9) return null
+  return <span className="shrink-0 font-mono text-xs text-muted-foreground">{slot}</span>
+}
+
 export function DeviceSwitcher({ compact = false }: { compact?: boolean }) {
   const { devices, activeDeviceId, activeDevice, refresh, testDevice } = useDevices()
   const [dialogMode, setDialogMode] = useState<null | "add" | "manage">(null)
@@ -94,10 +100,11 @@ export function DeviceSwitcher({ compact = false }: { compact?: boolean }) {
             <DropdownMenuItem onClick={() => switchDevice(LOCAL_DEVICE_ID)}>
               <Laptop />
               <span className="flex-1 truncate">This machine</span>
+              <SlotHint slot={1} />
               {!activeIsRemote && <Check className="ml-auto text-success" />}
             </DropdownMenuItem>
 
-            {devices.map((device) => {
+            {devices.map((device, index) => {
               const version = deviceVersion(device)
               const skewed = version !== undefined && version !== HUB_VERSION
               const isActive = device.id === activeDeviceId
@@ -125,6 +132,7 @@ export function DeviceSwitcher({ compact = false }: { compact?: boolean }) {
                       {device.auth === "none" && " · unauthenticated"}
                     </span>
                   </div>
+                  <SlotHint slot={index + 2} />
                   {isActive && <Check className="ml-auto text-success" />}
                 </DropdownMenuItem>
               )

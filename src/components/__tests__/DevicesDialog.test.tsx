@@ -309,6 +309,37 @@ describe("DevicesDialog", () => {
     await waitFor(() => expect(confirm).toBeEnabled())
   })
 
+  it("reorders devices from the keyboard on the drag handle and shows each shortcut slot", async () => {
+    const make = (id: string, name: string) => ({
+      id, name, host: `${name}.lan`, port: 19384, auth: "none", addedAt: 1,
+      runtime: { authState: "ok" },
+    })
+    const alpha = make("dev_a", "Alpha")
+    const beta = make("dev_b", "Beta")
+    let order = [alpha, beta]
+    mocks.hubFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/hub/devices/order") {
+        order = (JSON.parse(init!.body as string).ids as string[])
+          .map((id) => order.find((device) => device.id === id)!)
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ devices: order }) })
+    })
+    const user = userEvent.setup()
+    render(<DevicesDialog open initialMode="manage" onClose={vi.fn()} />)
+
+    await screen.findByText("Alpha")
+    const names = () => screen.getAllByText(/^(Alpha|Beta)$/).map((el) => el.textContent)
+    expect(names()).toEqual(["Alpha", "Beta"])
+
+    screen.getByRole("button", { name: "Reorder Beta" }).focus()
+    await user.keyboard("{ArrowUp}")
+
+    const call = mocks.hubFetch.mock.calls.find(([url]) => url === "/api/hub/devices/order")!
+    expect((call[1] as RequestInit).method).toBe("PUT")
+    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({ ids: ["dev_b", "dev_a"] })
+    await waitFor(() => expect(names()).toEqual(["Beta", "Alpha"]))
+  })
+
   it("maps a rejected password to an inline field error", async () => {
     routeHub({
       probe: { ok: true, hello: { name: "Studio", networkAccess: true, configured: true } },
