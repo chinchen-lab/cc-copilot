@@ -8,6 +8,7 @@ import { CrewChat } from "./CrewChat"
 import { PendingInputPrompt } from "@/components/PendingInputPrompt"
 import { useSessionNames } from "@/hooks/useSessionNames"
 import { useSessionCrew } from "@/hooks/useSessionCrew"
+import { agentKindForDirName } from "@/lib/agents"
 import { formatRelativeTime } from "@/lib/format"
 import { revealSessionById, revealSessionPath, sessionPath } from "@/lib/revealSession"
 import { cn } from "@/lib/utils"
@@ -62,6 +63,7 @@ export function CrewPanel({ context, closePanel }: WorkspacePanelProps) {
   const { names } = useSessionNames()
   const [tab, setTab] = useState("overview")
   const byId = useMemo(() => new Map((crew?.members ?? []).map((member) => [member.sessionId, member])), [crew])
+  const kinds = useMemo(() => new Map((crew?.members ?? []).flatMap((member) => member.address ? [[member.sessionId, agentKindForDirName(member.address.dirName)] as const] : [])), [crew])
   const nameOf = (member: CrewMember) => crewMemberName(member, byId, names)
   const open = (member: CrewMember) => {
     if (member.address && member.device) revealSessionPath(sessionPath(member.address.dirName, member.address.fileName, member.device.id))
@@ -104,7 +106,7 @@ export function CrewPanel({ context, closePanel }: WorkspacePanelProps) {
             </ScrollArea>
           </TabsContent>
           <TabsContent value="chat" keepMounted className="min-h-0">
-            <CrewChat key={crew.rootId} rootId={crew.rootId} active={tab === "chat"} />
+            <CrewChat key={crew.rootId} rootId={crew.rootId} kinds={kinds} active={tab === "chat"} />
           </TabsContent>
         </Tabs>
       )}

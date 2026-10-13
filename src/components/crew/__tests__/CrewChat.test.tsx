@@ -4,6 +4,7 @@ import type { CrewChatPage } from "../../../../shared/contracts/crewChat"
 const mocks = vi.hoisted(() => ({ fetch: vi.fn(), json: vi.fn() }))
 vi.mock("@/lib/auth", () => ({ authFetch: mocks.fetch, jsonFetch: mocks.json }))
 import { CrewChat } from "../CrewChat"
+import { OpenAIIcon } from "@/lib/agents/brandIcons"
 
 const initial: CrewChatPage = {
   rootId: "lead", canPost: true, nextCursor: 1, hasMore: false,
@@ -18,10 +19,10 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe("CrewChat", () => {
-  it("shows shared messages, mention badges and per-member listening controls", async () => {
+  it("shows shared messages, who they are for and per-member listening controls", async () => {
     render(<CrewChat rootId="lead" />)
     expect(await screen.findByText("Found the issue")).toBeInTheDocument()
-    expect(screen.getByRole("log", { name: "Shared messages" })).toHaveTextContent("@lead")
+    expect(screen.getByRole("article", { name: "Message from Parser" })).toHaveTextContent("ParserToLead")
     fireEvent.click(screen.getByText("1 listening · Members & mentions"))
     expect(screen.getByRole("switch", { name: "Listen for Lead" })).toBeChecked()
     expect(screen.getByRole("switch", { name: "Listen for Parser" })).not.toBeChecked()
@@ -37,7 +38,7 @@ describe("CrewChat", () => {
     expect(screen.getByRole("textbox", { name: "Message the crew" })).toHaveValue("@parser ")
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "@parser Check this finding" } })
     fireEvent.click(screen.getByRole("button", { name: "Send" }))
-    expect(await screen.findByText("@parser Check this finding")).toBeInTheDocument()
+    expect(await screen.findByRole("article", { name: "Message from You" })).toHaveTextContent("@parser Check this finding")
     expect(mocks.json).toHaveBeenCalledWith("/api/crew-chat/lead", { text: "@parser Check this finding", commandId: expect.any(String) })
     await waitFor(() => expect(screen.getByRole("textbox")).toHaveValue(""))
   })
@@ -52,6 +53,21 @@ describe("CrewChat", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }))
     await screen.findByText("Finding to share")
     expect(mocks.json.mock.calls[0]![1].commandId).toBe(mocks.json.mock.calls[1]![1].commandId)
+  })
+  it("renders a message as markdown with the opening mention moved to its header", async () => {
+    mocks.fetch.mockResolvedValue(response({ ...initial, messages: [{ ...initial.messages[0], text: "@lead **Done**: (a) tests PASS (b) ask @parser" }] }))
+    render(<CrewChat rootId="lead" />)
+    const message = await screen.findByRole("article", { name: "Message from Parser" })
+    expect(message.querySelector("strong")).toHaveTextContent("Done")
+    expect([...message.querySelectorAll("ol > li")].map((item) => item.textContent)).toEqual(["tests PASS", "ask @parser"])
+    expect(message).toHaveTextContent("ParserToLead")
+    expect(message).not.toHaveTextContent("@lead")
+  })
+  it("marks an agent's messages with its provider's icon", async () => {
+    render(<CrewChat rootId="lead" kinds={new Map([["parser", "codex"]])} />)
+    const message = await screen.findByRole("article", { name: "Message from Parser" })
+    const mark = render(<OpenAIIcon />).container.querySelector("path")!.getAttribute("d")
+    expect(message.querySelector("span[aria-hidden] path")).toHaveAttribute("d", mark)
   })
   it("loads earlier history without duplicating existing messages", async () => {
     mocks.fetch.mockResolvedValueOnce(response({ ...initial, hasMore: true, messages: [{ ...initial.messages[0], sequence: 2 }] }))

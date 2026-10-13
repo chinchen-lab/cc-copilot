@@ -37,7 +37,7 @@ export function useCrewChat(rootId: string) {
       const response = await checked(await authFetch(`/api/crew-chat/${encodeURIComponent(rootId)}${cursor === null ? "" : `?after=${cursor}&limit=100`}`))
       const next = await response.json() as CrewChatPage
       if (!isActive() || request !== requestCounter.current) return
-      setPage(next)
+      setPage((current) => current && JSON.stringify(current.members) === JSON.stringify(next.members) ? { ...next, members: current.members } : next)
       setMessages((current) => mergeMessages(current, next.messages))
       latestCursor.current = next.nextCursor
       if (!initialized.current) { initialized.current = true; setHasOlder(next.hasMore) }
