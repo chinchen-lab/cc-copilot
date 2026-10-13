@@ -7,17 +7,23 @@ they were accepted against; a handoff holds older queued messages for review.
 ## Sending and recovery
 
 The composer, session CLI and session MCP tools share one command dispatcher.
-Acceptance returns a receipt immediately. Queued messages can be edited, reordered,
+Acceptance returns a receipt immediately. A composer message sent during a running
+turn joins it where the agent supports steering, and otherwise waits for the turn
+to end. Queued messages can be edited, reordered,
 cancelled, promoted to steering where supported, or used to restart a turn.
 After a handoff, old session addresses can read the queue and its current address;
 queue mutations require opening the current session.
 Editing or changing an intent creates a new immutable command ID. Retrying the
 same ID and content returns the original receipt; changing its content is refused.
 
-A database lease and attempt epoch fence competing hosts. Permissions are checked
-again before native delivery. On restart, unsent work is held and in-flight work
-becomes `unknown`. Inspect native history before confirming completion, failure,
-or an explicit resend. Unknown deliveries are never replayed automatically.
+A database lease and attempt epoch fence competing hosts. Only another host takes
+the lease over, so a host that slept past its expiry keeps its epoch and its work.
+Permissions are checked again before native delivery. On restart, unsent work is
+held and in-flight work becomes `unknown`, except messages the agent had already
+accepted into a running turn and notifications: those have nothing left to
+confirm and complete. They never take a failure from the turn they joined.
+Inspect native history before confirming completion, failure, or an explicit
+resend. Unknown deliveries are never replayed automatically.
 Definitive model rejection before a Codex turn is accepted can trigger one default
 model retry while the conversation is open; timeouts and partial turns cannot.
 Failed-turn notices can be dismissed from the composer. Dismissals persist in

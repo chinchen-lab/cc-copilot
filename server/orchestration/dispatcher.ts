@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto"
 import type { CommandReceipt } from "../../shared/contracts/orchestration"
-import { OrchestrationStore, type DispatcherLease, type StoredCommand } from "./store"
+import { OrchestrationStore, settlesOnDelivery, type DispatcherLease, type StoredCommand } from "./store"
+
+const SETTLED = { isError: false, message: undefined }
 
 export interface DispatchDelivery {
   delivery: "started" | "enqueued" | "steered" | "busy"
@@ -44,7 +46,8 @@ export class CommandDispatcher {
         if (!authority) continue
         const activity = authority.activity(command)
         if (!activity.live) {
-          this.store.finish(command, lease, "unknown", { error: "Agent disconnected before reporting completion. Inspect native history." })
+          if (settlesOnDelivery(command.receipt.delivery, command.payload)) this.store.finish(command, lease, "completed")
+          else this.store.finish(command, lease, "unknown", { error: "Agent disconnected before reporting completion. Inspect native history." })
           this.active.delete(key)
         } else if (!activity.running) {
           this.store.finish(command, lease, "completed")
@@ -89,10 +92,11 @@ export class CommandDispatcher {
         return
       }
       if (!this.store.finish(command, lease, "delivered", { delivery: outcome.delivery, turnId: outcome.turnId })) return
+      const settled = settlesOnDelivery(outcome.delivery, command.payload)
       if (outcome.completion) {
-        const result = await outcome.completion
+        const result = await (settled ? outcome.completion.then(() => SETTLED, () => SETTLED) : outcome.completion)
         if (!this.closed) this.store.finish(command, lease, result.isError ? "failed" : "completed", { error: result.isError ? result.message ?? "Turn failed" : undefined })
-      } else this.active.set(JSON.stringify([command.scope, command.receipt.id]), command)
+      } else this.active.set(JSON.stringify([command.scope, command.receipt.id]), { ...command, receipt: { ...command.receipt, delivery: outcome.delivery } })
     } catch (error) {
       if (this.closed) return
       const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 0

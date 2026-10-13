@@ -69,17 +69,12 @@ describe("QueuedTurns", () => {
     expect(owner.action).toHaveBeenLastCalledWith({ action: "cancel", commandId: "first", sessionId: "s1" })
   })
 
-  it("sends now by interrupting, or by steering where the agent supports it", async () => {
+  it.each([["acp", "restart"], ["claude", "steer"], ["codex", "steer"]] as const)("sends a %s message now with %s", async (agent, action) => {
     withCommands([command({ id: "first" })])
-    const { unmount } = render(<QueuedTurns sessionId="s1" turns={[]} pendingMessages={[]} canManage isMobile={false} />)
-    await userEvent.click(screen.getByRole("button", { name: "Send now" }))
-    expect(owner.action).toHaveBeenLastCalledWith(expect.objectContaining({ action: "restart", commandId: "first" }))
-    unmount()
-
-    owner.state = { ...owner.state, conversation: { ...owner.state.conversation!, binding: { ...owner.state.conversation!.binding, agent: "codex" } } }
+    owner.state = { ...owner.state, conversation: { ...owner.state.conversation!, binding: { ...owner.state.conversation!.binding, agent } } }
     render(<QueuedTurns sessionId="s1" turns={[]} pendingMessages={[]} canManage isMobile={false} />)
     await userEvent.click(screen.getByRole("button", { name: "Send now" }))
-    expect(owner.action).toHaveBeenLastCalledWith(expect.objectContaining({ action: "steer", commandId: "first" }))
+    expect(owner.action).toHaveBeenLastCalledWith(expect.objectContaining({ action, commandId: "first" }))
   })
 
   it("edits a queued message in place and saves on Enter", async () => {

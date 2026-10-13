@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { query } from "@anthropic-ai/claude-agent-sdk"
 import type {
   Options,
@@ -136,11 +137,16 @@ export interface SDKSessionState {
 }
 
 export const sdkSessions = new Map<string, SDKSessionState>()
-const inputTurns = new WeakMap<SDKSessionState, { accepted: number; completed: number }>()
+/**
+ * The sends written to a query, by uuid. `taken` holds the ones the CLI reports
+ * it took up (`command_lifecycle`); it stays null on a CLI that reports none.
+ */
+interface InputTurns { sent: string[]; completed: number; taken: Set<string> | null }
+const inputTurns = new WeakMap<SDKSessionState, InputTurns>()
 const resultObservers = new WeakMap<SDKSessionState, Set<{ turn: number; resolve: (result: Record<string, unknown>) => void }>>()
 export function observeSDKResult(state: SDKSessionState) {
   let observer!: { turn: number; resolve: (result: Record<string, unknown>) => void }
-  const turn = (inputTurns.get(state)?.accepted ?? Number(state.running)) + 1
+  const turn = (inputTurns.get(state)?.sent.length ?? Number(state.running)) + 1
   const completion = new Promise<Record<string, unknown>>((resolve) => { observer = { turn, resolve } })
   const observers = resultObservers.get(state) ?? new Set()
   observers.add(observer); resultObservers.set(state, observers)
@@ -148,10 +154,15 @@ export function observeSDKResult(state: SDKSessionState) {
 }
 function notifyResultObservers(state: SDKSessionState, result: Record<string, unknown>, end = false) {
   const turns = inputTurns.get(state)
-  if (turns && !end) turns.completed++
+  // A send that joins a running turn gets no result of its own, so a result
+  // settles every send the CLI has taken up. A CLI without lifecycle reports
+  // only says how many it still holds queued.
+  const queued = result.queued_turn_count
+  if (turns && !end && !turns.taken) turns.completed = typeof queued === "number" ? Math.max(turns.completed, turns.sent.length - queued) : turns.completed + 1
+  const settled = (turn: number) => turns?.taken ? turns.taken.has(turns.sent[turn - 1]) : turn <= (turns?.completed ?? 0)
   const observers = resultObservers.get(state)
   for (const observer of observers ?? []) {
-    if (!end && observer.turn > (turns?.completed ?? 0)) continue
+    if (!end && !settled(observer.turn)) continue
     observers!.delete(observer); observer.resolve(result)
   }
   if (!observers?.size) resultObservers.delete(state)
@@ -474,6 +485,14 @@ export function describeErrorResult(result: Record<string, unknown>): string {
 }
 
 function processSDKEvent(state: SDKSessionState, msg: SDKMessage): void {
+  const lifecycle = msg as unknown as { type: string; command_uuid?: string; state?: string }
+  if (lifecycle.type === "command_lifecycle") {
+    const turns = inputTurns.get(state)
+    if (turns) {
+      turns.taken ??= new Set()
+      if (lifecycle.command_uuid && lifecycle.state !== "queued") turns.taken.add(lifecycle.command_uuid)
+    }
+  }
   if (msg.type === "system" && msg.subtype === "init") {
     state.cwd = msg.cwd
     const onInit = state.onInit
@@ -672,8 +691,9 @@ function runQuery(state: SDKSessionState, prompt: string, opts: {
 
   const queryOpts = buildQueryOptions(state, opts)
   const messageStream = new SDKMessageStream()
-  inputTurns.set(state, { accepted: 1, completed: 0 })
-  messageStream.enqueue(buildUserMessage(prompt, opts.images))
+  const first = buildUserMessage(prompt, opts.images)
+  inputTurns.set(state, { sent: [first.uuid!], completed: 0, taken: null })
+  messageStream.enqueue(first)
   state.messageStream = messageStream
 
   // Streaming input keeps one SDK/CLI process alive across turns. This is
@@ -764,6 +784,7 @@ function rejectAllPending(state: SDKSessionState, reason: string): void {
 function buildUserMessage(
   message: string,
   images?: ImageAttachment[],
+  startsTurn = true,
 ): SDKUserMessage {
   const content: MessageParam["content"] = []
   if (images?.length) {
@@ -788,6 +809,9 @@ function buildUserMessage(
     type: "user",
     message: { role: "user", content },
     parent_tool_use_id: null,
+    uuid: randomUUID(),
+    // The CLI still folds it into a running turn; an idle one only records it.
+    ...(startsTurn ? {} : { shouldQuery: false }),
   }
 }
 
@@ -1097,6 +1121,7 @@ export function sendSDKMessage(
   message: string,
   images?: ImageAttachment[],
   updates?: SDKSessionUpdates,
+  { startsTurn = true }: { startsTurn?: boolean } = {},
 ): SDKSessionState | null {
   const state = sdkSessions.get(sessionId)
   if (!state) return null
@@ -1105,10 +1130,10 @@ export function sendSDKMessage(
   autoResolvePendingForMode(state, changes)
 
   if (isSDKQueryLive(state)) {
-    const input = buildUserMessage(message, images)
+    const input = buildUserMessage(message, images, startsTurn)
     if (!state.messageStream.enqueue(input)) return null
     const turns = inputTurns.get(state)
-    if (turns) turns.accepted++
+    if (turns) turns.sent.push(input.uuid!)
     state.running = true
 
     // Best-effort: the setting is already persisted on `state`, so a failed

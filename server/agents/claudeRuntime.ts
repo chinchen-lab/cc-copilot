@@ -248,7 +248,7 @@ export const claudeRuntime: AgentRuntime = {
         fastMode: req.fastMode,
         ultracode: req.ultracode,
         mcpConfig: req.mcpConfig,
-      })
+      }, req.onlyWhileRunning ? { startsTurn: false } : undefined)
       if (!state) {
         observed?.cancel()
         throw new AgentRuntimeError(

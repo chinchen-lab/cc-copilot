@@ -273,6 +273,56 @@ describe("durable orchestration", () => {
     expect(b.claim("owner", "command-002", leaseB)).not.toBeNull()
   })
 
+  it("keeps its own lease, epoch and in-flight work after sleeping past the expiry", () => {
+    let time = 1000
+    const store = open(":memory:", () => time)
+    const lease = store.acquire("host", 100)!
+    const conversation = store.ensureConversation(binding)
+    store.admit("owner", "slept-delivery", conversation.id, { message: "one" })
+    store.admit("owner", "slept-queued", conversation.id, { message: "two" })
+    const claimed = store.claim("owner", "slept-delivery", lease)!
+    store.finish(claimed, lease, "delivered", { delivery: "started" })
+    time += 60_000
+    expect(store.acquire("host", 100)).toEqual(lease)
+    expect(store.command("owner", "slept-queued")?.receipt.state).toBe("queued")
+    expect(store.finish(claimed, lease, "completed")).toBe(true)
+  })
+
+  it("completes accepted steers and notifications when another host recovers, but not a turn of its own", () => {
+    let time = 1000
+    const root = mkdtempSync(join(tmpdir(), "cogpit-recovery-")); roots.push(root)
+    const a = open(join(root, "state.sqlite"), () => time)
+    const b = open(join(root, "state.sqlite"), () => time)
+    const lease = a.acquire("a", 100)!
+    const deliver = (id: string, payload: Record<string, unknown>, intent: "queue" | "steer", delivery: "started" | "enqueued", state: "delivered" | "unknown" = "delivered") => {
+      const conversation = a.ensureConversation({ ...binding, sessionId: id })
+      a.admit("owner", id, conversation.id, payload, intent)
+      a.finish(a.claim("owner", id, lease)!, lease, state, { delivery })
+    }
+    deliver("joined-steer", { message: "also check logs" }, "steer", "enqueued")
+    deliver("idle-notice", { message: "crew message", notification: true }, "steer", "started")
+    deliver("stale-notice", { message: "crew message", notification: true }, "steer", "enqueued", "unknown")
+    deliver("own-turn", { message: "build it" }, "queue", "started")
+    time += 101
+    b.acquire("b", 100)
+    expect(["joined-steer", "idle-notice", "stale-notice", "own-turn"].map((id) => b.command("owner", id)?.receipt.state)).toEqual(["completed", "completed", "completed", "unknown"])
+  })
+
+  it("does not fail a message for the failure of the turn it joined", async () => {
+    const store = open(); const dispatcher = new CommandDispatcher(store); dispatcher.start()
+    try {
+      const failedTurn = { isError: true, message: "The agent stopped before completing this turn." }
+      for (const [id, intent, delivery] of [["joined-turn", "steer", "enqueued"], ["own-turn", "queue", "started"]] as const) {
+        const conversation = store.ensureConversation({ ...binding, sessionId: id })
+        dispatcher.attach("owner", conversation.id, { authorize: async () => true, activity: () => ({ live: true, running: false }), deliver: async () => ({ delivery, completion: Promise.resolve(failedTurn) }) })
+        store.admit("owner", id, conversation.id, { message: id }, intent)
+      }
+      await dispatcher.tick()
+      expect((await dispatcher.wait("owner", "joined-turn", 1000))?.state).toBe("completed")
+      expect((await dispatcher.wait("owner", "own-turn", 1000))?.state).toBe("failed")
+    } finally { dispatcher.close() }
+  })
+
   it("replaces immutable messages, reorders with conflict checks and isolates accounts", () => {
     const store = open(); store.acquire("host")
     const conversation = store.ensureConversation(binding)

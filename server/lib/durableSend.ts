@@ -102,6 +102,8 @@ export async function admitSessionCommand(options: {
   request: SendRequest
   req?: IncomingMessage
   intent?: CommandIntent
+  /** The intent when the caller names none; a retry keeps the one its command was first admitted with. */
+  defaultIntent?: CommandIntent
   /** A crew lead the command speaks for: delivery keeps requiring access to it too. */
   leadSessionId?: string
   answer?: AcceptedAnswer
@@ -131,7 +133,7 @@ export async function admitSessionCommand(options: {
     payload.answerInput = options.answerInput
     payload.answerQuestion = answer.durableQuestion
     receipt = store.admitAnswer(scope, commandId, conversation.id, payload, instanceId, questionSessionId, requestId)
-  } else receipt = store.admit(scope, commandId, conversation.id, payload, options.intent)
+  } else receipt = store.admit(scope, commandId, conversation.id, payload, options.intent ?? store.command(scope, commandId)?.receipt.intent ?? options.defaultIntent)
   void dispatcher.tick()
   return receipt
 }

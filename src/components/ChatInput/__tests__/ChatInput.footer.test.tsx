@@ -25,7 +25,7 @@ vi.mock("@/contexts/SessionContext", () => ({
     promptSuggestion: null,
   }),
   useSessionChatContext: () => ({
-    chat: { status: "idle", error: null, isConnected: true, sendMessage: mocks.sendMessage, interrupt: vi.fn() },
+    chat: { status: "idle", error: null, isConnected: false, sendMessage: mocks.sendMessage, interrupt: vi.fn() },
   }),
 }))
 vi.mock("@/hooks/useCapability", () => ({ useCapability: () => true }))

@@ -31,6 +31,10 @@ function decode<T>(value: unknown): T { return JSON.parse(String(value)) as T }
 function receipt(row: Row): CommandReceipt {
   return { ...decode<CommandReceipt>(row.receipt), state: row.state as CommandState, position: Number(row.position), updatedAt: Number(row.updated_at) }
 }
+/** A message that joined a turn already running, or only informs, is done once the agent accepts it: the turn's outcome is not its own. */
+export function settlesOnDelivery(delivery: string | undefined, payload: Record<string, unknown>): boolean {
+  return delivery !== undefined && (delivery !== "started" || payload.notification === true)
+}
 
 export class OrchestrationStore {
   private readonly db: SqliteDatabase
@@ -283,21 +287,23 @@ export class OrchestrationStore {
     return this.transaction(() => {
       const old = this.db.prepare("SELECT * FROM dispatcher WHERE id=1").get() as Row | undefined
       if (old && old.owner !== owner && Number(old.expires_at) > this.now()) return null
-      if (old?.owner === owner && Number(old.expires_at) > this.now()) {
+      // Only another host replaces the owner, so a lease that lapsed while this one slept is still its own.
+      if (old?.owner === owner) {
         this.db.prepare("UPDATE dispatcher SET expires_at=? WHERE id=1").run(this.now() + ttl)
         return { owner, epoch: Number(old.epoch) }
       }
       const epoch = Number(old?.epoch ?? 0) + 1
       this.db.prepare("INSERT INTO dispatcher VALUES(1,?,?,?) ON CONFLICT(id) DO UPDATE SET owner=excluded.owner,epoch=excluded.epoch,expires_at=excluded.expires_at").run(owner, epoch, this.now() + ttl)
       for (const command of this.pending()) {
-        if (command.receipt.state === "dispatching" || command.receipt.state === "delivered") this.update(command, "unknown", { error: "Host stopped during delivery. Inspect native history before resolving or resending." })
+        if (["delivered", "unknown"].includes(command.receipt.state) && settlesOnDelivery(command.receipt.delivery, command.payload)) this.update(command, "completed", { error: undefined })
+        else if (command.receipt.state === "dispatching" || command.receipt.state === "delivered") this.update(command, "unknown", { error: "Host stopped during delivery. Inspect native history before resolving or resending." })
         else if (command.receipt.state === "queued") this.update(command, "held", { error: "Host restarted; resume this queue after reviewing it." })
       }
       return { owner, epoch }
     })
   }
   release(lease: DispatcherLease): void { this.db.prepare("UPDATE dispatcher SET expires_at=0 WHERE id=1 AND owner=? AND epoch=?").run(lease.owner, lease.epoch) }
-  private owns(lease: DispatcherLease): boolean { return Boolean(this.db.prepare("SELECT 1 FROM dispatcher WHERE id=1 AND owner=? AND epoch=? AND expires_at>?").get(lease.owner, lease.epoch, this.now())) }
+  private owns(lease: DispatcherLease): boolean { return Boolean(this.db.prepare("SELECT 1 FROM dispatcher WHERE id=1 AND owner=? AND epoch=?").get(lease.owner, lease.epoch)) }
   currentAttempt(command: StoredCommand, lease: DispatcherLease): boolean {
     const current = this.command(command.scope, command.receipt.id)
     return this.owns(lease) && Boolean(current && current.attempt === command.attempt && current.epoch === lease.epoch && ["dispatching", "delivered"].includes(current.receipt.state))

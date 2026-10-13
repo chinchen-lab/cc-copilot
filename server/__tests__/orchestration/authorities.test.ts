@@ -59,3 +59,15 @@ describe("a queued crew chat message", () => {
     } finally { closeCommandDispatcher() }
   })
 })
+
+describe("a retried durable send", () => {
+  it("keeps the intent its command was first admitted with when the retry names none", async () => {
+    const runtime = { kind: "claude", instanceId: "default", descriptor: descriptorFor("claude"), activity: () => ({ live: true, running: true }) } as unknown as AgentRuntime
+    const binding = { hostId: "local", agent: "claude" as const, instanceId: "default", sessionId: "retried-session" }
+    const admit = (defaultIntent: "queue" | "steer") => admitSessionCommand({ sessionId: "retried-session", commandId: "retried-send-0001", request: { message: "check the logs" }, runtime, binding, defaultIntent })
+    try {
+      const first = await admit("queue")
+      await expect(admit("steer")).resolves.toMatchObject({ id: first.id, intent: "queue" })
+    } finally { closeCommandDispatcher() }
+  })
+})

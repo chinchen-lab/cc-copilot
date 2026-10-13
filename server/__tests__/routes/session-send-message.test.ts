@@ -33,7 +33,9 @@ const {
   mockCodexAppServer,
   mockCopilotRuntime,
   mockSessionFolderProblem,
+  mockAdmitSessionCommand,
 } = vi.hoisted(() => ({
+  mockAdmitSessionCommand: vi.fn(async (options: { commandId: string; intent?: string; defaultIntent?: string }) => ({ id: options.commandId, intent: options.intent ?? options.defaultIntent })),
   mockActiveProcesses: new Map<string, unknown>(),
   mockPersistentSessions: new Map<string, unknown>(),
   mockSdkSessions: new Map<string, unknown>(),
@@ -144,6 +146,11 @@ vi.mock("../../agents/codexAppServer", async (importOriginal) => {
 })
 
 vi.mock("../../agents/copilotTransport", () => ({ copilotRuntime: mockCopilotRuntime }))
+
+vi.mock("../../lib/durableSend", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../lib/durableSend")>(),
+  admitSessionCommand: mockAdmitSessionCommand,
+}))
 
 import type { UseFn, Middleware } from "../../helpers"
 import { dirs } from "../../dirs"
@@ -485,9 +492,28 @@ describe("/api/send-message SDK resume cwd", () => {
       "new direction",
       undefined,
       expect.objectContaining({ ultracode: true }),
+      undefined,
     )
     expect(mockResumeSDKSession).not.toHaveBeenCalled()
     expect(res._getData()).toEqual({ success: true })
+  })
+
+  it.each([
+    ["steers a running turn", true, undefined, "steer"],
+    ["queues behind an idle session", false, undefined, "queue"],
+    ["keeps an explicit queue intent during a running turn", true, "queue", "queue"],
+  ] as const)("durable send %s", async (_name, running, intent, expected) => {
+    mockFindJsonlPath.mockResolvedValue("/Users/me/.claude/projects/-Users-me-proj/sess-1.jsonl")
+    mockSdkSessions.set("sess-1", { sessionId: "sess-1", running, activeQuery: {}, messageStream: {} })
+
+    const handler = getHandler("/api/send-message")
+    const { req, res, next, sendBody } = createMockReqRes("POST", JSON.stringify({ sessionId: "sess-1", message: "also check the logs", commandId: "command-0001", intent }))
+    handler(req as never, res as never, next)
+    sendBody()
+
+    await vi.waitFor(() => expect(res.end).toHaveBeenCalled())
+    expect(res._getData()).toMatchObject({ receipt: { id: "command-0001", intent: expected } })
+    expect(res.statusCode).toBe(202)
   })
 
   it("derives cwd from session metadata when the request omits cwd", async () => {
@@ -630,6 +656,14 @@ describe("/api/send-message Codex app-server", () => {
     )
     expect(mockCodexAppServer.startTurn).not.toHaveBeenCalled()
     expect(res._getData()).toEqual({ success: true })
+  })
+
+  it("steers a running turn with a durable message that names no intent", async () => {
+    mockCodexAppServer.getActiveTurnId.mockReturnValue("turn-active")
+    const { res } = await postCodexMessage({ sessionId: "sess-1", message: "focus on tests", commandId: "command-0001" })
+
+    await vi.waitFor(() => expect(res.end).toHaveBeenCalled())
+    expect(mockAdmitSessionCommand).toHaveBeenCalledWith(expect.objectContaining({ commandId: "command-0001", defaultIntent: "steer" }))
   })
 
   it("falls back to codex exec resume when app-server is unavailable", async () => {

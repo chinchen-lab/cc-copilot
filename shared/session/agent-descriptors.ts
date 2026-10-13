@@ -692,7 +692,7 @@ const claude: AgentDescriptor = {
     fastTier: true,
     lowPriorityInTerminal: true,
     imageInput: true,
-    midTurnSteering: false,
+    midTurnSteering: true,
     activeNotifications: true,
     stopSession: true,
     ultracode: true,

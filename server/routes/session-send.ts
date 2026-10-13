@@ -15,6 +15,7 @@ import {
   type UseFn,
 } from "../http"
 import type { SendOutcome, SendRequest, TurnResult } from "../agents/runtimes"
+import type { CommandIntent } from "../../shared/contracts/orchestration"
 
 type SendBody = Partial<SendRequest> & { sessionId?: string; settingsChange?: unknown; commandId?: unknown; intent?: unknown }
 
@@ -24,9 +25,11 @@ type SendBody = Partial<SendRequest> & { sessionId?: string; settingsChange?: un
  * The agent is resolved once, up front, and everything after that is the same
  * three lines for all three: the runtime decides whether the message joins a
  * running turn or opens a new one, and whether the response can be sent now or
- * has to wait for the turn. A body without a permission mode runs in the
- * session's stored one. The edition may hold the rest to the stored settings
- * too, except the ones the body lists in `settingsChange`.
+ * has to wait for the turn. A durable send without an intent steers a running
+ * turn where the agent supports it, and queues otherwise. A body without a
+ * permission mode runs in the session's stored one. The edition may hold the
+ * rest to the stored settings too, except the ones the body lists in
+ * `settingsChange`.
  */
 export function registerSessionSendRoutes(use: UseFn) {
   use("/api/send-message", (req, res, next) => {
@@ -98,7 +101,8 @@ export function registerSessionSendRoutes(use: UseFn) {
             sendJson(res, 400, { error: "Invalid commandId or delivery intent" })
             return
           }
-          const receipt = await admitSessionCommand({ sessionId, commandId: parsed.commandId, request: settled, req, runtime, intent: parsed.intent as "queue" | "steer" | "restart" | undefined })
+          const steers = runtime.descriptor.capabilities.midTurnSteering && runtime.activity(sessionId).running
+          const receipt = await admitSessionCommand({ sessionId, commandId: parsed.commandId, request: settled, req, runtime, intent: parsed.intent as CommandIntent | undefined, defaultIntent: steers ? "steer" : "queue" })
           sendJson(res, 202, { success: true, receipt })
           return
         }

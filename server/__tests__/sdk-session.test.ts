@@ -444,6 +444,91 @@ describe("sdk-session turn completion", () => {
     expect((await third.completion).result).toBe("C")
     await captured[0]!.completed
   })
+  async function sentUuids(count: number): Promise<string[]> {
+    const input = captured[0]!.prompt as AsyncIterator<{ uuid: string }>
+    const uuids: string[] = []
+    for (let i = 0; i < count; i++) uuids.push((await input.next()).value.uuid)
+    return uuids
+  }
+  const lifecycle = (uuid: string, state: string) => ({ type: "command_lifecycle", command_uuid: uuid, state })
+
+  it("settles a send the running turn took up with that turn's result", async () => {
+    const { createSDKSession, sdkSessions, sendSDKMessage, observeSDKResult } = await loadModule()
+    holdQueryOpen = true
+    createSDKSession({ sessionId: "taken-send", cwd: "/tmp", message: "A" })
+    await waitUntil(() => releaseHeldQuery !== null)
+    const state = sdkSessions.get("taken-send")!
+    const joined = observeSDKResult(state)
+    sendSDKMessage(state.sessionId, "B")
+    const next = observeSDKResult(state)
+    sendSDKMessage(state.sessionId, "C")
+    const [a, b, c] = await sentUuids(3)
+    scriptedMessages = [
+      lifecycle(a!, "queued"), lifecycle(a!, "started"), lifecycle(b!, "queued"), lifecycle(c!, "queued"), lifecycle(b!, "started"),
+      { type: "result", is_error: false, result: "A+B", queued_turn_count: 1 },
+      lifecycle(c!, "started"),
+      { type: "result", is_error: false, result: "C", queued_turn_count: 0 },
+    ]
+    releaseHeldQuery!()
+    expect((await joined.completion).result).toBe("A+B")
+    expect((await next.completion).result).toBe("C")
+    await captured[0]!.completed
+  })
+
+  it("writes a send that must not start a turn as one the CLI only folds into running work", async () => {
+    const { createSDKSession, sdkSessions, sendSDKMessage } = await loadModule()
+    holdQueryOpen = true
+    createSDKSession({ sessionId: "notice-send", cwd: "/tmp", message: "A" })
+    await waitUntil(() => releaseHeldQuery !== null)
+    sendSDKMessage("notice-send", "Crew notice", undefined, undefined, { startsTurn: false })
+    sendSDKMessage("notice-send", "Follow-up")
+    const input = captured[0]!.prompt as AsyncIterator<Record<string, unknown>>
+    const sent = [(await input.next()).value, (await input.next()).value, (await input.next()).value]
+    expect(sent.map((message) => message.shouldQuery)).toEqual([undefined, false, undefined])
+    expect(sdkSessions.get("notice-send")).toBeDefined()
+    releaseHeldQuery!()
+    await captured[0]!.completed
+  })
+
+  it("does not settle a send with a result the CLI produced before taking it up", async () => {
+    const { createSDKSession, sdkSessions, sendSDKMessage, observeSDKResult } = await loadModule()
+    holdQueryOpen = true
+    createSDKSession({ sessionId: "late-send", cwd: "/tmp", message: "A" })
+    await waitUntil(() => releaseHeldQuery !== null)
+    const state = sdkSessions.get("late-send")!
+    const late = observeSDKResult(state)
+    sendSDKMessage(state.sessionId, "B")
+    const [a, b] = await sentUuids(2)
+    scriptedMessages = [
+      lifecycle(a!, "queued"), lifecycle(a!, "started"),
+      { type: "result", is_error: false, result: "A", queued_turn_count: 0 },
+      lifecycle(b!, "queued"), lifecycle(b!, "started"),
+      { type: "result", is_error: false, result: "B", queued_turn_count: 0 },
+    ]
+    releaseHeldQuery!()
+    expect((await late.completion).result).toBe("B")
+    await captured[0]!.completed
+  })
+
+  it("without lifecycle reports, settles a send the running turn absorbed instead of waiting for the next turn", async () => {
+    const { createSDKSession, sdkSessions, sendSDKMessage, observeSDKResult } = await loadModule()
+    holdQueryOpen = true
+    scriptedMessages = [
+      { type: "result", is_error: false, result: "A+B", queued_turn_count: 1 },
+      { type: "result", is_error: false, result: "C", queued_turn_count: 0 },
+    ]
+    createSDKSession({ sessionId: "absorbed-send", cwd: "/tmp", message: "A" })
+    await waitUntil(() => releaseHeldQuery !== null)
+    const state = sdkSessions.get("absorbed-send")!
+    const absorbed = observeSDKResult(state)
+    sendSDKMessage(state.sessionId, "B")
+    const queued = observeSDKResult(state)
+    sendSDKMessage(state.sessionId, "C")
+    releaseHeldQuery!()
+    expect((await absorbed.completion).result).toBe("A+B")
+    expect((await queued.completion).result).toBe("C")
+    await captured[0]!.completed
+  })
   it("settles a parked onResult when the query ends without emitting a result", async () => {
     // Regression: a query can end without ever yielding a `result` message —
     // Query.close() (used by teardownState/stopSDKSession) ends the iterator
