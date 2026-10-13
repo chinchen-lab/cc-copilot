@@ -195,6 +195,8 @@ function makeProps(
       creatingSession: false,
       pendingSession: null,
       onStartNewSession: vi.fn(),
+      onStartNewSessionWith: vi.fn(),
+      newSessionModel: { selectedModel: "", onModelChange: vi.fn(), selectedEffort: "", onEffortChange: vi.fn() },
       onStartNewFolder: vi.fn(),
       onSelectProject: vi.fn(),
       onOpenPaletteProject: vi.fn(),

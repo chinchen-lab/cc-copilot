@@ -80,7 +80,7 @@ function props(): MobileAppShellProps {
         handleDuplicateSessionByPath: vi.fn(), handleDuplicateSession: vi.fn(), handleDeleteSession: vi.fn(),
         handleMobileJumpToTurn: vi.fn(), handleLoadSessionScrollAware: vi.fn(),
       },
-      creatingSession: false, pendingSession: null, onStartNewSession: vi.fn(), onStartNewFolder: vi.fn(), onSelectProject: vi.fn(),
+      creatingSession: false, pendingSession: null, onStartNewSession: vi.fn(), onStartNewSessionWith: vi.fn(), newSessionModel: { selectedModel: "", onModelChange: vi.fn(), selectedEffort: "", onEffortChange: vi.fn() }, onStartNewFolder: vi.fn(), onSelectProject: vi.fn(),
       liveSessionsRefreshRef: { current: null }, onPrefetchSession: vi.fn(),
     },
     sessionView: {

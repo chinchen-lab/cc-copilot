@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { ActiveSessionInfo } from "@/components/LiveSessions/types"
 import type { MemberStatus } from "@/components/LiveSessions/crew"
-import { homeQueue, homeRequestId, homeSessions, landedToday, type HomePending } from "../homeView"
+import { homeQueue, homeRequestId, homeSessionRows, homeSessions, recentHomeProjects, searchHomeSessions, type HomePending } from "../homeView"
 
 const NOW = Date.parse("2026-10-07T16:00:00")
 const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString()
@@ -51,26 +51,43 @@ describe("homeSessions", () => {
       row("lead", { lastActivityAt: ago(120) }),
       row("lane", { crew: crew("lead", 1), agentStatus: "tool_use", lastActivityAt: ago(1), pullRequests: [pr] }),
       row("solo", { lastActivityAt: ago(10) }),
-      row("old", { lastActivityAt: ago(3 * 24 * 60) }),
+      row("old", { lastActivityAt: ago(30 * 24 * 60) }),
     ]
-    const home = homeSessions(sessions, statusOf, NOW)
+    const home = homeSessions(homeSessionRows(sessions, statusOf), NOW)
     expect(home.map((entry) => entry.session.sessionId)).toEqual(["lead", "solo", "old"])
-    expect(home[0]).toMatchObject({ cells: ["working"], counts: { size: 1, working: 1 }, activityAt: ago(1), landed: { number: 252 } })
+    expect(home[0]).toMatchObject({ state: "done", cells: ["working"], counts: { size: 1, working: 1 }, activityAt: ago(1), landed: { number: 252 } })
   })
-})
 
-describe("landedToday", () => {
-  it("collects today's pull requests, finished members and starts, newest first", () => {
-    const today = Date.parse("2026-10-07T09:00:00")
-    const sessions = [
-      row("lead"),
-      row("a", { crew: crew("lead", today), lastActivityAt: ago(5) }),
-      row("b", { crew: crew("lead", today + 20_000), agentStatus: "tool_use", lastActivityAt: ago(2), pullRequests: [{ url: "u", number: 7, repo: "o/r", title: "Fix", isDraft: false, toolCallId: "", timestamp: ago(3) }] }),
-      row("yesterday", { crew: crew("lead", today - 86_400_000), lastActivityAt: ago(24 * 60 + 60) }),
-    ]
-    const statusOf = (member: ActiveSessionInfo): MemberStatus => ({ state: member.agentStatus === "tool_use" ? "working" : "done" })
-    const landed = landedToday(sessions, statusOf, NOW)
-    expect(landed.map((event) => event.kind === "started" ? ["started", event.sessions.map((s) => s.sessionId)] : [event.kind, event.session.sessionId]))
-      .toEqual([["pr", "b"], ["finished", "a"], ["started", ["a", "b"]]])
+  it("offers the newest sessions' projects once each, newest first", () => {
+    const rows = homeSessionRows([
+      row("a", { dirName: "-x", cwd: "/x", lastActivityAt: ago(1) }),
+      row("b", { dirName: "-y", cwd: "/y", lastActivityAt: ago(2) }),
+      row("c", { dirName: "-x", cwd: "/x", lastActivityAt: ago(3) }),
+      row("d", { dirName: "-unknown-folder", lastActivityAt: ago(4) }),
+      row("e", { dirName: "-x-by-another-agent", cwd: "/x", lastActivityAt: ago(5) }),
+      row("f", { dirName: "-z", cwd: "/z", lastActivityAt: ago(6) }),
+    ], statusOf)
+    const projectOf = (session: ActiveSessionInfo) => ({ dirName: session.dirName, cwd: session.cwd })
+    expect(recentHomeProjects(rows, projectOf).map((project) => project.dirName)).toEqual(["-x", "-y", "-z"])
+    expect(recentHomeProjects(rows, projectOf, 2).map((project) => project.dirName)).toEqual(["-x", "-y"])
+  })
+
+  it("shows the last week, never fewer than three, and at most a page", () => {
+    const week = Array.from({ length: 40 }, (_, index) => row(`s${index}`, { lastActivityAt: ago(index * 60) }))
+    expect(homeSessions(homeSessionRows(week, statusOf), NOW)).toHaveLength(30)
+    const sparse = [row("a", { lastActivityAt: ago(8 * 24 * 60) }), row("b", { lastActivityAt: ago(9 * 24 * 60) }), row("c", { lastActivityAt: ago(10 * 24 * 60) }), row("d", { lastActivityAt: ago(11 * 24 * 60) })]
+    expect(homeSessions(homeSessionRows(sparse, statusOf), NOW).map((entry) => entry.session.sessionId)).toEqual(["a", "b", "c"])
+  })
+
+  it("searches every session by every word, keeping the newest first", () => {
+    const rows = homeSessionRows([
+      row("fresh", { lastActivityAt: ago(5), lastUserMessage: "fix the login form" }),
+      row("stale", { lastActivityAt: ago(60 * 24 * 60), gitBranch: "login-redesign" }),
+      row("other", { lastActivityAt: ago(10), lastUserMessage: "release notes" }),
+    ], statusOf)
+    const textOf = (entry: ReturnType<typeof homeSessionRows>[number]) => [entry.session.sessionId, entry.session.lastUserMessage, entry.session.gitBranch]
+    expect(searchHomeSessions(rows, "login", textOf).map((entry) => entry.session.sessionId)).toEqual(["fresh", "stale"])
+    expect(searchHomeSessions(rows, "LOGIN redesign", textOf).map((entry) => entry.session.sessionId)).toEqual(["stale"])
+    expect(searchHomeSessions(rows, "   ", textOf)).toEqual([])
   })
 })

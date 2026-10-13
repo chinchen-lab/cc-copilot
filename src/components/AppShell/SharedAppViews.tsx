@@ -1,13 +1,12 @@
 import { lazy, Suspense, useState, type MutableRefObject, type ReactNode } from "react"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ProjectSwitcherList, useProjectList } from "@/components/ProjectSwitcherList"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Dashboard } from "@/components/Dashboard"
 import { SessionBrowser } from "@/components/session-browser"
 import { Spinner } from "@/components/ui/Spinner"
 import { useAppContext } from "@/contexts/AppContext"
 import { useSessionContext } from "@/contexts/SessionContext"
+import type { HomeModelControls } from "@/components/home/HomeComposer"
 import type { EditionMainView } from "@/edition/contract"
 import type { PendingSessionInfo } from "@/components/session-browser/types"
 import type { useAppHandlers } from "@/hooks/useAppHandlers"
@@ -43,6 +42,10 @@ interface ShellNavigation {
   creatingSession: boolean
   pendingSession: PendingSessionInfo | null
   onStartNewSession: (dirName: string, cwd?: string) => void
+  /** Start a session and send its first message in one step. */
+  onStartNewSessionWith: (dirName: string, cwd: string | undefined, message: string) => void
+  /** The model and effort a session started from the home uses. */
+  newSessionModel: HomeModelControls
   onStartNewFolder: (cwd: string) => void
   onSelectProject: (dirName: string | null) => void
   liveSessionsRefreshRef: MutableRefObject<(() => void) | null>
@@ -101,7 +104,7 @@ export function ProjectDashboard({ navigation }: { navigation: ShellNavigation }
 
 /** The home and its project history, shared by desktop and mobile shells. */
 export function MissionControlView({ navigation, showProjectHistory = false }: { navigation: ShellNavigation; showProjectHistory?: boolean }) {
-  const { state } = useAppContext()
+  const { state, config } = useAppContext()
   const [browsing, setBrowsing] = useState(false)
   return (
     <Suspense fallback={<LazyViewFallback label="Loading Mission Control…" />}>
@@ -119,33 +122,11 @@ export function MissionControlView({ navigation, showProjectHistory = false }: {
           <MissionHome
             onOpenSession={navigation.actions.handleDashboardSelect}
             onBrowseProjects={() => setBrowsing(true)}
-            newSessionControl={<HomeSessionStart navigation={navigation} />}
+            start={{ defaultAgentKind: config.defaultAgentKind, model: navigation.newSessionModel, onStart: navigation.onStartNewSessionWith }}
           />
         )}
       </div>
     </Suspense>
-  )
-}
-
-function HomeSessionStart({ navigation }: { navigation: ShellNavigation }) {
-  const { config } = useAppContext()
-  const [open, setOpen] = useState(false)
-  const projects = useProjectList(open)
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<Button variant="outline" className="h-auto w-full justify-between px-4 py-4" />}>
-        What should we build?
-        <span className="text-muted-foreground">Choose a project</span>
-      </PopoverTrigger>
-      <PopoverContent className="w-96 max-w-[calc(100vw-2rem)] p-0">
-        <ProjectSwitcherList
-          projects={projects}
-          defaultAgentKind={config.defaultAgentKind}
-          onNewSession={(dirName, cwd) => { setOpen(false); navigation.onStartNewSession(dirName, cwd) }}
-          onNewFolder={(cwd) => { setOpen(false); navigation.onStartNewFolder(cwd) }}
-        />
-      </PopoverContent>
-    </Popover>
   )
 }
 

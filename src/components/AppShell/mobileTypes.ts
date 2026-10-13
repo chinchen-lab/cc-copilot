@@ -1,4 +1,5 @@
 import type { MutableRefObject, ReactNode, RefObject } from "react"
+import type { HomeModelControls } from "@/components/home/HomeComposer"
 import type { PendingSessionInfo } from "@/components/session-browser/types"
 import type { BgAgent } from "@/hooks/useBackgroundAgents"
 import type { useAppHandlers } from "@/hooks/useAppHandlers"
@@ -33,6 +34,8 @@ export interface MobileNavigation {
   creatingSession: boolean
   pendingSession: PendingSessionInfo | null
   onStartNewSession: (dirName: string, cwd?: string) => void
+  onStartNewSessionWith: (dirName: string, cwd: string | undefined, message: string) => void
+  newSessionModel: HomeModelControls
   onStartNewFolder: (cwd: string) => void
   onSelectProject: (dirName: string | null) => void
   liveSessionsRefreshRef: MutableRefObject<(() => void) | null>

@@ -1,13 +1,14 @@
 /**
  * What the Mission Control home shows, worked out from data the app already
- * polls: every request blocked on the user in one queue, the sessions the
- * user started with their crews, and what landed today.
+ * polls: every request blocked on the user in one queue, and the sessions the
+ * user started with their crews, recent ones by default and any of them by
+ * search.
  */
 
 import type { MissionControlPermission, MissionControlQuestion } from "../../../shared/contracts/missionControl"
 import type { MissionControlElicitation, MissionControlUserDialog } from "../../../shared/contracts/agentPrompts"
 import { getSessionRecencyMs } from "../../../shared/session-ordering"
-import { countCrew, crewActivityAt, foldCrewRows, type CrewCounts, type MemberStatus } from "@/components/LiveSessions/crew"
+import { countCrew, crewActivityAt, foldCrewRows, type CrewCounts, type MemberState, type MemberStatus } from "@/components/LiveSessions/crew"
 import type { ActiveSessionInfo } from "@/components/LiveSessions/types"
 
 export type HomeRequest =
@@ -74,6 +75,8 @@ export function homeRequestId(request: HomeRequest): string {
 
 export interface HomeSession {
   session: ActiveSessionInfo
+  /** The session's own state, before its crew's. */
+  state: MemberState
   members: ActiveSessionInfo[]
   /** One state per member, in the order they were started. */
   cells: Array<MemberStatus["state"]>
@@ -83,22 +86,19 @@ export interface HomeSession {
   landed?: { number: number; title: string | null; url: string; by: ActiveSessionInfo }
 }
 
-const DAY_MS = 86_400_000
+const WEEK_MS = 7 * 86_400_000
 const MIN_SESSIONS = 3
-const MAX_SESSIONS = 8
+const MAX_SESSIONS = 30
+const MAX_MATCHES = 50
 
-/**
- * The sessions the user started, each with its crew: those active in the last
- * day, newest crew activity first, and never fewer than three.
- */
-export function homeSessions(
+/** Every session the user started, each with its crew, newest crew activity first. */
+export function homeSessionRows(
   sessions: readonly ActiveSessionInfo[],
   statusOf: (member: ActiveSessionInfo) => MemberStatus,
-  now = Date.now(),
 ): HomeSession[] {
   const listed = sessions.filter((session) => !session.archived && !(session.teamName && session.agentName))
   const { topLevel, crewOf } = foldCrewRows(listed)
-  const placed = topLevel.map((session): HomeSession => {
+  return topLevel.map((session): HomeSession => {
     const members = crewOf.get(session.sessionId) ?? []
     const activityAt = members.length ? crewActivityAt(session, members) : session.lastActivityAt || session.lastModified
     const latest = [session, ...members]
@@ -106,6 +106,7 @@ export function homeSessions(
       .sort((a, b) => Date.parse(b.pullRequest.timestamp) - Date.parse(a.pullRequest.timestamp))[0]
     return {
       session,
+      state: statusOf(session).state,
       members,
       cells: members.map((member) => statusOf(member).state),
       counts: members.length ? countCrew(members, statusOf) : null,
@@ -113,54 +114,53 @@ export function homeSessions(
       ...(latest && { landed: { number: latest.pullRequest.number, title: latest.pullRequest.title, url: latest.pullRequest.url, by: latest.by } }),
     }
   }).sort((a, b) => Date.parse(b.activityAt) - Date.parse(a.activityAt))
-  const recent = placed.filter((entry) => now - Date.parse(entry.activityAt) < DAY_MS)
-  return (recent.length >= MIN_SESSIONS ? recent : placed.slice(0, MIN_SESSIONS)).slice(0, MAX_SESSIONS)
 }
-
-export type LandedEvent =
-  | { kind: "pr"; at: number; session: ActiveSessionInfo; number: number; title: string | null; url: string }
-  | { kind: "finished"; at: number; session: ActiveSessionInfo }
-  /** Sessions one session started within the same minute. */
-  | { kind: "started"; at: number; parentId: string; sessions: ActiveSessionInfo[] }
-
-function startOfToday(now: number): number {
-  const date = new Date(now)
-  date.setHours(0, 0, 0, 0)
-  return date.getTime()
-}
-
-const MAX_LANDED = 10
 
 /**
- * Today's milestones, newest first: pull requests opened, crew members that
- * finished, and sessions a lead started, grouped by the minute it started them.
+ * The sessions the home lists without a search: those active in the last
+ * week, never fewer than three and never more than a page's worth.
  */
-export function landedToday(
-  sessions: readonly ActiveSessionInfo[],
-  statusOf: (member: ActiveSessionInfo) => MemberStatus,
-  now = Date.now(),
-): LandedEvent[] {
-  const since = startOfToday(now)
-  const events: LandedEvent[] = []
-  const starts = new Map<string, ActiveSessionInfo[]>()
-  for (const session of sessions) {
-    if (session.archived) continue
-    for (const pullRequest of session.pullRequests ?? []) {
-      const at = Date.parse(pullRequest.timestamp)
-      if (at >= since) events.push({ kind: "pr", at, session, number: pullRequest.number, title: pullRequest.title, url: pullRequest.url })
-    }
-    if (!session.crew) continue
-    const activity = getSessionRecencyMs(session)
-    if (activity >= since && statusOf(session).state === "done") events.push({ kind: "finished", at: activity, session })
-    if (session.crew.startedAt >= since) {
-      const key = `${session.crew.parentId}:${Math.floor(session.crew.startedAt / 60_000)}`
-      const group = starts.get(key)
-      if (group) group.push(session)
-      else starts.set(key, [session])
-    }
+export function homeSessions(rows: readonly HomeSession[], now = Date.now()): HomeSession[] {
+  const recent = rows.filter((entry) => now - Date.parse(entry.activityAt) < WEEK_MS)
+  return (recent.length >= MIN_SESSIONS ? recent : rows.slice(0, MIN_SESSIONS)).slice(0, MAX_SESSIONS)
+}
+
+/**
+ * The folders of the newest sessions, each once however many agents encode
+ * it, so the next session can start in one of them with a click. A session
+ * whose folder is unknown cannot be offered: its name would be a guess.
+ */
+export function recentHomeProjects<T extends { cwd?: string }>(
+  rows: readonly HomeSession[],
+  projectOf: (session: ActiveSessionInfo) => T,
+  limit = 6,
+): T[] {
+  const projects: T[] = []
+  const seen = new Set<string>()
+  for (const entry of rows) {
+    const project = projectOf(entry.session)
+    if (!project.cwd || seen.has(project.cwd)) continue
+    seen.add(project.cwd)
+    projects.push(project)
+    if (projects.length === limit) break
   }
-  for (const group of starts.values()) {
-    events.push({ kind: "started", at: Math.min(...group.map((session) => session.crew!.startedAt)), parentId: group[0]!.crew!.parentId, sessions: group })
-  }
-  return events.sort((a, b) => b.at - a.at).slice(0, MAX_LANDED)
+  return projects
+}
+
+/**
+ * The sessions matching every word of the query somewhere in the text the
+ * caller supplies for them: title, project, branch, crew member names, last
+ * message. Order is kept, so the newest match comes first.
+ */
+export function searchHomeSessions(
+  rows: readonly HomeSession[],
+  query: string,
+  textOf: (entry: HomeSession) => ReadonlyArray<string | null | undefined>,
+): HomeSession[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return []
+  return rows.filter((entry) => {
+    const haystack = textOf(entry).filter(Boolean).join("\n").toLowerCase()
+    return words.every((word) => haystack.includes(word))
+  }).slice(0, MAX_MATCHES)
 }

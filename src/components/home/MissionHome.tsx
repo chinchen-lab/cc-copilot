@@ -1,23 +1,26 @@
-import { useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
-import { ChevronLeft, ChevronRight, FolderOpen, Plus } from "lucide-react"
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react"
+import { ChevronLeft, ChevronRight, FolderOpen, Pencil, Search, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { Input } from "@/components/ui/input"
 import { Empty, EmptyHeader, EmptyDescription } from "@/components/ui/empty"
 import { memberStatus, type CrewPendingInput } from "@/components/LiveSessions/crew"
 import { crewSessionTitle } from "@/components/LiveSessions/crew"
-import { sessionGroupKey } from "@/components/LiveSessions/sessionListView"
+import { STATUS_DOT } from "@/components/LiveSessions/statusDot"
+import { sessionGroupKey, sessionTitle } from "@/components/LiveSessions/sessionListView"
 import type { ActiveSessionInfo } from "@/components/LiveSessions/types"
 import { usePendingHumanInput } from "@/contexts/PendingHumanInputContext"
 import { useSessionInventory } from "@/contexts/SessionInventoryContext"
 import { useListedPermissions } from "@/hooks/useListedPermissions"
 import { useProjectNames } from "@/hooks/useProjectNames"
 import { useSessionNames } from "@/hooks/useSessionNames"
-import { formatRelativeTime } from "@/lib/format"
+import { agentKindForDirName, projectDirNameFor } from "@/lib/agents"
+import { formatRelativeTime, parseWorktreePath, projectName } from "@/lib/format"
 import { revealSessionById } from "@/lib/revealSession"
 import { cn } from "@/lib/utils"
+import { HomeComposer, type HomeProject, type HomeStart } from "./HomeComposer"
 import { HomeRequestPrompt } from "./HomeRequestPrompt"
-import { homeQueue, homeRequestId, homeSessions, landedToday, type HomeRequest, type HomeSession, type LandedEvent } from "./homeView"
+import { homeQueue, homeRequestId, homeSessionRows, homeSessions, recentHomeProjects, searchHomeSessions, type HomeRequest, type HomeSession } from "./homeView"
 
 const CELL: Record<string, string> = {
   working: "bg-success shadow-[0_0_0_1.5px_color-mix(in_oklch,var(--success)_25%,transparent)]",
@@ -27,24 +30,45 @@ const CELL: Record<string, string> = {
 
 export interface MissionHomeProps {
   onOpenSession: (dirName: string, fileName: string) => void
-  /** Start a session; the composer the app shows for a new session takes it from there. */
-  onNewSession?: () => void
   /** The full list of projects and their history. */
   onBrowseProjects?: () => void
-  newSessionControl?: ReactNode
+  /** Starting a session from the home; without it the composer stays hidden. */
+  start?: HomeStart
 }
 
 /**
- * The first screen: what is blocked on the user, across every session and
- * crew, answerable one request at a time; the sessions the user started, each
- * with its crew; and what landed today.
+ * Where the composer offers to start: the project of the session the user
+ * worked in last. A session in a worktree suggests the checkout it belongs to,
+ * the way the session rows fold worktrees into their project.
  */
-export function MissionHome({ onOpenSession, onNewSession, onBrowseProjects, newSessionControl }: MissionHomeProps) {
+function suggestedProject(latest: ActiveSessionInfo, projectNames: Record<string, string>): HomeProject {
+  const worktree = latest.cwd ? parseWorktreePath(latest.cwd) : null
+  const cwd = worktree?.parentPath ?? latest.cwd
+  const dirName = worktree ? projectDirNameFor(agentKindForDirName(latest.dirName), worktree.parentPath) : latest.dirName
+  return { dirName, cwd, name: projectNames[dirName] ?? (cwd ? projectName(cwd) : latest.projectShortName) }
+}
+
+/** Typing in a field or holding a modifier is never a page shortcut. */
+function isShortcutTarget(event: globalThis.KeyboardEvent): boolean {
+  const editing = event.target instanceof HTMLElement && event.target.closest("input,textarea,select,[contenteditable=true]")
+  return !event.metaKey && !event.ctrlKey && !event.altKey && !editing
+}
+
+/**
+ * The first screen: where the next piece of work starts; what is blocked on
+ * the user, across every session and crew, answerable one request at a time;
+ * and the sessions the user started, each with its crew, searchable across
+ * all of them. The composer and search stay put; only the lists scroll, and
+ * the queue takes a column only while something is waiting.
+ */
+export function MissionHome({ onOpenSession, onBrowseProjects, start }: MissionHomeProps) {
   const inventory = useSessionInventory()
   const input = usePendingHumanInput()
-  const { names } = useSessionNames()
+  const { names, rename } = useSessionNames()
   const { names: projectNames } = useProjectNames()
   const permissionsOf = useListedPermissions()
+  const [query, setQuery] = useState("")
+  const searchRef = useRef<HTMLInputElement>(null)
   const sessions = useMemo(() => inventory.sessions.filter((session) => !session.archived), [inventory.sessions])
   const byId = useMemo(() => new Map(sessions.map((session) => [session.sessionId, session])), [sessions])
   const pending = useMemo<CrewPendingInput>(() => ({
@@ -59,9 +83,24 @@ export function MissionHome({ onOpenSession, onNewSession, onBrowseProjects, new
     return permissionsOf(session?.access).canInteract
   }
   const queue = homeQueue(input, sessions, canAnswer)
-  const yours = homeSessions(sessions, statusOf)
-  const landed = landedToday(sessions, statusOf)
   const nameOf = (sessionId: string) => crewSessionTitle(sessionId, byId, names)
+  const projectLabel = (session: ActiveSessionInfo) => projectNames[session.dirName] ?? sessionGroupKey(session)
+  const rows = homeSessionRows(sessions, statusOf)
+  const searching = query.trim().length > 0
+  const yours = searching
+    ? searchHomeSessions(rows, query, (entry) => [
+      nameOf(entry.session.sessionId),
+      projectLabel(entry.session),
+      entry.session.gitBranch,
+      entry.session.cwd,
+      entry.session.lastUserMessage,
+      entry.session.firstUserMessage,
+      entry.landed?.title,
+      entry.landed && `#${entry.landed.number}`,
+      ...entry.members.map((member) => nameOf(member.sessionId)),
+    ])
+    : homeSessions(rows)
+  const recent = recentHomeProjects(rows, (session) => suggestedProject(session, projectNames))
   const open = (sessionId: string) => {
     const session = byId.get(sessionId)
     if (session) onOpenSession(session.dirName, session.fileName)
@@ -69,34 +108,62 @@ export function MissionHome({ onOpenSession, onNewSession, onBrowseProjects, new
   }
   const running = inventory.processes.filter((process) => process.sessionId).length
 
+  useEffect(() => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "/" && isShortcutTarget(event)) {
+        event.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [])
+
   return (
-    <ScrollArea className="h-full">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 pb-10 pt-16 lg:px-10">
-        <h1 className="text-xl font-semibold tracking-tight">Mission Control</h1>
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-          <NeedsYouQueue queue={queue} input={input} byId={byId} nameOf={nameOf} onOpen={open} canAnswer={canAnswer} />
-          <div className="flex min-w-0 flex-col gap-8">
-            <YourSessions
-              sessions={yours}
-              nameOf={nameOf}
-              projectLabel={(session) => projectNames[session.dirName] ?? sessionGroupKey(session)}
-              onOpen={open}
-              onNewSession={onNewSession}
-              onBrowseProjects={onBrowseProjects}
-            />
-            <LandedToday events={landed} nameOf={nameOf} onOpen={open} />
-          </div>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="mx-auto flex w-full max-w-6xl shrink-0 flex-col gap-8 px-6 pt-16 lg:px-10">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h1 className="text-xl font-semibold tracking-tight">Mission Control</h1>
+          {running > 0 && <p className="text-xs text-muted-foreground">{running} {running === 1 ? "agent" : "agents"} running on this machine</p>}
         </div>
-        {running > 0 && <p className="text-xs text-muted-foreground">{running} {running === 1 ? "agent" : "agents"} running on this machine.</p>}
-        {newSessionControl}
+        {start && <HomeComposer recent={recent} start={start} />}
       </div>
-    </ScrollArea>
+      <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
+        <div
+          className={cn(
+            "mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 pb-10 pt-10 lg:h-full lg:px-10",
+            queue.length > 0 && "lg:grid lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]",
+          )}
+        >
+          {queue.length > 0 ? (
+            <NeedsYouQueue queue={queue} input={input} byId={byId} nameOf={nameOf} onOpen={open} canAnswer={canAnswer} />
+          ) : (
+            <p className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+              <span className="size-1.5 rounded-full bg-success/40" aria-hidden="true" />
+              Nothing is waiting on you.
+            </p>
+          )}
+          <YourSessions
+            sessions={yours}
+            total={rows.length}
+            query={query}
+            onQueryChange={setQuery}
+            searchRef={searchRef}
+            nameOf={nameOf}
+            projectLabel={projectLabel}
+            onOpen={open}
+            onRename={rename}
+            onBrowseProjects={onBrowseProjects}
+          />
+        </div>
+      </div>
+    </div>
   )
 }
 
 function SectionHeading({ title, count, children }: { title: string; count?: number; children?: React.ReactNode }) {
   return (
-    <div className="mb-3 flex items-baseline gap-2">
+    <div className="mb-3 flex flex-wrap items-center gap-2">
       <h2 className="text-sm font-medium">{title}</h2>
       {count !== undefined && <span className="text-xs tabular-nums text-muted-foreground">{count}</span>}
       <span className="flex-1" />
@@ -138,14 +205,6 @@ function NeedsYouQueue({
 }) {
   const [index, setIndex] = useState(0)
   const answering = useRef(new Set<string>())
-  if (queue.length === 0) {
-    return (
-      <section aria-label="Needs you" className="min-w-0">
-        <SectionHeading title="Needs you" count={0} />
-        <Empty><EmptyHeader><EmptyDescription>Nothing is waiting on you.</EmptyDescription></EmptyHeader></Empty>
-      </section>
-    )
-  }
   const at = Math.min(index, queue.length - 1)
   const request = queue[at]!
   const session = byId.get(request.sessionId)
@@ -169,7 +228,7 @@ function NeedsYouQueue({
   }
 
   return (
-    <section aria-label="Needs you" tabIndex={0} onKeyDown={onKeyDown} className="min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    <section aria-label="Needs you" tabIndex={0} onKeyDown={onKeyDown} className="min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring lg:min-h-0 lg:overflow-y-auto">
       <SectionHeading title="Needs you" count={queue.length}>
         {queue.length > 1 && (
           <span className="flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
@@ -227,92 +286,83 @@ function NeedsYouQueue({
   )
 }
 
+/** The row's dot: attention if the session or anyone in its crew needs the user, live if any of them is working. */
+function rowDot(entry: HomeSession): string | null {
+  if (entry.state === "needs-you" || (entry.counts?.needsYou ?? 0) > 0) return STATUS_DOT.attention
+  if (entry.state === "working" || (entry.counts?.working ?? 0) > 0) return STATUS_DOT.working
+  return null
+}
+
 function YourSessions({
   sessions,
+  total,
+  query,
+  onQueryChange,
+  searchRef,
   nameOf,
   projectLabel,
   onOpen,
-  onNewSession,
+  onRename,
   onBrowseProjects,
 }: {
   sessions: HomeSession[]
+  total: number
+  query: string
+  onQueryChange: (query: string) => void
+  searchRef: RefObject<HTMLInputElement | null>
   nameOf: (sessionId: string) => string | undefined
   projectLabel: (session: ActiveSessionInfo) => string
   onOpen: (sessionId: string) => void
-  onNewSession?: () => void
+  onRename: (sessionId: string, name: string) => void
   onBrowseProjects?: () => void
 }) {
+  const searching = query.trim().length > 0
+  const clear = () => {
+    onQueryChange("")
+    searchRef.current?.focus()
+  }
   return (
-    <section aria-label="Your sessions" className="min-w-0">
-      <SectionHeading title="Your sessions" count={sessions.length}>
+    <section aria-label="Your sessions" className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1">
+      <SectionHeading title="Your sessions" count={searching ? sessions.length : total}>
+        <div className="relative w-full max-w-64">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            ref={searchRef}
+            type="search"
+            aria-label="Search sessions"
+            placeholder="Search sessions"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); clear(); searchRef.current?.blur() } }}
+            className="h-7 pl-8 pr-7 text-xs [&::-webkit-search-cancel-button]:hidden"
+          />
+          {searching ? (
+            <button type="button" aria-label="Clear search" onClick={clear} className="absolute right-1.5 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+              <X className="size-3" />
+            </button>
+          ) : (
+            <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[10px] text-muted-foreground/70" aria-hidden="true">/</kbd>
+          )}
+        </div>
         {onBrowseProjects && (
           <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={onBrowseProjects}>
             <FolderOpen data-icon="inline-start" />
             All projects
           </Button>
         )}
-        {onNewSession && (
-          <Button variant="outline" size="xs" onClick={onNewSession}>
-            <Plus data-icon="inline-start" />
-            New session
-          </Button>
-        )}
       </SectionHeading>
       {sessions.length === 0 ? (
-        <Empty><EmptyHeader><EmptyDescription>Start a session and it shows up here, with every session it starts.</EmptyDescription></EmptyHeader></Empty>
+        <Empty>
+          <EmptyHeader>
+            <EmptyDescription>
+              {searching ? `No session matches “${query.trim()}”.` : "Start a session and it shows up here, with every session it starts."}
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
-        <ul className="flex flex-col">
+        <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
           {sessions.map((entry) => (
-            <li key={entry.session.sessionId} className="border-t border-border/70 first:border-t-0">
-              {entry.members.length > 0 && (
-                <div role="group" aria-label={`${nameOf(entry.session.sessionId)} crew`} className="flex flex-wrap gap-1 px-3 pt-3">
-                  {entry.members.map((member, cellIndex) => (
-                    <button
-                      key={member.sessionId}
-                      type="button"
-                      aria-label={`Open ${nameOf(member.sessionId) ?? "crew member"}`}
-                      title={`${nameOf(member.sessionId)}: ${entry.cells[cellIndex]}`}
-                      onClick={() => onOpen(member.sessionId)}
-                      className="flex size-5 items-center justify-center rounded-sm outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <span className={cn("size-2 rounded-[2px]", CELL[entry.cells[cellIndex]!])} />
-                    </button>
-                  ))}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => onOpen(entry.session.sessionId)}
-                className="grid w-full grid-cols-1 items-center gap-x-4 gap-y-1 rounded-lg px-3 py-3 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring xl:grid-cols-[minmax(0,1fr)_auto]"
-              >
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <span className="truncate text-[13.5px] font-medium">{nameOf(entry.session.sessionId) ?? "Untitled session"}</span>
-                  <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">{projectLabel(entry.session)}</span>
-                </span>
-                <span className="flex items-center gap-3 text-xs text-muted-foreground">
-                  {entry.counts ? (
-                    <>
-                      {entry.counts.working > 0 && <span><span className="font-medium text-foreground tabular-nums">{entry.counts.working}</span> working</span>}
-                      {entry.counts.needsYou > 0 && <span className="text-warning"><span className="font-medium tabular-nums">{entry.counts.needsYou}</span> need you</span>}
-                      <span><span className="font-medium text-foreground tabular-nums">{entry.counts.size}</span> in crew</span>
-                    </>
-                  ) : (
-                    entry.session.isActive && <span>working</span>
-                  )}
-                </span>
-                <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                  {entry.landed && (
-                    <Badge variant="outline" className="shrink-0">#{entry.landed.number}</Badge>
-                  )}
-                  <span className="truncate">
-                    {entry.landed ? `${entry.landed.title ?? "Pull request"} · ${nameOf(entry.landed.by.sessionId) ?? ""}` : entry.session.lastUserMessage ?? ""}
-                  </span>
-                </span>
-                <span className="text-[11px] tabular-nums text-muted-foreground/80">
-                  {entry.counts ? `crew active ${formatRelativeTime(entry.activityAt)}` : formatRelativeTime(entry.activityAt)}
-                </span>
-              </button>
-            </li>
+            <SessionRow key={entry.session.sessionId} entry={entry} nameOf={nameOf} projectLabel={projectLabel} onOpen={onOpen} onRename={onRename} />
           ))}
         </ul>
       )}
@@ -320,66 +370,129 @@ function YourSessions({
   )
 }
 
-function LandedToday({
-  events,
+/** One session with its crew; the title can be edited in place, saved with Enter and dropped with Escape. */
+function SessionRow({
+  entry,
   nameOf,
+  projectLabel,
   onOpen,
+  onRename,
 }: {
-  events: LandedEvent[]
+  entry: HomeSession
   nameOf: (sessionId: string) => string | undefined
+  projectLabel: (session: ActiveSessionInfo) => string
   onOpen: (sessionId: string) => void
+  onRename: (sessionId: string, name: string) => void
 }) {
-  if (events.length === 0) return null
-  return (
-    <section aria-label="Landed today" className="min-w-0">
-      <SectionHeading title="Landed today" />
-      <ol className="flex flex-col">
-        {events.map((event) => {
-          const sessionId = event.kind === "started" ? event.parentId : event.session.sessionId
-          const time = new Date(event.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-          return (
-            <li key={`${event.kind}:${sessionId}:${event.at}`}>
-              <button
-                type="button"
-                onClick={() => onOpen(sessionId)}
-                className="grid w-full grid-cols-[48px_minmax(0,1fr)] items-baseline gap-2.5 rounded-md px-3 py-1.5 text-left text-[12.5px] outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <span className="text-[11px] tabular-nums text-muted-foreground/80">{time}</span>
-                <span className="min-w-0 truncate">{landedLine(event, nameOf)}</span>
-              </button>
-            </li>
-          )
-        })}
-      </ol>
-    </section>
-  )
-}
-
-function landedLine(event: LandedEvent, nameOf: (sessionId: string) => string | undefined) {
-  switch (event.kind) {
-    case "pr":
-      return (
-        <>
-          <Badge variant="outline" className="mr-2 text-success">#{event.number}</Badge>
-          <span className="font-medium">{nameOf(event.session.sessionId) ?? "A session"}</span>
-          <span className="text-muted-foreground"> · {event.title ?? "opened a pull request"}</span>
-        </>
-      )
-    case "finished":
-      return (
-        <>
-          <span className="font-medium">{nameOf(event.session.sessionId) ?? "A session"}</span>
-          <span className="text-muted-foreground"> finished</span>
-        </>
-      )
-    case "started":
-      return (
-        <>
-          <span className="font-medium">
-            {event.sessions.length === 1 ? nameOf(event.sessions[0]!.sessionId) ?? "A session" : `${event.sessions.length} sessions`}
-          </span>
-          <span className="text-muted-foreground"> started · {nameOf(event.parentId) ?? "by another session"}</span>
-        </>
-      )
+  const [draft, setDraft] = useState<string | null>(null)
+  const { session } = entry
+  const title = nameOf(session.sessionId) ?? "Untitled session"
+  const ownTitle = sessionTitle(session)
+  const dot = rowDot(entry)
+  const commit = () => {
+    if (draft === null) return
+    const next = draft.trim()
+    setDraft(null)
+    if (next === title) return
+    onRename(session.sessionId, next === ownTitle ? "" : next)
   }
+  const details = (
+    <>
+      <span className="flex items-center gap-3 text-xs text-muted-foreground">
+        {entry.counts ? (
+          <>
+            {entry.counts.working > 0 && <span><span className="font-medium text-foreground tabular-nums">{entry.counts.working}</span> working</span>}
+            {entry.counts.needsYou > 0 && <span className="text-warning"><span className="font-medium tabular-nums">{entry.counts.needsYou}</span> need you</span>}
+            <span><span className="font-medium text-foreground tabular-nums">{entry.counts.size}</span> in crew</span>
+          </>
+        ) : (
+          session.isActive && <span>working</span>
+        )}
+      </span>
+      <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+        {entry.landed && (
+          <Badge variant="outline" className="shrink-0">#{entry.landed.number}</Badge>
+        )}
+        <span className="truncate">
+          {entry.landed ? `${entry.landed.title ?? "Pull request"} · ${nameOf(entry.landed.by.sessionId) ?? ""}` : session.lastUserMessage ?? ""}
+        </span>
+      </span>
+      <span className="text-[11px] tabular-nums text-muted-foreground/80">
+        {entry.counts ? `crew active ${formatRelativeTime(entry.activityAt)}` : formatRelativeTime(entry.activityAt)}
+      </span>
+    </>
+  )
+  const rowClass = "grid w-full grid-cols-1 items-center gap-x-4 gap-y-1 rounded-lg py-3 pl-3 pr-10 text-left xl:grid-cols-[minmax(0,1fr)_auto]"
+
+  return (
+    <li className="group/row relative border-t border-border/70 first:border-t-0">
+      {entry.members.length > 0 && (
+        <div role="group" aria-label={`${title} crew`} className="flex flex-wrap gap-1 px-3 pt-3">
+          {entry.members.map((member, cellIndex) => (
+            <button
+              key={member.sessionId}
+              type="button"
+              aria-label={`Open ${nameOf(member.sessionId) ?? "crew member"}`}
+              title={`${nameOf(member.sessionId)}: ${entry.cells[cellIndex]}`}
+              onClick={() => onOpen(member.sessionId)}
+              className="flex size-5 items-center justify-center rounded-sm outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span className={cn("size-2 rounded-[2px]", CELL[entry.cells[cellIndex]!])} />
+            </button>
+          ))}
+        </div>
+      )}
+      {draft === null ? (
+        <button
+          type="button"
+          onClick={() => onOpen(session.sessionId)}
+          className={cn(rowClass, "outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring")}
+        >
+          <span className="flex min-w-0 items-center gap-2.5">
+            {dot && <span className={cn("size-1.5 shrink-0 rounded-full", dot)} aria-hidden="true" />}
+            <span className="truncate text-[13.5px] font-medium">{title}</span>
+            <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">{projectLabel(session)}</span>
+          </span>
+          {details}
+        </button>
+      ) : (
+        <div className={rowClass}>
+          <span className="flex min-w-0 items-center gap-2.5">
+            {dot && <span className={cn("size-1.5 shrink-0 rounded-full", dot)} aria-hidden="true" />}
+            <Input
+              autoFocus
+              aria-label="Session name"
+              value={draft}
+              placeholder={ownTitle}
+              onChange={(event) => setDraft(event.target.value)}
+              onFocus={(event) => event.target.select()}
+              onBlur={commit}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") { event.preventDefault(); commit() }
+                if (event.key === "Escape") { event.preventDefault(); setDraft(null) }
+              }}
+              className="h-7 max-w-md text-[13.5px] font-medium"
+            />
+            <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">{projectLabel(session)}</span>
+          </span>
+          {details}
+        </div>
+      )}
+      {draft === null && (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={`Rename ${title}`}
+          title="Rename"
+          onClick={() => setDraft(title)}
+          className={cn(
+            "absolute right-2 text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100 focus-visible:opacity-100",
+            entry.members.length > 0 ? "top-[42px]" : "top-2.5",
+          )}
+        >
+          <Pencil data-icon="icon" />
+        </Button>
+      )}
+    </li>
+  )
 }
