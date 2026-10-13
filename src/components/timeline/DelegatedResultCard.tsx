@@ -9,13 +9,15 @@ import { TaskNotificationCard } from "./TaskNotificationCard"
 interface ChildResult {
   turn?: { reply?: unknown } | null
   filesChanged?: unknown
+  /** Changed files a long result left out of `filesChanged`. */
+  filesChangedOmitted?: unknown
 }
 
 function describeResult(result: unknown): { reply: string; raw: string } {
   if (typeof result === "string") return { reply: "", raw: result }
-  const { turn, filesChanged } = (result ?? {}) as ChildResult
+  const { turn, filesChanged, filesChangedOmitted } = (result ?? {}) as ChildResult
   const reply = typeof turn?.reply === "string" ? turn.reply : ""
-  const files = Array.isArray(filesChanged) ? filesChanged.length : 0
+  const files = (Array.isArray(filesChanged) ? filesChanged.length : 0) + (typeof filesChangedOmitted === "number" ? filesChangedOmitted : 0)
   const changed = files ? `\n\n_${files === 1 ? "1 file" : `${files} files`} changed_` : ""
   return { reply: reply + changed, raw: "" }
 }

@@ -424,14 +424,14 @@ function buildQueryOptions(state: SDKSessionState, opts: {
     } catch { /* ignore invalid JSON */ }
   }
 
-  // Ultracode is session-scoped and provided via the `settings` layer (the
-  // --settings equivalent). It needs Workflows enabled to function, so we turn
-  // that on alongside it.
-  if (state.ultracode || state.fastMode) {
-    queryOpts.settings = {
-      ...(state.ultracode ? { ultracode: true, enableWorkflows: true } : {}),
-      ...(state.fastMode ? { fastMode: true } : {}),
-    }
+  // The `settings` layer (the --settings equivalent) outranks the user's own
+  // settings. A full session refuses every message, including the ones agents
+  // send each other, so sessions run here always compact near the limit.
+  // Ultracode needs Workflows enabled to function.
+  queryOpts.settings = {
+    autoCompactEnabled: true,
+    ...(state.ultracode ? { ultracode: true, enableWorkflows: true } : {}),
+    ...(state.fastMode ? { fastMode: true } : {}),
   }
 
   queryOpts.env = cogpitAgentEnv({ ...process.env }, state.sessionId)

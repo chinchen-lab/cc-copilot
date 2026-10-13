@@ -202,6 +202,13 @@ describe("UserMessage — delegated session results", () => {
     expect(screen.getByText("2 files changed")).toBeInTheDocument()
   })
 
+  it("counts the changed files a long result had to leave out", () => {
+    const trimmed = formatTaskWakeup({ id: "task-2", parentSessionId: "parent", childSessionId: "child-2", state: "completed", result: { turn: { reply: "Done." }, filesChanged: Array.from({ length: 600 }, (_, i) => ({ path: `src/generated/module-${i}/deeply/nested/file-${i}.ts` })) } })
+    render(<UserMessage content={trimmed} timestamp="" />)
+    fireEvent.click(screen.getByText("Show detail"))
+    expect(screen.getByText("600 files changed")).toBeInTheDocument()
+  })
+
   it("keeps the raw prompt one click away", () => {
     render(<UserMessage content={wakeup} timestamp="" />)
     fireEvent.click(screen.getByText("Show raw"))

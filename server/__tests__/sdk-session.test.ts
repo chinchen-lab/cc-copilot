@@ -1167,7 +1167,7 @@ describe("sdk-session effort propagation", () => {
     )
   })
 
-  it("non-ultracode sessions do not inject the ultracode setting", async () => {
+  it("non-ultracode sessions only turn auto-compact on", async () => {
     const { createSDKSession } = await loadModule()
 
     createSDKSession({
@@ -1179,7 +1179,8 @@ describe("sdk-session effort propagation", () => {
     await waitUntil(() => captured.length === 1)
 
     expect(captured[0].options.effort).toBe("high")
-    expect(captured[0].options.settings).toBeUndefined()
+    // A full session refuses every message, so it compacts even when the user's settings turn that off.
+    expect(captured[0].options.settings).toEqual({ autoCompactEnabled: true })
   })
 
   it("passes Fast as an independent Claude session setting", async () => {

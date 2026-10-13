@@ -15,6 +15,46 @@ describe("task wakeup", () => {
     expect(typeof parsed?.result).toBe("string")
   })
 
+  it("leaves out the prompt the parent wrote itself", () => {
+    const result = { sessionId: "child", turn: { index: 0, userMessage: "Your task: ".repeat(500), reply: "Done." }, filesChanged: [] }
+    expect(parseTaskWakeup(formatTaskWakeup({ ...task, result }))?.result).toEqual({ sessionId: "child", turn: { index: 0, reply: "Done." }, filesChanged: [] })
+  })
+
+  it("shortens a long reply so the result still reads as a whole, and says where the rest is", () => {
+    const result = { turn: { reply: "line\n".repeat(10000) }, filesChanged: [{ path: "a.ts" }] }
+    const wakeup = formatTaskWakeup({ ...task, result })
+    expect(wakeup.length).toBeLessThan(25000)
+    const parsed = parseTaskWakeup(wakeup)?.result as { turn: { reply: string }; filesChanged: unknown[] }
+    expect(parsed.filesChanged).toEqual([{ path: "a.ts" }])
+    expect(parsed.turn.reply.startsWith("line\nline\n")).toBe(true)
+    expect(parsed.turn.reply.endsWith("[cut to fit; read it all with cogpit-session result child]")).toBe(true)
+  })
+
+  it("keeps a short reply whole when the changed-file list alone is too long, listing the paths that fit", () => {
+    const filesChanged = Array.from({ length: 600 }, (_, i) => ({ path: `src/features/module-${i}/components/really/deep/path/Component${i}.tsx`, type: "edit", additions: 12, deletions: 3 }))
+    const result = { turn: { reply: "Done, but the migration still needs a manual run." }, filesChanged }
+    const wakeup = formatTaskWakeup({ ...task, result })
+    expect(wakeup.length).toBeLessThan(25000)
+    const parsed = parseTaskWakeup(wakeup)?.result as { turn: { reply: string }; filesChanged: { path: string }[]; filesChangedOmitted: number }
+    expect(parsed.turn.reply).toBe("Done, but the migration still needs a manual run.")
+    expect(parsed.filesChanged[0]).toEqual({ path: filesChanged[0]!.path })
+    expect(parsed.filesChanged.length + parsed.filesChangedOmitted).toBe(600)
+    expect(parsed.filesChangedOmitted).toBeGreaterThan(0)
+  })
+
+  it("keeps a short reply whole when the file list alone almost fills the result", () => {
+    const entry = (path: string) => ({ path, type: "edit", additions: 12, deletions: 3 })
+    const size = (files: unknown[]) => JSON.stringify({ turn: { reply: "" }, filesChanged: files }).length
+    const filesChanged = []
+    while (size([...filesChanged, entry("src/features/module/Component.tsx")]) < 23_800) filesChanged.push(entry(`src/features/module-${filesChanged.length}/Component.tsx`))
+    filesChanged.push(entry("x".repeat(23_980 - size([...filesChanged, entry("")]))))
+    expect(size(filesChanged)).toBe(23_980)
+    const reply = "Done, but the migration still needs a manual run."
+    const parsed = parseTaskWakeup(formatTaskWakeup({ ...task, result: { turn: { reply }, filesChanged } }))?.result as { turn: { reply: string }; filesChanged: unknown[]; filesChangedOmitted?: number }
+    expect(parsed.turn.reply).toBe(reply)
+    expect(parsed.filesChanged.length + (parsed.filesChangedOmitted ?? 0)).toBe(filesChanged.length)
+  })
+
   it("ignores ordinary prompts", () => {
     expect(parseTaskWakeup("Delegated task looks fine, carry on")).toBeNull()
     expect(isTaskWakeup("Delegated task looks fine, carry on")).toBe(false)
