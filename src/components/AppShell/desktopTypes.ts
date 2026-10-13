@@ -62,10 +62,8 @@ export type DesktopWorktrees = Pick<
   "worktrees" | "loading" | "refetch"
 >
 
-export interface DesktopNavigation {
-  panels: DesktopPanels
-  actions: DesktopSessionActions
-  handlers: DesktopAppHandlers
+/** How both shells start sessions and move between projects. */
+export interface SessionStartNavigation {
   creatingSession: boolean
   pendingSession: PendingSessionInfo | null
   onStartNewSession: (dirName: string, cwd?: string) => void
@@ -73,9 +71,15 @@ export interface DesktopNavigation {
   newSessionModel: HomeModelControls
   onStartNewFolder: (cwd: string) => void
   onSelectProject: (dirName: string | null) => void
-  onOpenPaletteProject: (dirName: string) => void
   liveSessionsRefreshRef: MutableRefObject<(() => void) | null>
   onPrefetchSession: (dirName: string, fileName: string) => void
+}
+
+export interface DesktopNavigation extends SessionStartNavigation {
+  panels: DesktopPanels
+  actions: DesktopSessionActions
+  handlers: DesktopAppHandlers
+  onOpenPaletteProject: (dirName: string) => void
 }
 
 export interface DesktopSessionView {

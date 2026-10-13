@@ -1,12 +1,10 @@
-import type { MutableRefObject, ReactNode, RefObject } from "react"
-import type { HomeModelControls } from "@/components/home/HomeComposer"
-import type { PendingSessionInfo } from "@/components/session-browser/types"
+import type { ReactNode, RefObject } from "react"
 import type { BgAgent } from "@/hooks/useBackgroundAgents"
 import type { useAppHandlers } from "@/hooks/useAppHandlers"
 import type { useProcessPanel } from "@/hooks/useProcessPanel"
 import type { useSessionActions } from "@/hooks/useSessionActions"
 import type { ChatInputHandle } from "@/components/ChatInput"
-import type { DesktopPanels, DesktopWorktrees } from "./desktopTypes"
+import type { DesktopPanels, DesktopWorktrees, SessionStartNavigation } from "./desktopTypes"
 import type { BuiltInEditorRequest } from "@/lib/fileOpener"
 
 export type MobileSessionActions = Pick<
@@ -24,22 +22,13 @@ export type MobileAppHandlers = Pick<
   | "handleLoadSessionScrollAware"
 >
 
-export interface MobileNavigation {
+export interface MobileNavigation extends SessionStartNavigation {
   panels: Pick<
     DesktopPanels,
     "activeWorkspacePanel" | "openWorkspacePanel" | "closeWorkspacePanel" | "openMainView" | "closeMainView"
   >
   actions: MobileSessionActions
   handlers: MobileAppHandlers
-  creatingSession: boolean
-  pendingSession: PendingSessionInfo | null
-  onStartNewSession: (dirName: string, cwd?: string) => void
-  onStartNewSessionWith: (dirName: string, cwd: string | undefined, message: string) => void
-  newSessionModel: HomeModelControls
-  onStartNewFolder: (cwd: string) => void
-  onSelectProject: (dirName: string | null) => void
-  liveSessionsRefreshRef: MutableRefObject<(() => void) | null>
-  onPrefetchSession: (dirName: string, fileName: string) => void
 }
 
 export interface MobileSessionView {
