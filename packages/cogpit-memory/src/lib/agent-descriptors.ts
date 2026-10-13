@@ -84,6 +84,8 @@ export interface AgentCapabilities {
   readonly imageInput: boolean
   /** A message can be delivered into an already-running turn. */
   readonly midTurnSteering: boolean
+  /** Shared informational input can join active work at the provider's next opportunity. */
+  readonly activeNotifications: boolean
   /** The whole session can be shut down from the composer. */
   readonly stopSession: boolean
   /** Maximum-effort orchestration mode, pinned to the top effort level. */
@@ -690,7 +692,8 @@ const claude: AgentDescriptor = {
     fastTier: true,
     lowPriorityInTerminal: true,
     imageInput: true,
-    midTurnSteering: false,
+    midTurnSteering: true,
+    activeNotifications: true,
     stopSession: true,
     ultracode: true,
     contextWindow: true,
@@ -850,6 +853,7 @@ const codex: AgentDescriptor = {
     lowPriorityInTerminal: false,
     imageInput: true,
     midTurnSteering: true,
+    activeNotifications: true,
     stopSession: false,
     ultracode: false,
     contextWindow: false,
@@ -983,6 +987,7 @@ const copilot: AgentDescriptor = {
     lowPriorityInTerminal: false,
     imageInput: false,
     midTurnSteering: true,
+    activeNotifications: true,
     stopSession: true,
     ultracode: false,
     contextWindow: false,
@@ -1007,7 +1012,7 @@ const acp: AgentDescriptor = {
   launchArgs: { permissions: () => [], model: () => [], effort: () => [], fastTier: () => [] },
   cli: { ...copilot.cli, packageName: "", homebrew: null, wingetId: null, selfUpdate: null, requiresConfiguration: true, homeDirName: ".cogpit-acp", homeEnvVar: "COGPIT_ACP_HOME", homeIsDiscoverable: true, installMarker: "projects" },
   config: { ...copilot.config, rootDirName: ".cogpit-acp", instructions: [], settings: [], skillsDir: null },
-  capabilities: { ...copilot.capabilities, undo: false, redo: false, nativeRewind: false, nativeFork: false, midTurnSteering: false, externalProcesses: false, autoPermissionMode: "never", toolPermissionRules: false, namedSessions: false },
+  capabilities: { ...copilot.capabilities, undo: false, redo: false, nativeRewind: false, nativeFork: false, midTurnSteering: false, activeNotifications: false, externalProcesses: false, autoPermissionMode: "never", toolPermissionRules: false, namedSessions: false },
 }
 
 // ── Registry ────────────────────────────────────────────────────────────────
