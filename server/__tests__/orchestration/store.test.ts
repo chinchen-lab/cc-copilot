@@ -14,6 +14,42 @@ const binding = { hostId: "local", agent: "codex" as const, instanceId: "default
 afterEach(() => { for (const store of stores.splice(0)) store.close(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 
 describe("durable orchestration", () => {
+  it("cancels a notice when its agent becomes idle during authorization", async () => {
+    const store = open()
+    const dispatcher = new CommandDispatcher(store)
+    dispatcher.start()
+    try {
+      const conversation = store.ensureConversation(binding)
+      store.admit("owner", "notice-idle-race", conversation.id, { message: "New crew message", onlyWhileRunning: true }, "steer")
+      let running = true
+      let authorizations = 0
+      const deliver = vi.fn(async () => ({ delivery: "started" as const }))
+      dispatcher.attach("owner", conversation.id, {
+        authorize: async () => { if (++authorizations === 2) running = false; return true },
+        activity: () => ({ live: true, running }),
+        deliver,
+      })
+      await dispatcher.tick()
+      await vi.waitFor(() => expect(store.command("owner", "notice-idle-race")?.receipt.state).toBe("cancelled"))
+      expect(deliver).not.toHaveBeenCalled()
+    } finally { dispatcher.close() }
+  })
+
+  it("cancels a notice rejected by an idle runtime instead of holding it for a new turn", async () => {
+    const store = open()
+    const dispatcher = new CommandDispatcher(store)
+    dispatcher.start()
+    try {
+      const conversation = store.ensureConversation(binding)
+      store.admit("owner", "notice-runtime-race", conversation.id, { message: "New crew message", onlyWhileRunning: true }, "steer")
+      const deliver = vi.fn(async () => ({ delivery: "busy" as const }))
+      dispatcher.attach("owner", conversation.id, { authorize: async () => true, activity: () => ({ live: true, running: true }), deliver })
+      await dispatcher.tick()
+      await vi.waitFor(() => expect(store.command("owner", "notice-runtime-race")?.receipt.state).toBe("cancelled"))
+      expect(deliver).toHaveBeenCalledOnce()
+    } finally { dispatcher.close() }
+  })
+
   it("keeps answer ownership scoped when callers reuse a command ID", () => {
     let time = 1000
     const store = open(":memory:", () => time); const lease = store.acquire("host")!

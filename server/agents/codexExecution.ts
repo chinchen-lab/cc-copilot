@@ -35,6 +35,7 @@ export interface CodexImageInput {
 }
 
 export interface CodexExecutionOptions {
+  onlyWhileRunning?: boolean
   deliveryIntent?: "queue" | "steer" | "restart"
   commandId?: string
   message?: string
@@ -54,11 +55,7 @@ export interface CodexThreadIdentity {
   filePath: string
 }
 
-export interface CodexContinuationResult {
-  action: "started" | "steered" | "busy"
-  threadId: string
-  turnId: string
-}
+export type CodexContinuationResult = { action: "started" | "steered"; threadId: string; turnId: string } | { action: "busy"; threadId: string; turnId?: string }
 
 type ApprovalPolicy = "on-request" | "never"
 type SandboxMode = "workspace-write" | "read-only" | "danger-full-access"
@@ -244,6 +241,8 @@ export async function continueCodexExecution(
     const steered = await client.steerTurn(threadId, input, knownTurnId)
     return { action: "steered", threadId, turnId: steered.turnId }
   }
+
+  if (options.onlyWhileRunning) return { action: "busy", threadId }
 
   if (options.reloadContextWindow) {
     await client.call("thread/unsubscribe", { threadId })

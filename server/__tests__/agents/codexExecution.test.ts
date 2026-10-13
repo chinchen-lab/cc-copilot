@@ -39,6 +39,18 @@ function client(overrides: Partial<CodexExecutionClient> = {}): CodexExecutionCl
 }
 
 describe("Codex execution mappings", () => {
+  it("never starts or resumes an idle thread for an informational notice", async () => {
+    const runtime = client()
+    expect(await continueCodexExecution(runtime, "thread-1", { cwd: "/work", message: "Crew notice", onlyWhileRunning: true })).toEqual({ action: "busy", threadId: "thread-1" })
+    expect(runtime.resumeThread).not.toHaveBeenCalled()
+    expect(runtime.startTurn).not.toHaveBeenCalled()
+  })
+  it("delivers an informational notice into an active turn", async () => {
+    const runtime = client({ getActiveTurnId: vi.fn().mockReturnValue("running") })
+    expect(await continueCodexExecution(runtime, "thread-1", { cwd: "/work", message: "Crew notice", onlyWhileRunning: true, deliveryIntent: "steer" })).toMatchObject({ action: "steered" })
+    expect(runtime.steerTurn).toHaveBeenCalledWith("thread-1", expect.anything(), "running")
+    expect(runtime.startTurn).not.toHaveBeenCalled()
+  })
   it("marks a definitive model rejection before turn acceptance and keeps an uncertain delivery ambiguous", () => {
     expect(codexSendError(new CodexAppServerRpcError("turn/start", { code: -32602, message: "There is an issue with the selected model" }))).toMatchObject({ status: 400, code: "MODEL_REJECTED" })
     expect(codexSendError(new CodexAppServerError("RPC timed out: selected model might be unavailable"))).toMatchObject({ status: 500, code: "INTERNAL_ERROR" })

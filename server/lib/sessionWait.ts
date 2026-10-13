@@ -25,6 +25,7 @@ export interface SessionState extends Partial<SessionStatusInfo> {
   outcome: SessionOutcome
   live: boolean
   running: boolean
+  activeNotifications?: boolean
   waiting: PendingInput[]
   error?: string
   environment?: WorkspaceEnvironment
@@ -78,6 +79,7 @@ export async function readSessionState(sessionId: string): Promise<SessionState>
     sessionId,
     outcome,
     ...activity,
+    activeNotifications: runtime.descriptor.capabilities.activeNotifications,
     ...statusInfo,
     waiting,
     ...workspace,

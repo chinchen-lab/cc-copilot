@@ -92,7 +92,7 @@ An independently launched memory CLI can set that variable to Cogpit's data root
 
 SQLite at `<dataRoot>/orchestration/state.sqlite` is separate from native provider
 transcripts. Node uses its native SQLite driver; Bun uses `bun:sqlite`. It uses WAL and FULL synchronous transactions, owner-only files on
-POSIX, transactional schema version 3 migrations, and refuses future schemas.
+POSIX, transactional schema version 4 migrations, and refuses future schemas.
 Answer links and handoff reservations retain the caller scope. Legacy answer links
 remain resolved until explicit reconciliation; legacy handoffs acquire an owner
 only when exactly one stored operation identifies it. Ambiguous legacy records
@@ -130,6 +130,18 @@ Final assistant replies can render `cogpit-status`, `cogpit-decisions` and
 answers persist per reply and block, and send together as one message.
 `cogpit-session board set`, `progress`, `get` and `clear` keep a local session
 board pinned above the crew’s composer.
+
+The Crew panel's Chat tab shares a durable history across its root and nested
+members. Agents use `cogpit-session chat post`, `fetch`, `members` and `listen
+on|off`. Members listen by default: working listeners get short notices with a
+fetch command; mentions deliver the full message even when listening is off and
+can resume an idle member. Notifications never start idle agents. Providers
+without active notification support keep history available to fetch and queue
+direct mentions for their next turn. Each agent has its own unread cursor.
+History and listening settings survive restarts; stable post and delivery IDs
+prevent duplicates. The chat requires access to the crew's lead, and deliveries
+recheck access to both the lead and recipient. Remote delivery requires the
+`crewChat: 1` handshake and includes the coordinating host's fetch command.
 
 The global device list, wall view, delegation budgets/launch review and editable
 boards are later phases. Current home data is scoped to the selected device.

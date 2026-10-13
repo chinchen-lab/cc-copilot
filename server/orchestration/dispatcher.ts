@@ -74,9 +74,17 @@ export class CommandDispatcher {
       if (!await authority.authorize(command).catch(() => false)) { this.store.finish(command, lease, "held", { error: "Access changed before delivery" }); return }
       const currentAttempt = () => !this.closed && this.store.currentAttempt(command, lease)
       if (!currentAttempt()) return
+      if (command.payload.onlyWhileRunning && !authority.activity(command).running) {
+        this.store.finish(command, lease, "cancelled", { error: "Informational notification skipped because the agent is idle." })
+        return
+      }
       const outcome = await authority.deliver(command, currentAttempt)
       if (this.closed) return
       if (outcome.delivery === "busy") {
+        if (command.payload.onlyWhileRunning) {
+          this.store.finish(command, lease, "cancelled", { error: "Informational notification could not join the active turn." })
+          return
+        }
         this.store.finish(command, lease, "held", { error: "Agent is busy; review and resume the queue." })
         return
       }

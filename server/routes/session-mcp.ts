@@ -4,8 +4,8 @@ import { commandScope } from "../lib/durableSend"
 import { runSessionCli } from "../sessionCli/commands"
 import { sendJson, withJsonBody, type UseFn } from "../http"
 
-const commands = { session_new: "new", session_send: "send", session_status: "status", session_result: "result", session_answer: "answer", session_tasks: "tasks", session_receipt: "receipt", session_approve: "approve", session_deny: "deny", session_interrupt: "interrupt", session_stop: "stop", session_children: "children", conversation_transition: "transition" } as const
-const descriptions: Record<keyof typeof commands, string> = { session_new: "Create a session with durable creation deduplication.", session_send: "Queue, steer or restart a session with a durable receipt.", session_status: "Read session activity and pending requests.", session_result: "Read a session’s final result.", session_answer: "Answer a pending request.", session_tasks: "Read and acknowledge durable delegated results.", session_receipt: "Read a durable delivery receipt.", session_approve: "Approve a pending native permission or plan.", session_deny: "Deny a pending native permission or plan.", session_interrupt: "Interrupt a running turn.", session_stop: "Stop sessions.", session_children: "List child sessions.", conversation_transition: "Resume a compatible native session or create a bounded context handoff." }
+const commands = { session_new: "new", session_send: "send", session_status: "status", session_result: "result", session_answer: "answer", session_tasks: "tasks", session_receipt: "receipt", session_approve: "approve", session_deny: "deny", session_interrupt: "interrupt", session_stop: "stop", session_children: "children", session_chat: "chat", conversation_transition: "transition" } as const
+const descriptions: Record<keyof typeof commands, string> = { session_new: "Create a session with durable creation deduplication.", session_send: "Queue, steer or restart a session with a durable receipt.", session_status: "Read session activity and pending requests.", session_result: "Read a session’s final result.", session_answer: "Answer a pending request.", session_tasks: "Read and acknowledge durable delegated results.", session_receipt: "Read a durable delivery receipt.", session_approve: "Approve a pending native permission or plan.", session_deny: "Deny a pending native permission or plan.", session_interrupt: "Interrupt a running turn.", session_stop: "Stop sessions.", session_children: "List child sessions.", session_chat: "Post, fetch, list members or change listening in your crew's shared chat.", conversation_transition: "Resume a compatible native session or create a bounded context handoff." }
 const readCommands = new Set(["status", "result", "receipt", "children"])
 export function registerSessionMcpRoutes(use: UseFn): void {
   use("/api/session-mcp", (req, res) => {
@@ -24,13 +24,14 @@ export function registerSessionMcpRoutes(use: UseFn): void {
       const args = body.params?.arguments as Record<string, unknown> | undefined
       if (typeof name !== "string" || !Object.hasOwn(commands, name) || !args || !Array.isArray(args.argv) || args.argv.length > 100 || args.argv.some((arg) => typeof arg !== "string" || arg.length > 50000)) return failure(-32602, "Unknown tool or invalid argv")
       const command = commands[name as keyof typeof commands]
-      const mutating = !readCommands.has(command) && !(command === "tasks" && !(args.argv as string[]).some((arg) => /^--(?:ack|cancel)(?:=|$)/.test(arg)))
+      const mutating = !readCommands.has(command) && !(command === "tasks" && !(args.argv as string[]).some((arg) => /^--(?:ack|cancel)(?:=|$)/.test(arg))) && !(command === "chat" && ["fetch", "members"].includes(String(args.argv[0])))
       if (mutating && (typeof args.commandId !== "string" || !/^[A-Za-z0-9_-]{8,128}$/.test(args.commandId))) return failure(-32602, "A stable commandId is required for mutations")
       const callerSessionId = typeof args.callerSessionId === "string" ? args.callerSessionId : undefined
       if (callerSessionId && await authorizeSession(req, res, { sessionId: callerSessionId }, "interact") === null) return
       try {
         const argv = [command, ...args.argv as string[]]
         if (["send", "answer", "transition"].includes(command)) argv.push("--command-id", String(args.commandId))
+        if (command === "chat" && typeof args.commandId === "string") argv.push("--command-id", args.commandId)
         const result = await runSessionCli({ argv, cwd: typeof args.cwd === "string" ? args.cwd : process.cwd(), callerSessionId, invocationId: typeof args.commandId === "string" ? args.commandId : randomUUID(), scope: commandScope(req), admin: mayActHostWide(req), visible: visibilityFor(req), req })
         reply({ content: [{ type: "text", text: result.stdout || result.stderr }], isError: result.exitCode !== 0 })
       } catch (error) { failure(-32000, error instanceof Error ? error.message : "Session tool failed") }

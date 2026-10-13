@@ -19,7 +19,7 @@ export interface SessionHost {
   readonly remote: boolean
   create(input: HostCreateInput): Promise<{ sessionId: string; dirName: string }>
   /** Deliver a follow-up without waiting for the turn it starts. */
-  send(sessionId: string, message: string, options?: { interrupt?: boolean; commandId?: string; req?: IncomingMessage; intent?: CommandIntent }): Promise<{ delivery: string; receipt?: CommandReceipt }>
+  send(sessionId: string, message: string, options?: { interrupt?: boolean; commandId?: string; req?: IncomingMessage; intent?: CommandIntent; onlyWhileRunning?: boolean; notification?: boolean; leadSessionId?: string }): Promise<{ delivery: string; receipt?: CommandReceipt }>
   receipt?(commandId: string, req?: IncomingMessage, waitMs?: number): Promise<CommandReceipt | null>
   transition?(input: TransitionInput | (TransitionResolution & { action: "resolve" }), req: IncomingMessage): Promise<unknown>
   state(sessionId: string): Promise<SessionState>

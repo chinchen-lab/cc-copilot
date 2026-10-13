@@ -370,6 +370,7 @@ export const copilotRuntime: AgentRuntime = {
   },
 
   async send(sessionId, req: SendRequest): Promise<SendOutcome> {
+    if (req.onlyWhileRunning && !transport.isTurnActive(sessionId)) return { delivery: "busy" }
     if (!transport.isSessionActive(sessionId)) {
       await transport.resumeSession(sessionId, {
         workingDirectory: await resolveSessionCwd(req.cwd, req.filePath),
@@ -390,6 +391,7 @@ export const copilotRuntime: AgentRuntime = {
 
     const attachments = buildAttachments(req.images)
     const steering = transport.isTurnActive(sessionId)
+    if (req.onlyWhileRunning && !steering) return { delivery: "busy" }
     if (steering && req.deliveryIntent === "queue") return { delivery: "busy" }
     const observed = req.commandId ? transport.observeTurn(sessionId) : null
     void observed?.completion.catch(() => {})

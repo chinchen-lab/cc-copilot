@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../lib/sessionCreate", () => ({ createSession: mocks.createSession }))
 vi.mock("../../lib/sessionSend", () => ({ sendToSession: mocks.sendToSession }))
+vi.mock("../../lib/sessionSettings", () => ({
+  withSessionSettings: async (_sessionId: string, request: object) => ({ ...request, permissions: { mode: "bypassPermissions" }, effort: "xhigh" }),
+}))
 vi.mock("../../routes/projects/projectList", () => ({ listProjects: vi.fn() }))
 vi.mock("../../lib/sessionWait", async (importOriginal) => ({
   ...await importOriginal<Record<string, unknown>>(),
@@ -46,7 +49,7 @@ describe("localHost", () => {
     }))
   })
 
-  it("interrupts first when asked and keeps a resume failure for wait", async () => {
+  it("interrupts first when asked, sends with the session's own settings and keeps a resume failure for wait", async () => {
     let settle: (value: { isError: boolean; message?: string }) => void = () => {}
     mocks.sendToSession.mockResolvedValue({
       outcome: { delivery: "started", completion: new Promise((resolve) => { settle = resolve }) },
@@ -54,7 +57,7 @@ describe("localHost", () => {
     expect(await localHost.send("s1", "and now docs", { interrupt: true })).toEqual({ delivery: "started" })
     expect(mocks.interrupt).toHaveBeenCalledWith("s1")
     expect(mocks.clearTurnError).toHaveBeenCalledWith("s1")
-    expect(mocks.sendToSession).toHaveBeenCalledWith("s1", { message: "and now docs" })
+    expect(mocks.sendToSession).toHaveBeenCalledWith("s1", { message: "and now docs", permissions: { mode: "bypassPermissions" }, effort: "xhigh" })
 
     settle({ isError: true, message: "resume failed" })
     await vi.waitFor(() => expect(mocks.recordTurnError).toHaveBeenCalledWith("s1", "resume failed"))

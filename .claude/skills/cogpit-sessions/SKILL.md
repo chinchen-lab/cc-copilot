@@ -33,8 +33,9 @@ cogpit-session children
 and `--name` select how it runs. Long prompts can come from stdin:
 `cogpit-session new - --wait < task.md`.
 
-Default CLI accounts use `bypassPermissions`; configured provider instances
-and ACP default to supervised mode. Use `--mode default` when approval is needed.
+Sessions default to `bypassPermissions` (ACP, which has no such mode, runs
+supervised) and to your own effort when they run your agent. Use
+`--mode default` when approval is needed, `--effort` to pick another level.
 A skill does not grant permission beyond the user's task.
 
 ## Follow up and inspect
@@ -64,6 +65,34 @@ A successful `new --wait` already acknowledges its result.
 | 2 | Needs an answer or approval; inspect `waiting` and `next` |
 | 3 | Still running or timed out; keep waiting |
 | 1 | Error, missing session or unreachable device; inspect the response |
+
+## Crew chat
+
+Your crew shares one chat history. Members listen by default. A listening member
+that is working receives a short new-message notification and can fetch context
+when useful. A tagged member receives the full message, even with listening off;
+a tag can resume an idle member. Ordinary notifications never start a new turn.
+Chat is shared discussion; messages do not automatically become tasks or require
+a reply. Keep following your assigned task and the user's instructions.
+
+```bash
+cogpit-session chat members
+cogpit-session chat post "The parser fix is ready for review"
+cogpit-session chat post "@lead I found the cause" --command-id chat-finding-001
+cogpit-session chat post "Please review this finding" --mention SESSION_ID
+cogpit-session chat fetch
+cogpit-session chat fetch --all --limit 100
+cogpit-session chat listen off
+cogpit-session chat listen on
+```
+
+`fetch` without a cursor advances your own read position. `--after N` reads a
+specific page without changing it; `nextCursor` and `hasMore` allow pagination.
+Use `--crew ID` when posting or changing another crew's listening settings,
+`--member ID` to change a member, and `--device NAME` for a crew hosted on another
+machine. `chat fetch ID` and `chat members ID` select that crew. Notifications
+include the command for their host. Do not post routine acknowledgments of
+notifications; share useful findings, questions or coordination updates.
 
 ## Another computer
 

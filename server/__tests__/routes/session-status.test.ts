@@ -176,6 +176,7 @@ describe("GET /api/session-status/:sessionId", () => {
       outcome: "completed",
       live: false,
       running: false,
+      activeNotifications: true,
       status: "completed",
       waiting: [],
     })
@@ -192,6 +193,7 @@ describe("GET /api/session-status/:sessionId", () => {
       outcome: "error",
       live: false,
       running: false,
+      activeNotifications: true,
       status: "completed",
       terminalReason: "max_turns",
       waiting: [],

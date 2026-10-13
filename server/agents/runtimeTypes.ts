@@ -83,6 +83,9 @@ export interface StartedSession {
 }
 
 export interface SendRequest extends AgentTurnSettings {
+  /** Informational delivery may join active work, but must never open a new turn. */
+  onlyWhileRunning?: boolean
+  notification?: boolean
   deliveryIntent?: "queue" | "steer" | "restart"
   commandId?: string
   message?: string

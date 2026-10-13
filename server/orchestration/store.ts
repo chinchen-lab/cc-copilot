@@ -3,6 +3,7 @@ import { chmodSync, existsSync, mkdirSync } from "node:fs"
 import { dirname } from "node:path"
 import { openDatabase, type SqliteDatabase } from "./database"
 import type { CommandIntent, CommandReceipt, CommandState, Conversation, ConversationEvent, DelegatedTask, EventPage, NativeBinding, ProviderInstance } from "../../shared/contracts/orchestration"
+import type { CrewChatAuthor, CrewChatDelivery, CrewChatMessage } from "../../shared/contracts/crewChat"
 
 type Row = Record<string, unknown>
 export interface StoredCommand {
@@ -45,7 +46,7 @@ export class OrchestrationStore {
     try {
       this.db.exec("PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")
       const version = Number((this.db.prepare("PRAGMA user_version").get() as Row).user_version)
-      if (version > 3) throw new Error("Orchestration database was created by a newer Cogpit; upgrade before opening it")
+      if (version > 4) throw new Error("Orchestration database was created by a newer Cogpit; upgrade before opening it")
       this.transaction(() => {
         this.db.exec(`
           CREATE TABLE IF NOT EXISTS conversations(id TEXT PRIMARY KEY, native_key TEXT UNIQUE NOT NULL, data TEXT NOT NULL);
@@ -60,6 +61,11 @@ export class OrchestrationStore {
           CREATE TABLE IF NOT EXISTS instances(id TEXT PRIMARY KEY, data TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS transitions(conversation_id TEXT PRIMARY KEY, operation_id TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS operations(scope TEXT NOT NULL,id TEXT NOT NULL,fingerprint TEXT NOT NULL,input TEXT NOT NULL,result TEXT,PRIMARY KEY(scope,id));
+          CREATE TABLE IF NOT EXISTS crew_chat_messages(sequence INTEGER PRIMARY KEY AUTOINCREMENT,root_id TEXT NOT NULL,scope TEXT NOT NULL,id TEXT NOT NULL,fingerprint TEXT NOT NULL,data TEXT NOT NULL,UNIQUE(scope,id));
+          CREATE INDEX IF NOT EXISTS crew_chat_history ON crew_chat_messages(root_id,sequence);
+          CREATE TABLE IF NOT EXISTS crew_chat_listeners(root_id TEXT NOT NULL,session_id TEXT NOT NULL,listening INTEGER NOT NULL DEFAULT 1,cursor INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(root_id,session_id));
+          CREATE TABLE IF NOT EXISTS crew_chat_deliveries(sequence INTEGER NOT NULL REFERENCES crew_chat_messages(sequence) ON DELETE CASCADE,session_id TEXT NOT NULL,scope TEXT NOT NULL,kind TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'pending',error TEXT,PRIMARY KEY(sequence,session_id));
+          CREATE INDEX IF NOT EXISTS crew_chat_pending ON crew_chat_deliveries(scope,state,sequence);
         `)
         if (!(this.db.prepare("PRAGMA table_info(events)").all() as Row[]).some((row) => row.name === "scope")) this.db.exec("ALTER TABLE events ADD COLUMN scope TEXT")
         if (!(this.db.prepare("PRAGMA table_info(operations)").all() as Row[]).some((row) => row.name === "updated_at")) this.db.exec("ALTER TABLE operations ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0")
@@ -68,7 +74,7 @@ export class OrchestrationStore {
           this.db.exec("ALTER TABLE transitions ADD COLUMN scope TEXT")
           this.db.exec("UPDATE transitions SET scope=(SELECT scope FROM operations WHERE id=transitions.operation_id) WHERE (SELECT COUNT(*) FROM operations WHERE id=transitions.operation_id)=1")
         }
-        this.db.exec("PRAGMA user_version=3")
+        this.db.exec("PRAGMA user_version=4")
       })
       this.protectFiles()
     } catch (error) { this.db.close(); throw error }
@@ -99,6 +105,56 @@ export class OrchestrationStore {
   }
 
   close(): void { this.listeners.clear(); this.db.close() }
+  chatListener(rootId: string, sessionId: string): { listening: boolean; cursor: number } {
+    const row = this.db.prepare("SELECT listening,cursor FROM crew_chat_listeners WHERE root_id=? AND session_id=?").get(rootId, sessionId) as Row | undefined
+    return { listening: row ? Boolean(row.listening) : true, cursor: Number(row?.cursor ?? 0) }
+  }
+  setChatListening(rootId: string, sessionId: string, listening: boolean): void {
+    this.transaction(() => this.db.prepare("INSERT INTO crew_chat_listeners(root_id,session_id,listening) VALUES(?,?,?) ON CONFLICT(root_id,session_id) DO UPDATE SET listening=excluded.listening").run(rootId, sessionId, Number(listening)))
+  }
+  setChatCursor(rootId: string, sessionId: string, cursor: number): void {
+    this.transaction(() => this.db.prepare("INSERT INTO crew_chat_listeners(root_id,session_id,cursor) VALUES(?,?,?) ON CONFLICT(root_id,session_id) DO UPDATE SET cursor=MAX(cursor,excluded.cursor)").run(rootId, sessionId, cursor))
+  }
+  finishChatFetch(scope: string, id: string | undefined, hash: string, rootId: string, reader: string, page: { messages: CrewChatMessage[]; nextCursor: number; hasMore: boolean }): void {
+    this.transaction(() => {
+      if (id) this.beginOperation(scope, id, hash, { sessionId: rootId, reader })
+      this.setChatCursor(rootId, reader, page.nextCursor)
+      if (id) this.finishOperation(scope, id, page)
+    })
+  }
+  postChat(scope: string, id: string, input: { rootId: string; author: CrewChatAuthor; text: string; mentions: string[] }, recipients: Pick<CrewChatDelivery, "sessionId" | "kind">[]): CrewChatMessage {
+    if (!/^[a-zA-Z0-9_-]{8,128}$/.test(id)) throw new OrchestrationError(400, "commandId must contain 8–128 letters, digits, underscores or hyphens")
+    return this.transaction(() => {
+      const hash = fingerprint(input)
+      const existing = this.db.prepare("SELECT sequence,fingerprint,data FROM crew_chat_messages WHERE scope=? AND id=?").get(scope, id) as Row | undefined
+      if (existing) {
+        if (existing.fingerprint !== hash) throw new OrchestrationError(409, "commandId was already accepted with different chat content")
+        return { ...decode<CrewChatMessage>(existing.data), sequence: Number(existing.sequence) }
+      }
+      const message = { id, ...input, createdAt: this.now() }
+      const result = this.db.prepare("INSERT INTO crew_chat_messages(root_id,scope,id,fingerprint,data) VALUES(?,?,?,?,?)").run(input.rootId, scope, id, hash, JSON.stringify(message))
+      const sequence = Number(result.lastInsertRowid)
+      for (const recipient of recipients) this.db.prepare("INSERT INTO crew_chat_deliveries(sequence,session_id,scope,kind) VALUES(?,?,?,?)").run(sequence, recipient.sessionId, scope, recipient.kind)
+      return { ...message, sequence }
+    })
+  }
+  chatMessage(sequence: number): CrewChatMessage | null {
+    const row = this.db.prepare("SELECT data FROM crew_chat_messages WHERE sequence=?").get(sequence) as Row | undefined
+    return row ? { ...decode<CrewChatMessage>(row.data), sequence } : null
+  }
+  chatMessages(rootId: string, options: { after?: number; before?: number; limit: number }): CrewChatMessage[] {
+    const rows = options.after !== undefined
+      ? this.db.prepare("SELECT sequence,data FROM crew_chat_messages WHERE root_id=? AND sequence>? ORDER BY sequence LIMIT ?").all(rootId, options.after, options.limit)
+      : this.db.prepare("SELECT sequence,data FROM crew_chat_messages WHERE root_id=? AND sequence<? ORDER BY sequence DESC LIMIT ?").all(rootId, options.before ?? Number.MAX_SAFE_INTEGER, options.limit)
+    const messages = (rows as Row[]).map((row) => ({ ...decode<CrewChatMessage>(row.data), sequence: Number(row.sequence) }))
+    return options.after !== undefined ? messages : messages.reverse()
+  }
+  chatDeliveries(rootId: string, scope: string): CrewChatDelivery[] {
+    return (this.db.prepare("SELECT d.* FROM crew_chat_deliveries d JOIN crew_chat_messages m ON m.sequence=d.sequence WHERE m.root_id=? AND d.scope=? AND d.state='pending' ORDER BY d.sequence").all(rootId, scope) as Row[]).map((row) => ({ sequence: Number(row.sequence), sessionId: String(row.session_id), scope: String(row.scope), kind: row.kind as CrewChatDelivery["kind"], state: "pending", ...(row.error ? { error: String(row.error) } : {}) }))
+  }
+  updateChatDelivery(delivery: CrewChatDelivery, state: CrewChatDelivery["state"], error?: string): void {
+    this.transaction(() => this.db.prepare("UPDATE crew_chat_deliveries SET state=?,error=? WHERE sequence=? AND session_id=?").run(state, error ?? null, delivery.sequence, delivery.sessionId))
+  }
   subscribe(listener: (event: ConversationEvent) => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener) }
   private event(conversationId: string, type: ConversationEvent["type"], data: unknown, scope?: string): void {
     const createdAt = this.now()
@@ -414,6 +470,9 @@ export class OrchestrationStore {
   }
   forgetSession(sessionId: string): void {
     this.transaction(() => {
+      this.db.prepare("DELETE FROM crew_chat_messages WHERE root_id=?").run(sessionId)
+      this.db.prepare("DELETE FROM crew_chat_listeners WHERE root_id=? OR session_id=?").run(sessionId, sessionId)
+      this.db.prepare("DELETE FROM crew_chat_deliveries WHERE session_id=?").run(sessionId)
       this.db.prepare("DELETE FROM commands WHERE json_extract(receipt,'$.sessionId')=?").run(sessionId)
       for (const row of this.db.prepare("SELECT native_key,conversation_id,data FROM bindings").all() as Row[]) {
         if (decode<NativeBinding>(row.data).sessionId !== sessionId) continue

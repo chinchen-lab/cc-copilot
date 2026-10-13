@@ -12,7 +12,7 @@ import { isSessionTokenActive } from "../security"
 import { SESSION_ABSOLUTE_TTL_MS, SESSION_IDLE_TTL_MS } from "../sessionConstants"
 import { CommandDispatcher } from "../orchestration/dispatcher"
 import { beforeOrchestrationClose, orchestrationStore } from "../orchestration/storage"
-import { OrchestrationError } from "../orchestration/store"
+import { OrchestrationError, type StoredCommand } from "../orchestration/store"
 import { setSessionsArchived } from "./sessionArchive"
 
 let active: { store: ReturnType<typeof orchestrationStore>; dispatcher: CommandDispatcher } | undefined
@@ -54,22 +54,29 @@ function executionRequest(authentication: RequestAuthentication | null, original
 
 export function refreshExecutionRequest(req: IncomingMessage): IncomingMessage | null { return executionRequest(getRequestAuthentication(req), commandScope(req)) }
 
+/** The session a command goes to, and the crew lead it speaks for when it carries one. */
+async function mayDeliver(request: IncomingMessage, command: StoredCommand): Promise<boolean> {
+  const lead = command.payload.leadSessionId
+  for (const sessionId of typeof lead === "string" ? [command.receipt.sessionId, lead] : [command.receipt.sessionId]) {
+    const level = await accessLevelOf(request, sessionId)
+    if (level === null || !accessAtLeast(level, "interact")) return false
+  }
+  return true
+}
+
 export function attachCommandAuthority(scope: string, conversationId: string, runtime: AgentRuntime, req?: IncomingMessage): void {
   const authentication = req ? getRequestAuthentication(req) : null
   const dispatcher = commandDispatcher()
   dispatcher.attach(scope, conversationId, {
     async authorize(command) {
       const request = executionRequest(authentication, scope)
-      if (!request) return false
-      const level = await accessLevelOf(request, command.receipt.sessionId)
-      return level !== null && accessAtLeast(level, "interact")
+      return request !== null && await mayDeliver(request, command)
     },
     async deliver(command, currentAttempt) {
-      if (command.receipt.intent === "steer" && !runtime.descriptor.capabilities.midTurnSteering) throw new OrchestrationError(400, "This provider does not support steering a running turn")
+      if (command.receipt.intent === "steer" && !runtime.descriptor.capabilities.midTurnSteering && !(command.payload.notification && runtime.descriptor.capabilities.activeNotifications)) throw new OrchestrationError(400, "This provider does not support steering a running turn")
       const request = executionRequest(authentication, scope)
       if (!request) throw new OrchestrationError(403, "Sign in again before delivering queued work")
-      const level = await accessLevelOf(request, command.receipt.sessionId)
-      if (level === null || !accessAtLeast(level, "interact")) throw new OrchestrationError(403, "Session access changed")
+      if (!await mayDeliver(request, command)) throw new OrchestrationError(403, "Session access changed")
       const assertCurrent = () => { if (!currentAttempt()) throw new OrchestrationError(409, "Dispatcher ownership changed before provider delivery") }
       assertCurrent()
       if (command.receipt.intent === "restart") await runtime.interrupt(command.receipt.sessionId)
@@ -95,6 +102,8 @@ export async function admitSessionCommand(options: {
   request: SendRequest
   req?: IncomingMessage
   intent?: CommandIntent
+  /** A crew lead the command speaks for: delivery keeps requiring access to it too. */
+  leadSessionId?: string
   answer?: AcceptedAnswer
   answerInput?: unknown
   binding?: NativeBinding
@@ -114,7 +123,7 @@ export async function admitSessionCommand(options: {
   const conversation = store.ensureConversation(binding)
   if (conversation.binding.sessionId !== sessionId) throw new OrchestrationError(409, "This conversation moved to another native session; open its current binding")
   attachCommandAuthority(scope, conversation.id, runtime, req)
-  const payload: Record<string, unknown> = { ...request, filePath: resolved.filePath ?? binding.filePath }
+  const payload: Record<string, unknown> = { ...request, filePath: resolved.filePath ?? binding.filePath, ...(options.leadSessionId ? { leadSessionId: options.leadSessionId } : {}) }
   let receipt: CommandReceipt
   if (answer?.durableQuestion) {
     const { instanceId, sessionId: questionSessionId, requestId } = answer.durableQuestion

@@ -243,7 +243,7 @@ export function registerSessionOrchestrationRoutes(use: UseFn) {
         const host = await hostForSession(sessionId, scopeOf(req))
         if (body.commandId !== undefined && typeof body.commandId !== "string") return sendJson(res, 400, { error: "commandId must be a string" })
         if (body.intent !== undefined && !["queue", "steer", "restart"].includes(String(body.intent))) return sendJson(res, 400, { error: "Invalid delivery intent" })
-        const delivered = await host.send(sessionId, message, { interrupt: interrupt === true, commandId: body.commandId as string | undefined, intent: body.intent as "queue" | "steer" | "restart" | undefined, req })
+        const delivered = await host.send(sessionId, message, { interrupt: interrupt === true, commandId: body.commandId as string | undefined, intent: body.intent as "queue" | "steer" | "restart" | undefined, ...(body.onlyWhileRunning === true ? { onlyWhileRunning: true } : {}), ...(body.notification === true ? { notification: true } : {}), req })
         watchDelegatedRequestsOf(sessionId)
         sendJson(res, 200, delivered)
       } catch (error) {

@@ -1,12 +1,11 @@
 import { isValidContextWindowTokens } from "../../shared/session/contextWindowSettings"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import { mayActHostWide, authorizeSession, markDecided } from "../edition"
-import { readTranscriptEffort, sendJson } from "../helpers"
-import { findJsonlPath } from "../sessionPaths"
+import { sendJson } from "../helpers"
 import { RouteError, sendError, ErrorCodes } from "../lib/routeError"
 import { isStoreFile } from "../lib/sessionConfigDir"
 import { readSessionConfig } from "../lib/sessionConfigStore"
-import { writeSessionConfig } from "../lib/sessionSettings"
+import { sessionEffort, writeSessionConfig } from "../lib/sessionSettings"
 import { HttpBodyError, readJsonBody, type UseFn } from "../http"
 
 // Per-session UI configuration (model, effort, permission mode, MCP selection …)
@@ -66,9 +65,7 @@ async function authorizeKey(
  *
  * A stored effort wins, because it is the only value that can be newer than the
  * transcript: a freshly picked effort has not run a turn yet, so overlaying the
- * recorded one would revert the user's choice on the next hydration. An empty
- * string is not a choice — it means "use the provider default" — so it still
- * takes the transcript value.
+ * recorded one would revert the user's choice on the next hydration.
  */
 async function withTranscriptEffort(
   key: string,
@@ -77,17 +74,8 @@ async function withTranscriptEffort(
   // Keys are session fileNames or project dirNames; only the former have a transcript.
   const sessionId = sessionOfKey(key)
   if (sessionId === null) return stored
-  if (typeof stored.effort === "string" && stored.effort) return stored
-
-  try {
-    const filePath = await findJsonlPath(sessionId)
-    if (!filePath) return stored
-    const effort = await readTranscriptEffort(filePath)
-    return effort ? { ...stored, effort } : stored
-  } catch {
-    // An unreadable transcript must not break loading session config.
-    return stored
-  }
+  const effort = await sessionEffort(sessionId, stored)
+  return effort ? { ...stored, effort } : stored
 }
 
 function parsePatch(parsed: unknown): Record<string, unknown> {

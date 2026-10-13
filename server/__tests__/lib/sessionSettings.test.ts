@@ -9,7 +9,7 @@ import type { AgentTurnSettings } from "../../agents/runtimeTypes"
 import { dirs } from "../../dirs"
 import { __resetEditionForTest, type EditionSessionSettings } from "../../edition"
 import { readSessionConfig, sessionConfigKey, updateSessionConfig } from "../../lib/sessionConfigStore"
-import { heldLiveUpdate, settleTurnSettings, storeAppliedSettings, writeSessionConfig } from "../../lib/sessionSettings"
+import { heldLiveUpdate, settleTurnSettings, storeAppliedSettings, storeStartedSettings, withSessionSettings, writeSessionConfig } from "../../lib/sessionSettings"
 import { installFakeEdition } from "../edition/fakeEdition"
 
 const SESSION = "5e000000-0000-4000-8000-0000000005e7"
@@ -139,5 +139,23 @@ describe("an edition's session settings", () => {
     await writeSessionConfig(REQ, KEY, SESSION, { model: "opus" })
     await writeSessionConfig(REQ, "-Users-me-proj", null, { model: "haiku" })
     expect(hooks.onConfigWrite).toHaveBeenCalledOnce()
+  })
+})
+
+describe("sends from outside the composer", () => {
+  it("run with the session's stored permission mode and effort where they name none", async () => {
+    await updateSessionConfig(KEY, () => ({ permissionMode: "bypassPermissions", effort: "xhigh" }))
+
+    expect(await withSessionSettings(SESSION, { message: "hi" })).toEqual({ message: "hi", permissions: { mode: "bypassPermissions" }, effort: "xhigh" })
+    expect(await withSessionSettings(SESSION, { message: "hi", permissions: { mode: "plan" }, effort: "low" })).toEqual({ message: "hi", permissions: { mode: "plan" }, effort: "low" })
+  })
+
+  it("keep the mode and effort a session started with, without replacing ones already chosen", async () => {
+    await storeStartedSettings(SESSION, { mode: "bypassPermissions", effort: "xhigh" })
+    expect(await readSessionConfig(KEY)).toEqual({ permissionMode: "bypassPermissions", effort: "xhigh" })
+
+    await updateSessionConfig(KEY, () => ({ permissionMode: "plan", effort: "low" }))
+    await storeStartedSettings(SESSION, { mode: "bypassPermissions", effort: "xhigh" })
+    expect(await readSessionConfig(KEY)).toEqual({ permissionMode: "plan", effort: "low" })
   })
 })

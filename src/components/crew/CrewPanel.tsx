@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight, MailCheck, Network, Square, X } from "lucide
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CrewChat } from "./CrewChat"
 import { PendingInputPrompt } from "@/components/PendingInputPrompt"
 import { useSessionNames } from "@/hooks/useSessionNames"
 import { useSessionCrew } from "@/hooks/useSessionCrew"
@@ -58,6 +60,7 @@ export function CrewPanel({ context, closePanel }: WorkspacePanelProps) {
   const sessionId = context.session?.sessionId ?? null
   const { crew, error, busy, respond, markRead, stop } = useSessionCrew(sessionId)
   const { names } = useSessionNames()
+  const [tab, setTab] = useState("overview")
   const byId = useMemo(() => new Map((crew?.members ?? []).map((member) => [member.sessionId, member])), [crew])
   const nameOf = (member: CrewMember) => crewMemberName(member, byId, names)
   const open = (member: CrewMember) => {
@@ -80,19 +83,30 @@ export function CrewPanel({ context, closePanel }: WorkspacePanelProps) {
       {!crew ? (
         !error && <p className="px-3 py-6 text-center text-sm text-muted-foreground">Loading the crew…</p>
       ) : (
-        <ScrollArea className="min-h-0 flex-1">
-          <CrewRoll crew={crew} hereId={sessionId} nameOf={nameOf} onOpen={open} />
-          <NeedsYou crew={crew} busy={busy} nameOf={nameOf} onOpen={open} onRespond={respond} />
-          <CrewSessions
-            crew={crew}
-            hereId={sessionId}
-            busy={busy}
-            nameOf={nameOf}
-            onOpen={open}
-            onMarkRead={markRead}
-            onStop={stop}
-          />
-        </ScrollArea>
+        <Tabs value={tab} onValueChange={setTab} className="min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)]">
+          <TabsList variant="line" className="mx-3 mb-1">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="chat">Chat</TabsTrigger>
+          </TabsList>
+          <TabsContent value="overview" className="min-h-0">
+            <ScrollArea className="h-full min-h-0">
+              <CrewRoll crew={crew} hereId={sessionId} nameOf={nameOf} onOpen={open} />
+              <NeedsYou crew={crew} busy={busy} nameOf={nameOf} onOpen={open} onRespond={respond} />
+              <CrewSessions
+                crew={crew}
+                hereId={sessionId}
+                busy={busy}
+                nameOf={nameOf}
+                onOpen={open}
+                onMarkRead={markRead}
+                onStop={stop}
+              />
+            </ScrollArea>
+          </TabsContent>
+          <TabsContent value="chat" keepMounted className="min-h-0">
+            <CrewChat key={crew.rootId} rootId={crew.rootId} active={tab === "chat"} />
+          </TabsContent>
+        </Tabs>
       )}
     </aside>
   )

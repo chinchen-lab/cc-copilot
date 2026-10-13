@@ -122,6 +122,7 @@ async function load(id: string, request: SendRequest): Promise<LiveSession> {
   return session
 }
 async function send(id: string, request: SendRequest) {
+  if (request.onlyWhileRunning) return { delivery: "busy" as const }
   if (sending.has(id)) return { delivery: "busy" as const }
   sending.add(id)
   let started = false

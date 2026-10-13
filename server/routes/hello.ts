@@ -49,7 +49,7 @@ export function getInstanceId(): string {
 }
 
 /** Human-facing device name: explicit override wins, else the OS hostname. */
-function getDeviceName(): string {
+export function getDeviceName(): string {
   return process.env.COGPIT_DEVICE_NAME || hostname()
 }
 
@@ -77,6 +77,7 @@ export function registerHelloRoutes(use: UseFn, opts: { mode: HubMode }) {
       hubApi: 1,
       // The session endpoints a hub drives remote sessions through.
       sessionApi: 2,
+      crewChat: 1,
       workspaceEnvironment: 1,
       mode: opts.mode,
       edition: running.edition,

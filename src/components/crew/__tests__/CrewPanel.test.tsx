@@ -46,7 +46,7 @@ function renderPanel() {
 beforeEach(() => {
   mocks.crew = crew
   mocks.navigate.mockReset()
-  mocks.fetch.mockReset().mockImplementation(async () => ({ ok: true, status: 200, json: async () => mocks.crew }))
+  mocks.fetch.mockReset().mockImplementation(async (url: string) => ({ ok: true, status: 200, json: async () => url.startsWith("/api/crew-chat/") ? { rootId: mocks.crew.rootId, messages: [], members: [], canPost: true, hasMore: false, nextCursor: 0 } : mocks.crew }))
   mocks.json.mockReset().mockResolvedValue({ ok: true, status: 200 })
 })
 afterEach(cleanup)

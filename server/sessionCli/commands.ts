@@ -7,7 +7,9 @@ import { resumeDelegations } from "../lib/delegationAuthority"
 import { hostname } from "node:os"
 import type { IncomingMessage } from "node:http"
 import { isAbsolute, resolve } from "node:path"
-import { AGENT_KINDS, descriptorFor, type AgentKind } from "../../shared/session/agent-descriptors"
+import { AGENT_KINDS, agentKindForDirName, descriptorFor, type AgentKind } from "../../shared/session/agent-descriptors"
+import { resolveSessionAgent } from "../agents/runtimes"
+import { sessionEffort } from "../lib/sessionSettings"
 import type { PendingInput, PendingInputResponse } from "../agents/pendingInput"
 import type { VisibilityCheck } from "../edition"
 import { deviceJson } from "../hub/deviceRequest"
@@ -39,6 +41,7 @@ import {
 } from "../workspaceTransfer/handoff"
 import type { WorkspaceEnvironmentMode } from "../../shared/contracts/workspaces"
 import { parseEnvPatterns } from "../workspaceTransfer/environment"
+import { crewChatContext, postCrewChat, readCrewChat, setCrewChatListening } from "../lib/crewChat"
 
 /**
  * The `cogpit-session` CLI, run on the server. The script Cogpit installs in
@@ -87,8 +90,9 @@ Start and drive other agent sessions through Cogpit. Output is JSON unless noted
       [--env auto|target|caller|none] [--env-files GLOBS] [--target-checkout DIR]
       [--wait] [--timeout SECS]
         Start a session in DIR (default: your working directory). Runs with
-        --mode bypassPermissions for default CLI accounts; configured instances
-        default to supervised mode. Creation retries reuse the invocation id.
+        --mode bypassPermissions unless the agent has no such mode (ACP), and
+        at your own effort when it runs your agent. Creation retries reuse the
+        invocation id.
         --device runs it on another machine: your repository (HEAD plus
         uncommitted changes) is sent there as a fresh worktree, and when the
         session finishes its work comes back as a local branch. Pass --cwd with
@@ -141,6 +145,17 @@ Start and drive other agent sessions through Cogpit. Output is JSON unless noted
   board progress DONE/TOTAL Move only your board's progress, such as 35/99.
   board get [ID]            Print a session's board (default: yours).
   board clear               Remove your board.
+  chat post MESSAGE         Post to your crew's shared chat. --mention ID[,ID]
+                            tags members; @handles in MESSAGE work too.
+                            --crew ID selects another crew; --command-id ID
+                            makes retries safe. --device NAME uses its host.
+  chat fetch [ID]           Fetch messages since your last read; --all reads
+                            from the start, --after N uses a cursor, --limit N
+                            sets page size (1–100). --device NAME uses its host.
+  chat members [ID]         List crew handles and listening settings.
+  chat listen on|off        Change your listening setting. --member ID changes
+                            another member; --crew ID selects the crew.
+                            Tagged members receive full messages even when off.
   devices                   Machines this Cogpit can run sessions on.
   projects [--device NAME]  Project folders on this machine or a device.
 
@@ -369,6 +384,14 @@ function sendOnce(inv: CliInvocation, host: SessionHost, task: string, options: 
   return sent
 }
 
+/** The caller's own effort, for a child running the caller's agent; effort levels do not carry across agents. */
+async function callerEffort(inv: CliInvocation, kind: AgentKind): Promise<string | undefined> {
+  if (!inv.callerSessionId) return undefined
+  const caller = await resolveSessionAgent(inv.callerSessionId).catch(() => null)
+  if (caller?.kind !== kind) return undefined
+  return await sessionEffort(inv.callerSessionId) ?? undefined
+}
+
 function localCwd(inv: CliInvocation, cwdFlag: string | undefined): string {
   return cwdFlag === undefined ? inv.cwd : isAbsolute(cwdFlag) ? cwdFlag : resolve(inv.cwd, cwdFlag)
 }
@@ -384,6 +407,7 @@ async function newCommand(inv: CliInvocation, rest: string[]): Promise<CliOutput
   if (agent !== undefined && !AGENT_KINDS.includes(agent as AgentKind)) {
     throw new UsageError(`--agent must be one of ${AGENT_KINDS.join(", ")}`)
   }
+  const kind = (agent as AgentKind | undefined) ?? agentKindForDirName(undefined)
   const deviceName = args.values.get("device")
   const host = deviceName === undefined ? localHost : hostNamed(deviceName)
   const cwdFlag = args.values.get("cwd")
@@ -417,9 +441,9 @@ async function newCommand(inv: CliInvocation, rest: string[]): Promise<CliOutput
     ...(args.values.has("instance") ? { instanceId: args.values.get("instance") } : {}),
     ...(inv.req ? { req: inv.req } : {}),
     message: sent ? `${handoffBriefing(sent, resolveDeviceName(process.env, hostname()))}\n\n${message}` : message,
-    mode: args.values.get("mode") ?? (args.values.has("instance") || (agent && descriptorFor(agent as AgentKind).cli.requiresConfiguration) ? "default" : "bypassPermissions"),
+    mode: args.values.get("mode") ?? (descriptorFor(kind).cli.requiresConfiguration ? "default" : "bypassPermissions"),
     model: args.values.get("model"),
-    effort: args.values.get("effort"),
+    effort: args.values.get("effort") ?? await callerEffort(inv, kind),
     worktreeName: args.values.get("worktree"),
     name: args.values.get("name"),
     requestId: inv.invocationId,
@@ -830,6 +854,45 @@ async function boardCommand(inv: CliInvocation, rest: string[]): Promise<CliOutp
   }
 }
 
+async function chatCommand(inv: CliInvocation, rest: string[]): Promise<CliOutput> {
+  const [verb, ...more] = rest
+  const args = parseArgs(more, ["crew", "member", "mention", "command-id", "after", "limit", "device"], ["all"])
+  if (!["post", "fetch", "members", "listen"].includes(verb)) throw new UsageError("chat needs post, fetch, members or listen")
+  const id = args.values.get("crew") ?? ((verb === "fetch" || verb === "members") ? args.positionals[0] : undefined) ?? inv.callerSessionId
+  if (!id) throw new UsageError("chat needs a crew session ID outside a Cogpit session")
+  const deviceName = args.values.get("device")
+  if (deviceName) {
+    const host = hostNamed(deviceName)
+    if (host.remote) {
+      requireAdmin(inv, "access crew chat on another machine")
+      const forwarded = ["chat", verb, ...args.positionals]
+      for (const [flag, value] of args.values) if (flag !== "device") forwarded.push(`--${flag}`, value)
+      for (const flag of args.switches) forwarded.push(`--${flag}`)
+      return deviceJson<CliOutput>(host.id, "POST", "/api/session-cli", { argv: forwarded, cwd: inv.cwd, callerSessionId: inv.callerSessionId, invocationId: inv.invocationId })
+    }
+  }
+  await requireSessionAccess(inv, id, verb === "post" || verb === "listen")
+  switch (verb) {
+    case "post":
+      return json(await postCrewChat(id, { text: messageArg(args, "chat post"), senderSessionId: inv.callerSessionId, commandId: args.values.get("command-id") ?? inv.invocationId, mentions: args.values.get("mention")?.split(",").filter(Boolean) }, inv.req))
+    case "members":
+      return json(await crewChatContext(id, inv.req))
+    case "fetch": {
+      if (args.switches.has("all") && args.values.has("after")) throw new UsageError("Use either --all or --after")
+      const after = args.switches.has("all") ? 0 : args.values.has("after") ? Number(args.values.get("after")) : undefined
+      return json(await readCrewChat(id, { after, limit: args.values.has("limit") ? Number(args.values.get("limit")) : undefined, readerSessionId: inv.callerSessionId, fetchId: args.values.get("command-id") ?? inv.invocationId }, inv.req))
+    }
+    case "listen": {
+      const mode = args.positionals[0]
+      if (mode !== "on" && mode !== "off") throw new UsageError("chat listen needs on or off")
+      const memberId = args.values.get("member") ?? inv.callerSessionId
+      if (!memberId) throw new UsageError("chat listen needs --member outside a Cogpit session")
+      return json(await setCrewChatListening(id, memberId, mode === "on", inv.req))
+    }
+    default: throw new UsageError("Unknown chat command")
+  }
+}
+
 const COMMANDS: Record<string, (inv: CliInvocation, rest: string[]) => Promise<CliOutput>> = {
   new: newCommand,
   send: sendCommand,
@@ -846,6 +909,7 @@ const COMMANDS: Record<string, (inv: CliInvocation, rest: string[]) => Promise<C
   stop: stopCommand,
   children: childrenCommand,
   board: boardCommand,
+  chat: chatCommand,
   fetch: fetchCommand,
   discard: discardCommand,
   devices: devicesCommand,

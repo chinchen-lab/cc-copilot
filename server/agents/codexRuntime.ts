@@ -110,6 +110,7 @@ function executionOptions(
   return {
     cwd: req.cwd,
     deliveryIntent: "deliveryIntent" in req ? req.deliveryIntent : undefined,
+    onlyWhileRunning: "onlyWhileRunning" in req ? req.onlyWhileRunning : undefined,
     commandId: "commandId" in req ? req.commandId : undefined,
     message: req.message,
     images: req.images,
@@ -121,14 +122,14 @@ function executionOptions(
   }
 }
 
-type ThreadSettings = Omit<CodexExecutionOptions, "message" | "images" | "deliveryIntent" | "commandId">
+type ThreadSettings = Omit<CodexExecutionOptions, "message" | "images" | "deliveryIntent" | "commandId" | "onlyWhileRunning">
 
 // Question answers omit session settings. Preserve them so replies keep the
 // thread's access mode, working directory, and model options.
 const rememberedSettings = new Map<string, ThreadSettings>()
 
 function rememberThreadSettings(sessionId: string, options: CodexExecutionOptions): void {
-  const { message: _message, images: _images, reloadContextWindow: _reload, deliveryIntent: _intent, commandId: _command, ...settings } = options
+  const { message: _message, images: _images, reloadContextWindow: _reload, deliveryIntent: _intent, commandId: _command, onlyWhileRunning: _onlyWhileRunning, ...settings } = options
   rememberedSettings.set(sessionId, settings)
 }
 
@@ -811,6 +812,7 @@ export const codexRuntime: AgentRuntime = {
         throw codexSendError(error)
       }
     }
+    if (req.onlyWhileRunning) return { delivery: "busy" }
     return sendLegacy(sessionId, { ...req, cwd })
   },
 

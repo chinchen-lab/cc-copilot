@@ -32,6 +32,8 @@ const mocks = vi.hoisted(() => {
     clearSessionHandoff: vi.fn(),
     ensureSessionApi: vi.fn(),
     accessLevelOf: vi.fn(),
+    callerKind: "claude",
+    sessionEffort: vi.fn(async (): Promise<string | null> => null),
   }
 })
 
@@ -61,8 +63,18 @@ vi.mock("../../lib/sessionOrigins", () => ({
   sessionOrigin: mocks.sessionOrigin,
   clearSessionHandoff: mocks.clearSessionHandoff,
 }))
+vi.mock("../../agents/runtimes", async (original) => ({
+  ...await original<typeof import("../../agents/runtimes")>(),
+  resolveSessionAgent: async () => ({ kind: mocks.callerKind, filePath: null }),
+}))
+vi.mock("../../lib/sessionSettings", async (original) => ({
+  ...await original<typeof import("../../lib/sessionSettings")>(),
+  sessionEffort: mocks.sessionEffort,
+}))
 vi.mock("../../hub/deviceRequest", () => ({ deviceJson: mocks.deviceJson }))
 const boards = vi.hoisted(() => new Map<string, Record<string, unknown>>())
+const chat = vi.hoisted(() => ({ context: vi.fn(), post: vi.fn(), read: vi.fn(), listen: vi.fn() }))
+vi.mock("../../lib/crewChat", () => ({ crewChatContext: chat.context, postCrewChat: chat.post, readCrewChat: chat.read, setCrewChatListening: chat.listen }))
 vi.mock("../../lib/sessionBoards", () => ({
   sessionBoard: async (id: string) => boards.get(id) ?? null,
   setSessionBoard: async (id: string, content: Record<string, unknown>) => {
@@ -202,6 +214,25 @@ describe("new", () => {
     expect(mocks.waitAcrossHosts).not.toHaveBeenCalled()
     expect(orchestrationStore().tasks("local", "parent-1")).toEqual([expect.objectContaining({ childSessionId: "child-1", state: "running", deliveryDisposition: "async" })])
     expect(out(output)).toEqual({ sessionId: "child-1", dirName: "-work-app", next: "cogpit-session wait child-1" })
+  })
+
+  it("runs a configured instance in bypass mode too, and only ACP supervised", async () => {
+    await run(["new", "hi", "--instance", "account-2"])
+    expect(mocks.local.create).toHaveBeenLastCalledWith(expect.objectContaining({ instanceId: "account-2", mode: "bypassPermissions" }))
+    await run(["new", "hi", "--agent", "acp"], { invocationId: "acp" })
+    expect(mocks.local.create).toHaveBeenLastCalledWith(expect.objectContaining({ mode: "default" }))
+  })
+
+  it("runs at the caller's effort when it runs the caller's agent, unless told otherwise", async () => {
+    mocks.sessionEffort.mockResolvedValue("xhigh")
+    await run(["new", "hi"])
+    expect(mocks.sessionEffort).toHaveBeenCalledWith("parent-1")
+    expect(mocks.local.create).toHaveBeenLastCalledWith(expect.objectContaining({ effort: "xhigh" }))
+    await run(["new", "hi", "--effort", "low"], { invocationId: "explicit" })
+    expect(mocks.local.create).toHaveBeenLastCalledWith(expect.objectContaining({ effort: "low" }))
+    await run(["new", "hi", "--agent", "codex"], { invocationId: "other-agent" })
+    expect(mocks.local.create).toHaveBeenLastCalledWith(expect.objectContaining({ effort: undefined }))
+    mocks.sessionEffort.mockResolvedValue(null)
   })
 
   it("records the name a session was started with, so the crew can call it that", async () => {
@@ -561,5 +592,35 @@ describe("board", () => {
     expect(await run(["board", "progress", "35 of 99"])).toMatchObject({ exitCode: EXIT.error, stderr: expect.stringContaining("DONE/TOTAL") })
     expect(await run(["board", "set", "title: x"], { callerSessionId: undefined })).toMatchObject({ exitCode: EXIT.error, stderr: expect.stringContaining("COGPIT_SESSION_ID") })
     expect(await run(["board"])).toMatchObject({ exitCode: EXIT.error, stderr: expect.stringContaining("set, progress, get or clear") })
+  })
+})
+
+describe("crew chat", () => {
+  it("posts from the caller and passes tags and stable IDs", async () => {
+    chat.post.mockResolvedValue({ message: { text: "Finding" }, pending: [] })
+    expect((await run(["chat", "post", "Finding", "--mention", "reviewer,lead", "--command-id", "finding-chat-001"])).exitCode).toBe(0)
+    expect(chat.post).toHaveBeenCalledWith("parent-1", { text: "Finding", senderSessionId: "parent-1", mentions: ["reviewer", "lead"], commandId: "finding-chat-001" }, undefined)
+  })
+  it("fetches unread messages or an explicit history page", async () => {
+    chat.read.mockResolvedValue({ messages: [], nextCursor: 0 })
+    await run(["chat", "fetch", "lead", "--limit", "10"])
+    expect(chat.read).toHaveBeenLastCalledWith("lead", expect.objectContaining({ readerSessionId: "parent-1", after: undefined, limit: 10, fetchId: expect.any(String) }), undefined)
+    await run(["chat", "fetch", "--all"])
+    expect(chat.read).toHaveBeenLastCalledWith("parent-1", expect.objectContaining({ after: 0 }), undefined)
+    expect((await run(["chat", "fetch", "--all", "--after", "2"])).exitCode).toBe(EXIT.error)
+  })
+  it("changes listening for the caller or a selected member", async () => {
+    chat.listen.mockResolvedValue({ listening: false })
+    await run(["chat", "listen", "off"])
+    expect(chat.listen).toHaveBeenCalledWith("parent-1", "parent-1", false, undefined)
+    await run(["chat", "listen", "on", "--crew", "lead", "--member", "reviewer"])
+    expect(chat.listen).toHaveBeenLastCalledWith("lead", "reviewer", true, undefined)
+    expect((await run(["chat", "listen", "maybe"])).exitCode).toBe(EXIT.error)
+  })
+  it("forwards remote chat to its host without forwarding the device flag", async () => {
+    mocks.deviceJson.mockResolvedValue({ exitCode: 0, stdout: "history\n", stderr: "" })
+    expect(await run(["chat", "fetch", "lead", "--after", "2", "--device", "agentbox"])).toMatchObject({ stdout: "history\n" })
+    expect(mocks.deviceJson).toHaveBeenCalledWith("dev_1", "POST", "/api/session-cli", expect.objectContaining({ argv: ["chat", "fetch", "lead", "--after", "2"], callerSessionId: "parent-1" }))
+    expect((await run(["chat", "fetch", "lead", "--device", "agentbox"], { admin: false })).exitCode).toBe(EXIT.error)
   })
 })

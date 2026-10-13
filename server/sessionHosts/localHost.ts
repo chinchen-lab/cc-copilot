@@ -9,6 +9,7 @@ import { clearTurnError, readSessionState, recordTurnError, waitForSessions } fr
 import { listProjects } from "../routes/projects/projectList"
 import { createSession } from "../lib/sessionCreate"
 import { sendToSession } from "../lib/sessionSend"
+import { withSessionSettings } from "../lib/sessionSettings"
 import { admitSessionCommand, commandDispatcher, commandScope } from "../lib/durableSend"
 import { storeForPath } from "../agents"
 import { findJsonlPath } from "../sessionPaths"
@@ -29,14 +30,15 @@ export const localHost: SessionHost = {
     return { sessionId: started.sessionId, dirName: started.dirName }
   },
 
-  async send(sessionId, message, { interrupt = false, commandId, req, intent } = {}) {
+  async send(sessionId, message, { interrupt = false, commandId, req, intent, onlyWhileRunning, notification, leadSessionId } = {}) {
+    const request = await withSessionSettings(sessionId, { message, ...(onlyWhileRunning ? { onlyWhileRunning: true } : {}), ...(notification ? { notification: true } : {}) })
     if (commandId) {
-      const receipt = await admitSessionCommand({ sessionId, commandId, request: { message }, req, intent: intent ?? (interrupt ? "restart" : "queue") })
+      const receipt = await admitSessionCommand({ sessionId, commandId, request, req, intent: intent ?? (interrupt ? "restart" : "queue"), leadSessionId })
       return { delivery: receipt.state, receipt }
     }
     if (interrupt) await this.interrupt(sessionId)
     clearTurnError(sessionId)
-    const { outcome } = await sendToSession(sessionId, { message })
+    const { outcome } = await sendToSession(sessionId, request)
     // A resume reports its failure only on this promise; keep it for `wait`.
     outcome.completion
       ?.then((result) => {

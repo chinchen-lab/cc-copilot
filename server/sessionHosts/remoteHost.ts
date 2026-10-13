@@ -122,9 +122,13 @@ export function createRemoteHost(deviceId: string): SessionHost {
       }
     },
 
-    async send(sessionId, message, { interrupt = false, commandId, intent } = {}) {
+    async send(sessionId, message, { interrupt = false, commandId, intent, onlyWhileRunning, notification } = {}) {
       if (commandId) await ensureDurableApi(deviceId)
-      return call("POST", "/api/session-send", { sessionId, message, interrupt, commandId, intent })
+      if (notification || onlyWhileRunning) {
+        const hello = await deviceJson<{ crewChat?: number }>(deviceId, "GET", "/api/hello")
+        if ((hello.crewChat ?? 0) < 1) throw new DeviceRequestError(deviceId, 426, `Update ${registered(deviceId).name} to receive crew chat notifications.`, "DEVICE_TOO_OLD")
+      }
+      return call("POST", "/api/session-send", { sessionId, message, interrupt, commandId, intent, ...(onlyWhileRunning ? { onlyWhileRunning: true } : {}), ...(notification ? { notification: true } : {}) })
     },
 
     async receipt(commandId, _req, waitMs) {

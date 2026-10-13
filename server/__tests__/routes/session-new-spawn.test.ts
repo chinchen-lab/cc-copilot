@@ -89,6 +89,8 @@ const {
 })
 
 vi.mock("../../lib/folders", () => ({ sessionFolderProblem: mockSessionFolderProblem }))
+const mockStoreStartedSettings = vi.hoisted(() => vi.fn(async () => {}))
+vi.mock("../../lib/sessionSettings", () => ({ storeStartedSettings: mockStoreStartedSettings }))
 
 // ---------------------------------------------------------------------------
 // Mock ../../helpers
@@ -486,6 +488,7 @@ describe("registerCreateAndSendRoute (Copilot)", () => {
       "Ship  Copilot  support",
     )
     expect(mockCopilotRuntime.setPermissionMode).toHaveBeenCalledWith("test-session-uuid", false)
+    expect(mockStoreStartedSettings).toHaveBeenCalledWith("test-session-uuid", { mode: "plan", effort: "high" })
     expect(mockCopilotRuntime.send).toHaveBeenCalledWith("test-session-uuid", {
       prompt: "look at this",
       agentMode: "plan",

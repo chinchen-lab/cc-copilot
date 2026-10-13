@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 const runtime = {
+  descriptor: { capabilities: { activeNotifications: true } },
   activity: (id: string) => mocks.activity.get(id) ?? { live: false, running: false },
   hasSession: (id: string) => mocks.held.has(id),
 }

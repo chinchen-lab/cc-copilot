@@ -52,7 +52,7 @@ function childrenIndex(parents: ReadonlyMap<string, CrewLink>): Map<string, stri
 }
 
 /** The root and the members the caller may see; a hidden member hides what it started too. */
-async function crewIds(rootId: string, sources: CrewSources): Promise<string[]> {
+export async function crewSessionIds(rootId: string, sources: Pick<CrewSources, "parents" | "canView">): Promise<string[]> {
   const children = childrenIndex(sources.parents)
   const ids = [rootId]
   const seen = new Set(ids)
@@ -124,7 +124,7 @@ export async function readSessionCrew(sessionId: string, sources: CrewSources): 
   const root = crewRootOf(sessionId, sources.parents)
   // A root the caller may not see leaves the crew to start where they can.
   const rootId = root === sessionId || await sources.canView(root) ? root : sessionId
-  const ids = await crewIds(rootId, sources)
+  const ids = await crewSessionIds(rootId, sources)
   const tasks = resultTasks(sources.tasks())
   const members = await Promise.all(ids.map((id) => describeMember(id, rootId, sources, tasks.get(id))))
   return { sessionId, rootId, members }

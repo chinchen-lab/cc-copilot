@@ -36,7 +36,7 @@ function send(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body))
 }
 
-async function fakeDevice(handler: Handler, options: { sessionApi?: number } = {}) {
+async function fakeDevice(handler: Handler, options: { sessionApi?: number; crewChat?: number } = {}) {
   const seen: Seen[] = []
   let tokens = 0
   const server = http.createServer((req, res) => {
@@ -46,7 +46,7 @@ async function fakeDevice(handler: Handler, options: { sessionApi?: number } = {
       const raw = Buffer.concat(chunks).toString("utf8")
       const entry = { method: req.method ?? "GET", url: req.url ?? "/", headers: req.headers, body: raw ? JSON.parse(raw) : undefined }
       if (entry.url === "/api/auth/verify") return send(res, 200, { valid: true, token: `token-${++tokens}` })
-      if (entry.url === "/api/hello") return send(res, 200, { app: "cogpit", version: "9.9.9", sessionApi: options.sessionApi ?? 1 })
+      if (entry.url === "/api/hello") return send(res, 200, { app: "cogpit", version: "9.9.9", sessionApi: options.sessionApi ?? 1, crewChat: options.crewChat ?? 0 })
       seen.push(entry)
       handler(entry, res)
     })
@@ -79,6 +79,19 @@ afterEach(async () => {
 const state = (sessionId: string, outcome: string) => ({ sessionId, outcome, live: true, running: false, waiting: [] })
 
 describe("remote session host", () => {
+  it("refuses notifications on old devices before sending any message", async () => {
+    const { device, seen } = await fakeDevice((_req, res) => send(res, 200, {}), { sessionApi: 2 })
+    await expect(createRemoteHost(device.id).send("s1", "Notice", { commandId: "notification-old-device", notification: true, onlyWhileRunning: true, intent: "steer" }))
+      .rejects.toMatchObject({ status: 426, code: "DEVICE_TOO_OLD" })
+    expect(seen).toEqual([])
+  })
+
+  it("preserves notification and idle guards when sending to a compatible device", async () => {
+    const { device, seen } = await fakeDevice((_req, res) => send(res, 200, { delivery: "queued" }), { sessionApi: 2, crewChat: 1 })
+    await createRemoteHost(device.id).send("s1", "Notice", { commandId: "notification-current-device", notification: true, onlyWhileRunning: true, intent: "steer" })
+    expect(seen[0]).toMatchObject({ url: "/api/session-send", body: { sessionId: "s1", message: "Notice", notification: true, onlyWhileRunning: true, intent: "steer" } })
+  })
+
   it("returns null for an absent durable receipt so a first answer can proceed", async () => {
     const { device } = await fakeDevice((_req, res) => send(res, 404, { error: "Command not found" }), { sessionApi: 2 })
     await expect(createRemoteHost(device.id).receipt!("first-answer")).resolves.toBeNull()

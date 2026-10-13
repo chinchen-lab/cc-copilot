@@ -17,7 +17,7 @@ describe("stateless session MCP", () => {
   it("initializes and advertises session receipts, permissions and durable tasks", async () => {
     expect((await call({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26" } })).body.result.protocolVersion).toBe("2025-03-26")
     const result = await call({ jsonrpc: "2.0", id: 2, method: "tools/list" })
-    expect(result.body.result.tools.map((tool: { name: string }) => tool.name)).toEqual(expect.arrayContaining(["session_receipt", "session_approve", "session_tasks"]))
+    expect(result.body.result.tools.map((tool: { name: string }) => tool.name)).toEqual(expect.arrayContaining(["session_receipt", "session_approve", "session_tasks", "session_chat"]))
     expect((await call({ jsonrpc: "2.0", method: "notifications/initialized" })).status).toBe(202)
     expect((await call({}, "GET")).status).toBe(405)
   })
@@ -29,5 +29,14 @@ describe("stateless session MCP", () => {
     const arguments_ = { argv: ["native", "Hello", "--command-id", "untrusted-override"], commandId: "immutable-command-id" }
     expect((await call({ ...request, params: { ...request.params, arguments: arguments_ } })).body.result.isError).toBe(false)
     expect(run.mock.calls[0][0]).toMatchObject({ invocationId: "immutable-command-id", argv: ["send", ...arguments_.argv, "--command-id", "immutable-command-id"] })
+  })
+  it("allows chat reads and requires a stable ID to post or change listening", async () => {
+    const request = (argv: string[], commandId?: string) => ({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "session_chat", arguments: { argv, commandId } } })
+    expect((await call(request(["fetch"])) ).body.result.isError).toBe(false)
+    expect((await call(request(["members"])) ).body.result.isError).toBe(false)
+    expect((await call(request(["post", "Finding"])) ).body.error.code).toBe(-32602)
+    expect((await call(request(["listen", "off"])) ).body.error.code).toBe(-32602)
+    expect((await call(request(["post", "Finding"], "mcp-chat-finding-001"))).body.result.isError).toBe(false)
+    expect(run).toHaveBeenLastCalledWith(expect.objectContaining({ argv: ["chat", "post", "Finding", "--command-id", "mcp-chat-finding-001"] }))
   })
 })

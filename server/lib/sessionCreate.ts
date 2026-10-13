@@ -15,6 +15,7 @@ import { resolveProjectCwd } from "./projectCwd"
 import { ErrorCodes, RouteError } from "./routeError"
 import { SessionCreationRequests } from "./sessionCreationRequests"
 import { recordSessionOrigin } from "./sessionOrigins"
+import { storeStartedSettings } from "./sessionSettings"
 import { splitInstanceDirName, instanceDirName } from "../../shared/session/instances"
 import { orchestrationStore } from "../orchestration/storage"
 
@@ -135,6 +136,7 @@ export async function createSession(
     ? await creationRequests.run(retry.scope, retry.requestId, startRequest, run)
     : await run()
   orchestrationStore().ensureConversation(await nativeBinding(started.sessionId, kind, started.filePath, started.cwd ?? cwd))
+  await storeStartedSettings(started.sessionId, { mode: request.permissions?.mode, effort: request.effort }).catch(() => {})
   if (parentSessionId) await recordSessionOrigin(started.sessionId, { parentSessionId, ...(request.name ? { name: request.name } : {}) })
   return started
 }

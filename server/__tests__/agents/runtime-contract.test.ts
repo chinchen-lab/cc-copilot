@@ -315,6 +315,16 @@ describe("a follow-up to a live Claude query", () => {
     await expect(runtimeFor("claude").send("session-1", { message: "also" }))
       .resolves.toEqual({ delivery: "enqueued" })
   })
+  it("keeps an idle query idle for an informational notice", async () => {
+    liveQuery(false)
+    await expect(runtimeFor("claude").send("session-1", { message: "Crew notice", onlyWhileRunning: true })).resolves.toEqual({ delivery: "busy" })
+    expect(sendSDKMessage).not.toHaveBeenCalled()
+    expect(resumeSDKSession).not.toHaveBeenCalled()
+  })
+  it("does not resume an absent query for an informational notice", async () => {
+    await expect(runtimeFor("claude").send("session-1", { message: "Crew notice", onlyWhileRunning: true })).resolves.toEqual({ delivery: "busy" })
+    expect(resumeSDKSession).not.toHaveBeenCalled()
+  })
 })
 
 describe("agent asymmetries the registry must not flatten", () => {

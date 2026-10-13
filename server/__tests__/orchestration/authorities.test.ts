@@ -1,13 +1,15 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { IncomingMessage } from "node:http"
 import { Socket } from "node:net"
 import { localHost } from "../../sessionHosts/localHost"
-import { commandDispatcher } from "../../lib/durableSend"
+import { admitSessionCommand, closeCommandDispatcher, commandDispatcher } from "../../lib/durableSend"
 import { __resetEditionForTest, PERSONAL_EDITION } from "../../edition"
 import { installFakeEdition } from "../edition/fakeEdition"
 import { createInstanceRuntime } from "../../agents/instanceRuntime"
 import { instanceSessionId } from "../../../shared/session/instances"
+import { descriptorFor } from "../../../shared/session/agent-descriptors"
+import type { AgentRuntime } from "../../agents/runtimeTypes"
 
 afterEach(__resetEditionForTest)
 describe("durable session authority", () => {
@@ -34,5 +36,26 @@ describe("durable session authority", () => {
       expect(runtime.listPendingQuestions(id)).toEqual([])
       expect(runtime.listPendingApprovals(id)).toEqual([])
     }
+  })
+})
+
+describe("a queued crew chat message", () => {
+  it("is held, not delivered, once its sender loses access to the crew lead", async () => {
+    let leadAllowed = true
+    let running = true
+    installFakeEdition({ access: { ...PERSONAL_EDITION.access, levelOf: async (_req, id) => id === "crew-lead" && !leadAllowed ? null : "own" } })
+    const send = vi.fn()
+    const runtime = { kind: "claude", instanceId: "default", descriptor: descriptorFor("claude"), activity: () => ({ live: true, running }), send } as unknown as AgentRuntime
+    const binding = { hostId: "local", agent: "claude" as const, instanceId: "default", sessionId: "crew-member" }
+    try {
+      await admitSessionCommand({ sessionId: "crew-member", commandId: "crew-mention-0001", request: { message: "@member look at this", notification: true }, runtime, binding, intent: "queue", leadSessionId: "crew-lead" })
+      leadAllowed = false
+      running = false
+      await vi.waitFor(async () => {
+        await commandDispatcher().tick()
+        expect(commandDispatcher().store.command("local", "crew-mention-0001")?.receipt.state).toBe("held")
+      })
+      expect(send).not.toHaveBeenCalled()
+    } finally { closeCommandDispatcher() }
   })
 })
