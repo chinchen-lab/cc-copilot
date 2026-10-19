@@ -13,6 +13,23 @@ import type { ActiveSessionInfo } from "@/components/LiveSessions/types"
 
 export type CrewCellState = "working" | "needs-you" | "done" | "failed" | "unreachable"
 
+/** The status dot each member state is drawn with. */
+export const CREW_DOT: Record<CrewCellState, string> = {
+  working: "bg-success ring-2 ring-success/30",
+  "needs-you": "bg-warning",
+  done: "bg-muted-foreground/50",
+  failed: "bg-destructive",
+  unreachable: "border border-muted-foreground/60",
+}
+
+/** "14:05" today, "Oct 6, 22:43" on an earlier day. */
+export function startedLabel(at: number): string {
+  const date = new Date(at)
+  const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  if (date.toDateString() === new Date().toDateString()) return time
+  return `${date.toLocaleDateString([], { month: "short", day: "numeric" })}, ${time}`
+}
+
 export function memberCellState(member: CrewMember): CrewCellState {
   switch (member.outcome) {
     case "needs_input": return "needs-you"

@@ -131,6 +131,16 @@ members, and offers request answers, member navigation, stop and result
 acknowledgment. Requests show their actual waiting time when the provider
 records it.
 
+The Crew panel's Map tab draws the same crew as a tree of cards from its root,
+left to right by depth; a panel too narrow for that stacks the cards, each
+stepped in under the session that started it. Its All / Active filter is
+remembered per device; Active keeps sessions that are working or waiting on the
+user plus every ancestor up to the root, drawn dimmed with their own status.
+Branches fold (per crew, separately for each filter) and a folded branch flags
+the work it hides. Expanding the map opens a large view where many childless
+siblings share one framed grid. Folds, filter and the panel's viewport survive
+polls and moves between the crew's sessions.
+
 Final assistant replies can render `cogpit-status`, `cogpit-decisions` and
 `cogpit-checklist` fences. Quoted blocks in user prompts remain code. Decision
 answers persist per reply and block, and send together as one message.

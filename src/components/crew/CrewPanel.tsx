@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CrewChat } from "./CrewChat"
+import { CrewMap, useCrewMapControls } from "./CrewMap"
 import { PendingInputPrompt } from "@/components/PendingInputPrompt"
 import { useSessionNames } from "@/hooks/useSessionNames"
 import { useSessionCrew } from "@/hooks/useSessionCrew"
@@ -16,6 +17,7 @@ import type { WorkspacePanelProps } from "@/plugin-api"
 import type { CrewMember, SessionCrew } from "../../../shared/contracts/crew"
 import { shortenModel } from "../../../shared/session/model-names"
 import {
+  CREW_DOT,
   crewMemberName,
   crewRequests,
   crewTally,
@@ -23,6 +25,7 @@ import {
   hasUnreadResult,
   memberActivity,
   memberCellState,
+  startedLabel,
   type CrewCellState,
   type CrewTreeRow,
 } from "./crewView"
@@ -44,14 +47,6 @@ const CELL: Record<CrewCellState, string> = {
   unreachable: "border border-muted-foreground/50",
 }
 
-const DOT: Record<CrewCellState, string> = {
-  working: "bg-success ring-2 ring-success/30",
-  "needs-you": "bg-warning",
-  done: "bg-muted-foreground/50",
-  failed: "bg-destructive",
-  unreachable: "border border-muted-foreground/60",
-}
-
 /**
  * The crew of the open session, pinned to its root wherever in the crew the
  * user is: a strip with one cell per member, the requests it is blocked on
@@ -62,6 +57,7 @@ export function CrewPanel({ context, closePanel }: WorkspacePanelProps) {
   const { crew, error, busy, respond, markRead, stop } = useSessionCrew(sessionId)
   const { names } = useSessionNames()
   const [tab, setTab] = useState("overview")
+  const mapControls = useCrewMapControls(crew?.rootId ?? "")
   const byId = useMemo(() => new Map((crew?.members ?? []).map((member) => [member.sessionId, member])), [crew])
   const kinds = useMemo(() => new Map((crew?.members ?? []).flatMap((member) => member.address ? [[member.sessionId, agentKindForDirName(member.address.dirName)] as const] : [])), [crew])
   const nameOf = (member: CrewMember) => crewMemberName(member, byId, names)
@@ -88,6 +84,7 @@ export function CrewPanel({ context, closePanel }: WorkspacePanelProps) {
         <Tabs value={tab} onValueChange={setTab} className="min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)]">
           <TabsList variant="line" className="mx-3 mb-1">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="map">Map</TabsTrigger>
             <TabsTrigger value="chat">Chat</TabsTrigger>
           </TabsList>
           <TabsContent value="overview" className="min-h-0">
@@ -104,6 +101,9 @@ export function CrewPanel({ context, closePanel }: WorkspacePanelProps) {
                 onStop={stop}
               />
             </ScrollArea>
+          </TabsContent>
+          <TabsContent value="map" className="min-h-0">
+            <CrewMap crew={crew} hereId={sessionId} controls={mapControls} kinds={kinds} nameOf={nameOf} onOpen={open} />
           </TabsContent>
           <TabsContent value="chat" keepMounted className="min-h-0">
             <CrewChat key={crew.rootId} rootId={crew.rootId} kinds={kinds} active={tab === "chat"} />
@@ -167,11 +167,11 @@ function CrewRoll({ crew, hereId, nameOf, onOpen }: CrewSectionProps & { hereId:
         </div>
       )}
       <div className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-muted-foreground">
-        {tally.working > 0 && <Count dot={DOT.working} value={tally.working} label="working" />}
-        {tally.needsYou > 0 && <Count dot={DOT["needs-you"]} value={tally.needsYou} label={tally.needsYou === 1 ? "needs you" : "need you"} />}
-        {tally.done > 0 && <Count dot={DOT.done} value={tally.done} label="done" />}
-        {tally.failed > 0 && <Count dot={DOT.failed} value={tally.failed} label="failed" />}
-        {tally.unreachable > 0 && <Count dot={DOT.unreachable} value={tally.unreachable} label="away" />}
+        {tally.working > 0 && <Count dot={CREW_DOT.working} value={tally.working} label="working" />}
+        {tally.needsYou > 0 && <Count dot={CREW_DOT["needs-you"]} value={tally.needsYou} label={tally.needsYou === 1 ? "needs you" : "need you"} />}
+        {tally.done > 0 && <Count dot={CREW_DOT.done} value={tally.done} label="done" />}
+        {tally.failed > 0 && <Count dot={CREW_DOT.failed} value={tally.failed} label="failed" />}
+        {tally.unreachable > 0 && <Count dot={CREW_DOT.unreachable} value={tally.unreachable} label="away" />}
         {tally.unreadResults > 0 && (
           <span className="ml-auto text-warning">
             <span className="font-medium tabular-nums">{tally.unreadResults}</span> {tally.unreadResults === 1 ? "result" : "results"} unread
@@ -180,14 +180,6 @@ function CrewRoll({ crew, hereId, nameOf, onOpen }: CrewSectionProps & { hereId:
       </div>
     </section>
   )
-}
-
-/** "14:05" today, "Oct 6, 22:43" on an earlier day. */
-function startedLabel(at: number): string {
-  const date = new Date(at)
-  const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-  if (date.toDateString() === new Date().toDateString()) return time
-  return `${date.toLocaleDateString([], { month: "short", day: "numeric" })}, ${time}`
 }
 
 function Count({ dot, value, label }: { dot: string; value: number; label: string }) {
@@ -235,7 +227,7 @@ function NeedsYou({
       </div>
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-2 px-0.5 text-xs">
-          <span className={cn("size-1.5 shrink-0 rounded-full", DOT["needs-you"])} aria-hidden="true" />
+          <span className={cn("size-1.5 shrink-0 rounded-full", CREW_DOT["needs-you"])} aria-hidden="true" />
           <span className="min-w-0 truncate font-medium text-foreground">{nameOf(member)}</span>
           {member.device && <Badge variant="outline">{member.device.name}</Badge>}
           <span className="ml-auto shrink-0 tabular-nums text-warning">
@@ -366,7 +358,7 @@ function CrewRow({
         aria-label={`${name}, ${activity}`}
         className="grid w-full grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 rounded-md px-2 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <span className={cn("size-1.5 justify-self-center rounded-full", DOT[state])} aria-hidden="true" />
+        <span className={cn("size-1.5 justify-self-center rounded-full", CREW_DOT[state])} aria-hidden="true" />
         <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium">
           <span className="truncate">{name}</span>
           {here && <span className="shrink-0 rounded-full border px-1.5 text-[10.5px] font-normal text-muted-foreground">you are here</span>}

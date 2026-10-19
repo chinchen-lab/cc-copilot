@@ -104,6 +104,18 @@ describe("CrewPanel", () => {
     await waitFor(() => expect(mocks.json).toHaveBeenCalledWith("/api/stop-session", { sessionId: "lane" }))
   })
 
+  it("maps the crew from its root next to the overview, and opens a member from the map", async () => {
+    const { openSession } = renderPanel()
+    fireEvent.click(await screen.findByRole("tab", { name: "Map" }))
+    const map = await screen.findByRole("region", { name: "Crew map" })
+    const cards = [...map.querySelectorAll("[data-crew-map-card]")]
+    expect(cards.map((card) => card.getAttribute("data-crew-map-card"))).toEqual(["coordinator", "lane", "rooftop", "theories"])
+    expect(within(map).getByRole("button", { name: "lane, Bash" })).toHaveAttribute("aria-current", "true")
+
+    fireEvent.click(within(map).getByRole("button", { name: "theories, Finished · result unread" }))
+    expect(openSession).toHaveBeenCalledWith("-theories", "theories.jsonl")
+  })
+
   it("filters the list by what members are doing", async () => {
     renderPanel()
     const sessions = await screen.findByRole("region", { name: "Sessions" })
