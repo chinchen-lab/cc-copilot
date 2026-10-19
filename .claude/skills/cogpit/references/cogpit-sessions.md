@@ -35,6 +35,24 @@ supervised) and to your own effort when they run your agent. Use
 `--mode default` when approval is needed, `--effort` to pick another level.
 A skill does not grant permission beyond the user's task.
 
+## Delegate further
+
+A child session can start its own children, and those can start theirs. If you
+were started by another session and your task splits into independent parts,
+start sub-sessions when doing so will finish the work sooner. There is no limit
+on how many layers of delegation you can use, as long as each layer keeps the
+chain of command intact:
+
+- You own the children you start. Wait for them, answer their requests, and stop
+  them when you finish. Do not leave orphaned sessions running.
+- Give each child a clear, scoped task and say what it should report back.
+- Merge your children's results, review them, and report one combined answer to
+  your parent. Your parent should not need to read your children's transcripts.
+- Escalate a question to your parent only when neither you nor your children can
+  answer it, and pass the answer back down.
+- Stay within the scope of your own task. Delegation splits up the work you were
+  given; it does not add new work.
+
 ## Follow up and inspect
 
 ```bash
