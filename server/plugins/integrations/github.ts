@@ -120,6 +120,8 @@ query($owner: String!, $name: String!, $first: Int!) {
         headRefName
         headRefOid
         baseRefName
+        additions
+        deletions
         createdAt
         updatedAt
         closedAt
@@ -412,6 +414,8 @@ function parsePull(value: unknown, viewer: string): GitHubPullRequest | null {
     comments: numberValue(record(source.comments)?.totalCount) ?? 0,
     mergeState: pullMergeState(source, state),
     headSha: stringValue(source.headRefOid),
+    additions: numberValue(source.additions) ?? 0,
+    deletions: numberValue(source.deletions) ?? 0,
   }
 }
 

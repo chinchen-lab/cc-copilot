@@ -73,6 +73,8 @@ const pullRequest = {
   mergeStateStatus: "BLOCKED",
   viewerCanUpdate: true,
   headRefOid: "b".repeat(40),
+  additions: 140,
+  deletions: 12,
   comments: { totalCount: 3 },
   reviewRequests: { nodes: [{ requestedReviewer: { login: "hubot" } }] },
   commits: { nodes: [{ commit: { statusCheckRollup: { state: "FAILURE", contexts: {
@@ -225,6 +227,8 @@ describe("GitHub routes", () => {
       comments: 3,
       mergeState: "blocked",
       headSha: "b".repeat(40),
+      additions: 140,
+      deletions: 12,
     })
     expect(parsePullsResponse(graphqlResponse([pullRequest], "octocat")).pulls[0].reviewRequested).toBe(false)
     expect(parsePullsResponse(graphqlResponse([{ ...pullRequest, isDraft: true }])).pulls[0]).toMatchObject({ state: "draft", mergeState: null })

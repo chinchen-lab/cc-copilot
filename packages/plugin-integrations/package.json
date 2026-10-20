@@ -19,6 +19,10 @@
       "types": "./dist/normalizeClickUp.d.ts",
       "import": "./dist/normalizeClickUp.js"
     },
+    "./changedFileKind": {
+      "types": "./dist/changedFileKind.d.ts",
+      "import": "./dist/changedFileKind.js"
+    },
     "./github": {
       "types": "./dist/github.d.ts",
       "import": "./dist/github.js"
