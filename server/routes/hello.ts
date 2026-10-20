@@ -7,6 +7,7 @@ import type { UseFn } from "../http"
 import type { SignInMode } from "../../shared/contracts/identity"
 import { getConfig } from "../config"
 import { editionModule } from "../edition"
+import { allowsHttpBrowserAccess } from "../lib/browserTransport"
 
 export type HubMode = "electron" | "standalone" | "dev"
 
@@ -90,6 +91,7 @@ export function registerHelloRoutes(use: UseFn, opts: { mode: HubMode }) {
       instanceId: INSTANCE_ID,
       networkAccess: config?.networkAccess ?? false,
       configured: config !== null,
+      ...(allowsHttpBrowserAccess() ? { httpOnly: true } : {}),
     }))
   })
 }

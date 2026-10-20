@@ -7,6 +7,9 @@ import * as browserSupport from "../browserSupport"
 import type { PluginBrowserEnvironment } from "../browserSupport"
 import { clientRuntimeDescriptor, RuntimePluginClient } from "../runtimeClient"
 import { useRuntimePlugins } from "../useRuntimePlugins"
+import { setHttpBrowserMode } from "@/lib/browserCrypto"
+
+afterEach(() => setHttpBrowserMode(false))
 
 const checkSupport = browserSupport.getPluginBrowserSupport
 function environment(): PluginBrowserEnvironment {
@@ -51,6 +54,17 @@ const cases: Array<[string, (value: PluginBrowserEnvironment) => void]> = [
 ]
 
 describe("runtime plugin browser prerequisites", () => {
+  it("allows HTTP hashing only after the server explicitly enables HTTP mode", () => {
+    const value = environment()
+    value.isSecureContext = false
+    value.crypto!.subtle = undefined
+    expect(checkSupport(value).supported).toBe(false)
+    setHttpBrowserMode(true)
+    expect(checkSupport(value)).toMatchObject({ supported: true, browser: ["message-channel", "blob-script", "web-crypto"], error: null })
+    value.crypto!.getRandomValues = undefined
+    expect(checkSupport(value).supported).toBe(false)
+  })
+
   it("checks APIs without allocating channels, invoking crypto, or making requests", () => {
     const value = environment()
     expect(checkSupport(value)).toEqual({ supported: true, browser: ["message-channel", "blob-script", "web-crypto"], missing: [], error: null })

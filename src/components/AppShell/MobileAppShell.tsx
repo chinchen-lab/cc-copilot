@@ -6,6 +6,7 @@ import { DeviceSwitcher } from "@/components/DeviceSwitcher"
 import { FolderBrowserHost } from "@/components/FolderBrowserHost"
 import { MobileNav, type MobileTab } from "@/components/MobileNav"
 import { SessionInfoBar } from "@/components/SessionInfoBar"
+import { ThemeToggleButton } from "@/components/ThemeToggleButton"
 import { ProviderUpdateBanner } from "@/components/ProviderUpdateBanner"
 import { UpdateBanner } from "@/components/UpdateBanner"
 import { useAppContext } from "@/contexts/AppContext"
@@ -61,13 +62,17 @@ export function MobileAppShell({
     },
   })
 
-  const headerAccessory = AccountControl && (
-    <AccountControl
-      mobile
-      onLogout={chrome.onLogout}
-      onOpenMainView={navigation.panels.openMainView}
-      className="ml-auto"
-    />
+  const headerAccessory = (
+    <div className="ml-auto flex shrink-0 items-center gap-1">
+      <ThemeToggleButton />
+      {AccountControl && (
+        <AccountControl
+          mobile
+          onLogout={chrome.onLogout}
+          onOpenMainView={navigation.panels.openMainView}
+        />
+      )}
+    </div>
   )
 
   const changeTab = (tab: MobileTab): void => {

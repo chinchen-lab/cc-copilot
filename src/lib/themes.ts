@@ -54,11 +54,12 @@ const STORAGE_KEY = "cogpit-theme"
 const themeClasses = [...new Set(themes.flatMap(theme => theme.className.split(" ").filter(Boolean)))]
 
 export function readSavedTheme(): ThemeId {
+  const defaultTheme = typeof navigator !== "undefined" && navigator.userAgent.includes("Electron") ? "dark" : "light"
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
-    return themes.find(theme => theme.id === saved)?.id ?? "dark"
+    return themes.find(theme => theme.id === saved)?.id ?? defaultTheme
   } catch {
-    return "dark"
+    return defaultTheme
   }
 }
 

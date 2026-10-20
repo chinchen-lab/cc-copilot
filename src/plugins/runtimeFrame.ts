@@ -3,6 +3,7 @@ import {
   type JsonValue, type PluginContext, type PluginError, type PluginRequest,
 } from "@cogpit/plugin-contracts"
 import { prepareRuntimePackage, type PreparedRuntimePackage } from "./runtimePayload"
+import { canHashInBrowser } from "@/lib/browserCrypto"
 
 export const RUNTIME_SHELL_PATH = "/api/plugins/shell/v1"
 const READY_TIMEOUT_MS = 10000
@@ -92,7 +93,7 @@ export function createRuntimeFrame(options: RuntimeFrameOptions): RuntimeFrameCo
     if (disposed) return
     if (loaded) { fail(new Error("Plugin frame navigated or reloaded")); return }
     loaded = true
-    if (!frame.contentWindow || !cryptoApi?.subtle) { fail(new Error("Plugin runtime requires a secure browser connection")); return }
+    if (!frame.contentWindow || !canHashInBrowser(cryptoApi)) { fail(new Error("Plugin runtime requires a secure browser connection or explicit HTTP mode")); return }
     try {
       nonce = Array.from(cryptoApi.getRandomValues(new Uint8Array(32)), (value) => value.toString(16).padStart(2, "0")).join("")
       channel = (options.createChannel ?? (() => new MessageChannel()))()

@@ -1,3 +1,5 @@
+import { isHttpBrowserMode } from "@/lib/browserCrypto"
+
 export interface PluginBrowserEnvironment {
   isSecureContext?: unknown
   MessageChannel?: unknown
@@ -28,8 +30,8 @@ export function getPluginBrowserSupport(environment: PluginBrowserEnvironment = 
   const channel = callable(environment.MessageChannel) && callable(environment.MessagePort?.prototype?.postMessage)
     && callable(environment.MessagePort?.prototype?.start) && callable(environment.MessagePort?.prototype?.close)
   const blob = callable(environment.Blob) && callable(environment.URL?.createObjectURL) && callable(environment.URL?.revokeObjectURL)
-  const crypto = callable(environment.crypto?.subtle?.digest) && callable(environment.crypto?.getRandomValues)
-  const secure = environment.isSecureContext === true
+  const crypto = (callable(environment.crypto?.subtle?.digest) || isHttpBrowserMode()) && callable(environment.crypto?.getRandomValues)
+  const secure = environment.isSecureContext === true || isHttpBrowserMode()
   const checks: Array<[string, boolean]> = [
     ["secure context (HTTPS or localhost)", secure],
     ["MessageChannel", channel], ["Blob URLs", blob], ["Web Crypto", crypto],

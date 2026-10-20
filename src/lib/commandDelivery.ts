@@ -1,8 +1,9 @@
+import { randomUUID } from "@/lib/uuid"
 import { authFetch, jsonFetch } from "./auth"
 
 /** Retries an interrupted HTTP exchange with the same durable command id. */
 export async function deliverCommand(url: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<Response> {
-  const commandId = typeof body.commandId === "string" ? body.commandId : crypto.randomUUID()
+  const commandId = typeof body.commandId === "string" ? body.commandId : randomUUID()
   const content = { ...body, commandId }
   for (let attempt = 0; ; attempt++) {
     try {

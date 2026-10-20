@@ -1,3 +1,4 @@
+import { randomUUID } from "@/lib/uuid"
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import type { ProviderInstance } from "../../shared/contracts/orchestration"
 import { AGENT_KINDS, descriptorFor, type AgentKind } from "@/lib/agents"
@@ -42,7 +43,7 @@ export function ConversationActions({ sessionId, onOpen, open, onOpenChange }: {
     const binding = state.conversation.binding
     const body = { sessionId, expectedRevision: state.conversation.revision, mode, agent: mode === "resume" ? binding.agent : instance?.agent ?? target as AgentKind, instanceId: mode === "resume" ? binding.instanceId : instance?.id ?? "default", message }
     const payload = JSON.stringify(body)
-    if (!attempt.current || attempt.current.payload !== payload) attempt.current = { id: crypto.randomUUID(), payload }
+    if (!attempt.current || attempt.current.payload !== payload) attempt.current = { id: randomUUID(), payload }
     setBusy(true); setError(null)
     try {
       const response = await authFetch("/api/conversation-transition", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, commandId: attempt.current.id }) })

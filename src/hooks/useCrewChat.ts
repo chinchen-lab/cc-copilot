@@ -1,3 +1,4 @@
+import { randomUUID } from "@/lib/uuid"
 import { useCallback, useRef, useState } from "react"
 import { authFetch, jsonFetch } from "@/lib/auth"
 import { useVisiblePolling } from "./useVisiblePolling"
@@ -50,7 +51,7 @@ export function useCrewChat(rootId: string) {
     if (postInFlight.current) return false
     postInFlight.current = true
     setPosting(true)
-    if (postAttempt.current?.text !== text) postAttempt.current = { text, id: crypto.randomUUID() }
+    if (postAttempt.current?.text !== text) postAttempt.current = { text, id: randomUUID() }
     try {
       const response = await checked(await jsonFetch(`/api/crew-chat/${encodeURIComponent(rootId)}`, { text, commandId: postAttempt.current.id }))
       const result = await response.json() as { message: CrewChatMessage; pending: { sessionId: string }[] }

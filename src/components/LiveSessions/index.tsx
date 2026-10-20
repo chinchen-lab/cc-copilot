@@ -1,3 +1,4 @@
+import { randomUUID } from "@/lib/uuid"
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react"
 import { toast } from "sonner"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -328,7 +329,7 @@ export const LiveSessions = memo(function LiveSessions({ activeSessionKey, onSel
 
   const handleResumeSession = useCallback((sessionId: string, cwd: string | undefined, dirName: string) => {
     const { command, args } = getResumeSpawn(agentKindForDirName(dirName), sessionId)
-    const id = `resume_${crypto.randomUUID().slice(0, 8)}`
+    const id = `resume_${randomUUID().slice(0, 8)}`
     pty.send({
       type: "spawn",
       id,

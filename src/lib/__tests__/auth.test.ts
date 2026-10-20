@@ -15,6 +15,7 @@ import {
 import { onGate } from "@/lib/gateEvents"
 import { GATE_HEADER } from "../../../shared/contracts/identity"
 import { SESSION_ACCESS_CHANGED_EVENT, SESSION_ACCESS_LOST_EVENT } from "@/lib/sessionAccessEvents"
+import { isHttpBrowserMode } from "@/lib/browserCrypto"
 
 function setHostname(hostname: string) {
   Object.defineProperty(window, "location", {
@@ -43,6 +44,22 @@ describe("auth", () => {
   afterEach(() => setHostname("localhost"))
 
   describe("getServerHello", () => {
+    it("learns explicit HTTP mode from the server and clears it on a failed refresh", async () => {
+      vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(new Response(JSON.stringify({ httpOnly: true })))
+        .mockRejectedValueOnce(new Error("offline"))
+      await getServerHello()
+      expect(isHttpBrowserMode()).toBe(true)
+      await refreshServerHello()
+      expect(isHttpBrowserMode()).toBe(false)
+    })
+
+    it.each([undefined, false, "true", 1])("does not infer HTTP mode from %s", async httpOnly => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ httpOnly })))
+      await getServerHello()
+      expect(isHttpBrowserMode()).toBe(false)
+    })
+
     it("reports account sign-in and its open setup from the same cached probe", async () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
         new Response(JSON.stringify({ edition: "team", signIn: "account", setupRequired: true }), { status: 200 }),

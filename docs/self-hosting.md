@@ -35,6 +35,14 @@ isn't one.
 
 Only the third one needs this page.
 
+## Appearance
+
+The browser interface defaults to a white light theme. Use the moon or sun button
+in the top-right toolbar to switch between light and dark mode, including on a phone.
+Your choice is saved in that browser and restored on reload. Existing saved themes
+are kept. On desktop, **Appearance** in the command palette also offers the full
+theme list and chat width settings.
+
 ---
 
 ## Headless server
@@ -46,10 +54,10 @@ bun install
 bun run build
 
 # Loopback only. Safe default, not reachable from the network.
-bun server/standalone.ts
+COGPIT_HOST=127.0.0.1 bun server/standalone.ts
 ```
 
-It prints the `host:port` it bound. Default is `127.0.0.1:19384`.
+It prints the `host:port` it bound. This example listens on `127.0.0.1:19384`.
 
 ### Reachable from your network
 
@@ -86,13 +94,13 @@ names the folder.
 
 ---
 
-## Remote browser access needs HTTPS
+## Remote browser access
 
 This is the part people trip on, so it is worth being blunt about.
 
-Cogpit keeps a browser session in a host-only, `HttpOnly`, `Secure`, `SameSite=Strict` cookie.
+By default, Cogpit keeps a browser session in a host-only, `HttpOnly`, `Secure`, `SameSite=Strict` cookie.
 A `Secure` cookie cannot be issued over plaintext HTTP. **So a plain `http://192.168.x.x:19384`
-URL cannot log you in from a browser, by design.**
+URL cannot log you in from a browser unless you explicitly enable HTTP mode.**
 
 Put a TLS terminator in front of the loopback listener and open the HTTPS origin instead.
 
@@ -126,7 +134,38 @@ Two things to get right:
    timeline sits still and then arrives in a lump.
 
 A displayed `http://` LAN address stays usable for authenticated Cogpit hub and device
-traffic. Do not open it as a browser login URL.
+traffic. Browser login over that address requires HTTP mode below.
+
+### HTTP mode for a private network or VPN
+
+To use a Linux server directly from a Windows browser over HTTP, opt in at startup:
+
+```bash
+COGPIT_HOST=0.0.0.0 \
+COGPIT_NETWORK_PASSWORD='replace-with-your-own-long-password' \
+bun server/standalone.ts --http-only
+```
+
+Open `http://<linux-server-ip>:19384` in the Windows browser. No reverse proxy or
+certificate installation is needed. Build the frontend with `bun run build` when
+updating the server so its HTTP-compatible browser code is included.
+
+For systemd, containers, or other launchers, `COGPIT_ALLOW_HTTP=1` enables the same
+mode without a command-line flag. Omit the flag and unset that variable to return
+to the default HTTPS requirement. `bun server/standalone.ts --help` lists the flag.
+
+HTTP mode retains password verification, login rate limits, session expiry,
+same-origin checks, and API/WebSocket authorization. Browser sessions use separate
+host-only `HttpOnly; SameSite=Strict` cookies without `Secure`; HTTPS mode does not
+accept these HTTP-mode cookies. Shared-session cookies follow the same mode and
+retain their restricted access. Frontend UUID generation and plugin SHA-256
+verification also work without the browser's HTTPS-only crypto APIs; plugin package
+integrity checks remain enabled.
+
+HTTP itself does not encrypt passwords, sessions, or conversation data. Use this
+mode only on the private network or VPN you intend to trust, with firewall access
+limited to those clients. Browser features such as the modern Clipboard API remain
+subject to the browser's secure-context rules; the app uses its existing copy fallback.
 
 ---
 
@@ -153,10 +192,10 @@ than look it up. Every shared session has its own passphrase, and it is unrelate
 network password: a guest cannot log in at `/` with it, and someone holding two share links
 reaches two sessions and no more.
 
-Network access has to be on before a session can be shared, and the guest needs the same HTTPS
-origin you do. Share login sets a `Secure` cookie, so a plain `http://192.168.x.x:19384` link
+Network access has to be on before a session can be shared, and the guest needs the same
+origin you do. By default, share login sets a `Secure` cookie, so a plain `http://192.168.x.x:19384` link
 answers `426 Upgrade Required` and says to use the tunnel. Send guests the HTTPS URL from your
-reverse proxy or tunnel, not the LAN address Cogpit prints. Login attempts are rate limited,
+reverse proxy or tunnel unless HTTP mode is enabled. Login attempts are rate limited,
 and a wrong passphrase and a session that was never shared return the same 401, so the endpoint
 cannot be used to discover which sessions are shared.
 
@@ -185,7 +224,8 @@ Every one of these is read by the server. Edition packages document their own.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `COGPIT_HOST` | `127.0.0.1` | Bind address. Non-loopback requires a password. |
+| `COGPIT_HOST` | `0.0.0.0` | Bind address. Non-loopback requires a password. Set `127.0.0.1` for local-only access. |
+| `COGPIT_ALLOW_HTTP` | off | Set `1` to allow browser login over HTTP on a trusted private network or VPN. Same as `--http-only` in the standalone entry point. |
 | `COGPIT_PORT` | `19384` | Bind port. |
 | `COGPIT_DATA_DIR` | `~/.config/cogpit` | Where config lives. |
 | `COGPIT_EDITION` | `personal` | Selects an installed edition package. Standalone server only; wins over the config file. |
@@ -318,7 +358,8 @@ You set a non-loopback `COGPIT_HOST` without a password. Set `COGPIT_NETWORK_PAS
 `COGPIT_NETWORK_PASSWORD_FILE`, or bind `127.0.0.1`.
 
 **The login page loads over HTTP but the password never sticks.**
-Expected. The session cookie is `Secure` and cannot be set over plaintext. Put TLS in front.
+By default, the session cookie is `Secure` and cannot be set over plaintext. Put TLS
+in front, or explicitly enable `--http-only` on a trusted private network or VPN.
 
 **The timeline freezes and then jumps.**
 Proxy buffering. Set `proxy_buffering off` in nginx. Caddy does not buffer by default.

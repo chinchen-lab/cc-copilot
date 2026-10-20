@@ -340,11 +340,29 @@ mark.find-in-session-active {
   background-color: color-mix(in oklab, var(--warning) 65%, transparent);
 }
 
+.terminal-surface {
+  background: var(--terminal-background, var(--background));
+}
+
+/* Shells often print bright ANSI text, even when the application uses a light theme. */
+:root:not(.dark) .terminal-surface {
+  --terminal-background: #202020;
+  --terminal-foreground: #f5f5f5;
+  --terminal-selection: #525252;
+  --terminal-bright-black: #a3a3a3;
+  --terminal-red: #f87171;
+  --terminal-green: #86efac;
+  --terminal-yellow: #facc15;
+  --terminal-blue: #93c5fd;
+  --terminal-magenta: #e879f9;
+  --terminal-cyan: #67e8f9;
+}
+
 .xterm .xterm-viewport {
   background-color: transparent;
 }
 
 .xterm .composition-view {
-  background: var(--popover);
-  color: var(--foreground);
+  background: var(--terminal-background, var(--popover));
+  color: var(--terminal-foreground, var(--foreground));
 }

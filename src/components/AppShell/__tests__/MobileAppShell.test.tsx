@@ -9,11 +9,12 @@ import type { AccountControlProps, EditionMainView } from "@/edition/contract"
 import { __installEditionUiForTest, __resetEditionUiForTest } from "@/edition/registry"
 import type { MainView } from "@/hooks/useSessionState"
 
-const mocks = vi.hoisted(() => ({ tab: "chat" as MobileTab, mainView: "sessions" as MainView }))
+const mocks = vi.hoisted(() => ({ tab: "chat" as MobileTab, mainView: "sessions" as MainView, setTheme: vi.fn() }))
 vi.mock("@/contexts/AppContext", () => ({
   useAppContext: () => ({
     state: { mobileTab: mocks.tab, mainView: mocks.mainView, extensionViewId: "reports", pendingDirName: null },
     config: { defaultAgentKind: "claude" },
+    theme: { activeTheme: "light", setTheme: mocks.setTheme },
   }),
 }))
 vi.mock("@/contexts/SessionContext", () => ({ useSessionContext: () => ({ session: {}, isSubAgentView: false }) }))
@@ -102,6 +103,7 @@ function props(): MobileAppShellProps {
 }
 
 beforeEach(() => {
+  mocks.setTheme.mockClear()
   mocks.tab = "chat"
   mocks.mainView = "sessions"
 })
@@ -130,6 +132,13 @@ describe("mobile chat continuity", () => {
 })
 
 describe("mobile shell header", () => {
+  it.each(["chat", "sessions", "workspace"] as const)("keeps theme switching in reach on the %s tab", (tab) => {
+    mocks.tab = tab
+    render(<MobileAppShell {...props()} />)
+    fireEvent.click(screen.getByRole("button", { name: "Switch to dark mode" }))
+    expect(mocks.setTheme).toHaveBeenCalledWith("dark")
+  })
+
   it("carries the edition's account control, wired to the shell's logout and main views", () => {
     __installEditionUiForTest({ AccountControl })
     mocks.tab = "sessions"

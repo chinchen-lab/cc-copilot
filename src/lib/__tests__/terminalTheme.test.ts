@@ -4,6 +4,29 @@ import { readTerminalTheme } from "../terminalTheme"
 afterEach(() => document.documentElement.removeAttribute("style"))
 
 describe("terminal theme", () => {
+  it("uses the terminal's dark surface and legible palette over a light application", () => {
+    const root = document.documentElement
+    root.style.setProperty("--foreground", "#171717")
+    root.style.setProperty("--canvas", "#ffffff")
+    const surface = document.createElement("div")
+    document.body.appendChild(surface)
+    const tokens = {
+      background: "#202020", foreground: "#f5f5f5", selection: "#525252",
+      "bright-black": "#a3a3a3", red: "#f87171", green: "#86efac",
+      yellow: "#facc15", blue: "#93c5fd", magenta: "#e879f9", cyan: "#67e8f9",
+    }
+    for (const [name, value] of Object.entries(tokens)) surface.style.setProperty(`--terminal-${name}`, value)
+    expect(readTerminalTheme(surface)).toMatchObject({
+      background: "#202020", foreground: "#f5f5f5", cursor: "#f5f5f5", cursorAccent: "#202020",
+      selectionBackground: "#525252", brightBlack: "#a3a3a3", red: "#f87171", brightRed: "#f87171",
+      green: "#86efac", yellow: "#facc15", blue: "#93c5fd", magenta: "#e879f9", cyan: "#67e8f9",
+    })
+    surface.style.removeProperty("--terminal-background")
+    surface.style.removeProperty("--terminal-foreground")
+    expect(readTerminalTheme(surface).background).toBe("#00000000")
+    surface.remove()
+  })
+
   it("reads the active CSS colors again after a theme change", () => {
     const root = document.documentElement
     root.style.setProperty("--foreground", "#fafafa")

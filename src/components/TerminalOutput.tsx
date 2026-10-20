@@ -76,6 +76,7 @@ export function TerminalOutput({ processId, autoFocus = false, onRequestNew, onR
       cursorStyle: "block",
       scrollback: 5000,
       allowTransparency: true,
+      minimumContrastRatio: 4.5,
     })
 
     const fitAddon = new FitAddon()
@@ -147,7 +148,7 @@ export function TerminalOutput({ processId, autoFocus = false, onRequestNew, onR
   }, [])
 
   return (
-    <div className="relative size-full bg-background">
+    <div className="terminal-surface relative size-full">
       <div
         ref={containerRef}
         className="size-full p-1"

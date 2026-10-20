@@ -1,3 +1,4 @@
+import { randomUUID } from "@/lib/uuid"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { devicePrefix } from "@/lib/device"
 
@@ -138,7 +139,7 @@ export function usePtySocket(enabled = true) {
   }, [])
 
   const spawnTerminal = useCallback((opts: { name?: string; cwd?: string } = {}) => {
-    const id = `pty_${crypto.randomUUID().slice(0, 8)}`
+    const id = `pty_${randomUUID().slice(0, 8)}`
     send({
       type: "spawn",
       id,
@@ -155,7 +156,7 @@ export function usePtySocket(enabled = true) {
     source: string
     scriptName: string
   }) => {
-    const id = `script_${crypto.randomUUID().slice(0, 8)}`
+    const id = `script_${randomUUID().slice(0, 8)}`
     send({
       type: "spawn",
       id,

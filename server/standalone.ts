@@ -12,11 +12,25 @@ import {
   buildBootBanner,
   resolveDataDir,
   resolveDeviceName,
+  parseStandaloneOptions,
 } from "./lib/standalone-bootstrap"
+import { allowsHttpBrowserAccess } from "./lib/browserTransport"
 import { editionModule, editionOwnsSignIn } from "./edition"
 import { startStandaloneServer } from "./standalone-runtime"
 
-const host = process.env.COGPIT_HOST || "127.0.0.1"
+try {
+  const options = parseStandaloneOptions(process.argv.slice(2))
+  if (options.help) {
+    console.log("Usage: bun server/standalone.ts [--http-only]\n\n  --http-only  Allow browser login over HTTP (also COGPIT_ALLOW_HTTP=1). Password authentication remains required for remote access.")
+    process.exit(0)
+  }
+  if (options.httpOnly) process.env.COGPIT_ALLOW_HTTP = "1"
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error))
+  process.exit(1)
+}
+
+const host = process.env.COGPIT_HOST || "0.0.0.0"
 const port = parseInt(process.env.COGPIT_PORT || "19384", 10)
 const dataDir = resolveDataDir()
 
@@ -50,6 +64,7 @@ const banner = buildBootBanner({
 })
 for (const line of banner) console.log(line)
 console.log(`Data directory: ${dataDir}`)
+if (allowsHttpBrowserAccess()) console.log("HTTP mode enabled: browser sessions are allowed over unencrypted HTTP. Use a trusted network or VPN.")
 if (runtime.envPassword && !editionOwnsSignIn()) {
   console.log("Network access: enabled via environment (password kept in memory only)")
 }

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { useTheme } from "../useTheme"
 import { applyTheme, readSavedTheme } from "../../lib/themes"
 
-describe("layered theme", () => {
+describe("theme", () => {
   beforeEach(() => {
     localStorage.clear()
     document.documentElement.className = "electron"
@@ -15,6 +15,46 @@ describe("layered theme", () => {
     document.querySelector('meta[name="theme-color"]')?.remove()
     localStorage.clear()
     document.documentElement.className = ""
+  })
+
+  it("defaults to light in the browser at startup and after mounting", () => {
+    expect(readSavedTheme()).toBe("light")
+    applyTheme(readSavedTheme())
+    expect(document.documentElement.style.colorScheme).toBe("light")
+    const { result } = renderHook(useTheme)
+    expect(result.current.theme).toBe("light")
+    expect(document.documentElement).not.toHaveClass("dark")
+  })
+
+  it("keeps the desktop app's dark default", () => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Electron/41.0.0")
+    const { result } = renderHook(useTheme)
+    expect(result.current.theme).toBe("dark")
+    expect(document.documentElement).toHaveClass("dark")
+  })
+
+  it("falls back to light for an unknown saved theme", () => {
+    localStorage.setItem("cogpit-theme", "unknown")
+    expect(readSavedTheme()).toBe("light")
+  })
+
+  it.each(["dark", "oled", "layered", "light", "layered-light"] as const)("preserves the saved %s theme", (id) => {
+    localStorage.setItem("cogpit-theme", id)
+    const { result } = renderHook(useTheme)
+    expect(result.current.theme).toBe(id)
+  })
+
+  it("restores the light/dark selection after remounting", () => {
+    const first = renderHook(useTheme)
+    act(() => first.result.current.setTheme("dark"))
+    first.unmount()
+    const second = renderHook(useTheme)
+    expect(second.result.current.theme).toBe("dark")
+    act(() => second.result.current.setTheme("light"))
+    second.unmount()
+    const third = renderHook(useTheme)
+    expect(third.result.current.theme).toBe("light")
+    expect(document.documentElement).not.toHaveClass("dark")
   })
 
   it("uses the same saved theme for startup, browser chrome, and mounted controls", () => {
@@ -31,10 +71,12 @@ describe("layered theme", () => {
   })
 
   it("still changes themes when browser storage is unavailable", () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("Storage blocked") })
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("Storage blocked") })
+    vi.spyOn(localStorage, "getItem").mockImplementation(() => { throw new Error("Storage blocked") })
+    vi.spyOn(localStorage, "setItem").mockImplementation(() => { throw new Error("Storage blocked") })
     const { result } = renderHook(useTheme)
-    expect(result.current.theme).toBe("dark")
+    expect(result.current.theme).toBe("light")
+    act(() => result.current.setTheme("dark"))
+    expect(document.documentElement).toHaveClass("dark")
     act(() => result.current.setTheme("layered-light"))
     expect(document.documentElement).toHaveClass("theme-layered")
     expect(document.documentElement).not.toHaveClass("dark")

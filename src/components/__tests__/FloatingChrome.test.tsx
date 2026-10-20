@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
     defaultAgentKind: "claude" as const,
     networkAccessDisabled: false,
   },
+  theme: { activeTheme: "light", setTheme: vi.fn() },
   session: null as ParsedSession | null,
   sessionSource: null as {
     dirName: string
@@ -41,7 +42,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock("@/contexts/AppContext", () => ({
-  useAppContext: () => ({ config: mocks.config, dispatch: mocks.dispatch }),
+  useAppContext: () => ({ config: mocks.config, dispatch: mocks.dispatch, theme: mocks.theme }),
 }))
 vi.mock("@/contexts/SessionContext", () => ({
   useSessionContext: () => ({

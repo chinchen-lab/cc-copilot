@@ -4,6 +4,10 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 
+// Deployment flags must not change the default security contract under test.
+// HTTP-mode suites explicitly opt in with vi.stubEnv and restore this baseline.
+process.env.COGPIT_ALLOW_HTTP = "0"
+
 const databaseClosers = vi.hoisted(() => new Set<() => void>())
 vi.mock("../../server/orchestration/database", async (original) => {
   const actual = await original<typeof import("../../server/orchestration/database")>()

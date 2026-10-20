@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import type { RuntimePluginClient } from "./runtimeClient"
+import { sha256Hex } from "@/lib/browserCrypto"
 
 export function PluginPublisherForm({ client, run, busy }: {
   client: RuntimePluginClient; run: (action: () => Promise<void>) => void; busy: boolean
@@ -18,9 +19,8 @@ export function PluginPublisherForm({ client, run, busy }: {
     event.preventDefault()
     run(async () => {
       if (!root || root.size > 256 * 1024) throw new Error("Choose a root metadata file smaller than 256 KiB")
-      if (!globalThis.crypto?.subtle) throw new Error("Publisher enrollment requires HTTPS or localhost")
       const bytes = await root.arrayBuffer()
-      const actual = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), (byte) => byte.toString(16).padStart(2, "0")).join("")
+      const actual = await sha256Hex(bytes)
       if (actual !== fingerprint.trim().toLowerCase()) throw new Error("The root file does not match the fingerprint you entered")
       await client.enrollDeveloper({ publisher, label, root: new TextDecoder("utf-8", { fatal: true }).decode(bytes), fingerprint: actual })
       setTrusted(false)

@@ -1,6 +1,7 @@
 import { parseManifest, type PluginManifest } from "@cogpit/plugin-contracts"
 import { ident, string as cssString, tokenize, tokenTypes, url } from "css-tree"
 import { z } from "zod"
+import { canHashInBrowser, sha256Hex } from "@/lib/browserCrypto"
 
 const MAX_UPLOAD = 4 * 1024 * 1024
 const MAX_EXPANDED = 16 * 1024 * 1024
@@ -91,10 +92,10 @@ function prepareStyle(text: string, path: string, images: Set<string>): string {
 }
 
 export async function prepareRuntimePackage(payload: ArrayBuffer, digest: string, cryptoApi: Crypto = globalThis.crypto): Promise<PreparedRuntimePackage> {
-  if (!cryptoApi?.subtle) throw new Error("Plugin integrity verification requires a secure browser connection with Web Crypto")
+  if (!canHashInBrowser(cryptoApi)) throw new Error("Plugin integrity verification requires a secure browser connection with Web Crypto or explicit HTTP mode")
   if (!/^[a-f0-9]{64}$/.test(digest) || payload.byteLength > MAX_UPLOAD) throw new Error("Invalid package digest or size")
   const copied = payload.slice(0)
-  const hash = Array.from(new Uint8Array(await cryptoApi.subtle.digest("SHA-256", copied)), (byte) => byte.toString(16).padStart(2, "0")).join("")
+  const hash = await sha256Hex(copied, cryptoApi)
   if (hash !== digest) throw new Error("Plugin package failed integrity verification")
   const decoder = new TextDecoder("utf-8", { fatal: true })
   const archive = archiveSchema.parse(JSON.parse(decoder.decode(copied)))

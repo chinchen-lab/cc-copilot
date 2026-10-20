@@ -1,3 +1,4 @@
+import { randomUUID } from "@/lib/uuid"
 import { useState, useCallback, useEffect, useRef } from "react"
 
 export interface UploadedImage {
@@ -79,7 +80,7 @@ export function useImageUpload(enabled = true) {
           const compressed = compressImage(img, file.type)
           setImages((prev) => [
             ...prev,
-            { id: crypto.randomUUID(), file, preview: compressed.dataUrl, data: compressed.base64, mediaType: compressed.mediaType },
+            { id: randomUUID(), file, preview: compressed.dataUrl, data: compressed.base64, mediaType: compressed.mediaType },
           ])
         }
         img.src = dataUrl

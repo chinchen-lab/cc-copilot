@@ -3,6 +3,7 @@ import { createHash, webcrypto } from "node:crypto"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { createRuntimeFrame, RUNTIME_SHELL_PATH, type RuntimeFrameController } from "../runtimeFrame"
 import { prepareRuntimePackage } from "../runtimePayload"
+import { setHttpBrowserMode } from "@/lib/browserCrypto"
 import type { JsonValue, PluginContext, PluginRequest } from "@cogpit/plugin-contracts"
 
 class Port extends EventTarget {
@@ -55,9 +56,29 @@ async function connect(value: ReturnType<typeof fixture>) {
   await vi.waitFor(() => expect(value.port1.sent.some((message) => (message as { type: string }).type === "cogpit-plugin-load")).toBe(true))
 }
 const request = (id: string, method = "lifecycle.ready", params: unknown = {}) => ({ protocol: 1, type: "request", id, method, params })
-afterEach(() => { for (const controller of controllers) controller.dispose(); controllers.clear(); vi.useRealTimers() })
+afterEach(() => { for (const controller of controllers) controller.dispose(); controllers.clear(); vi.useRealTimers(); setHttpBrowserMode(false) })
 
 describe("runtime frame controller", () => {
+  it("verifies package integrity and completes the frame handshake without native Web Crypto in HTTP mode", async () => {
+    setHttpBrowserMode(true)
+    const noSubtle = { getRandomValues: cryptoApi.getRandomValues.bind(cryptoApi) } as Crypto
+    const frame = new Frame(), port1 = new Port(), port2 = new Port()
+    const onReady = vi.fn(), onError = vi.fn()
+    const controller = createRuntimeFrame({ frame: frame as unknown as HTMLIFrameElement, ...makePayload(), context,
+      execute: async () => null, crypto: noSubtle, onReady, onError,
+      createChannel: () => ({ port1, port2 }) as unknown as MessageChannel })
+    controllers.add(controller)
+    frame.load()
+    const [message] = frame.contentWindow.postMessage.mock.calls[0]
+    port1.receive({ type: "cogpit-plugin-connected", nonce: message.nonce })
+    await vi.waitFor(() => expect(port1.sent.some(value => (value as { type: string }).type === "cogpit-plugin-load")).toBe(true))
+    port1.receive(request("http-ready"))
+    await vi.waitFor(() => expect(onReady).toHaveBeenCalledOnce())
+    expect(onError).not.toHaveBeenCalled()
+    const { payload } = makePayload()
+    await expect(prepareRuntimePackage(payload, "0".repeat(64), noSubtle)).rejects.toThrow("integrity")
+  })
+
   it("finishes readiness when a project is cached before its handshake completes", async () => {
     let finish!: (value: JsonValue) => void
     let signal!: AbortSignal

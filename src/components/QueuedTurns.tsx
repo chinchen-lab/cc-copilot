@@ -1,3 +1,4 @@
+import { randomUUID } from "@/lib/uuid"
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react"
 import { ArrowUp, Pencil, X } from "lucide-react"
 import type { CommandReceipt } from "../../shared/contracts/orchestration"
@@ -113,7 +114,7 @@ export function QueuedTurns({ sessionId, turns = NO_TURNS, pendingMessages, canM
 
   function saveEdit(commandId: string, message: string) {
     if (!message.trim()) return
-    void act(commandId, { action: "edit", commandId, newCommandId: crypto.randomUUID(), message })
+    void act(commandId, { action: "edit", commandId, newCommandId: randomUUID(), message })
   }
 
   return (
@@ -144,7 +145,7 @@ export function QueuedTurns({ sessionId, turns = NO_TURNS, pendingMessages, canM
                 variant="ghost"
                 title={canSteer ? "Add this to the current turn" : "Stop the current turn and send this now"}
                 disabled={busy}
-                onClick={() => void act(command.id, { action: canSteer ? "steer" : "restart", commandId: command.id, newCommandId: crypto.randomUUID() })}
+                onClick={() => void act(command.id, { action: canSteer ? "steer" : "restart", commandId: command.id, newCommandId: randomUUID() })}
               >
                 Send now
               </Button>

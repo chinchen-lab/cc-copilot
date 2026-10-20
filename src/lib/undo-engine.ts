@@ -1,3 +1,4 @@
+import { randomUUID } from "@/lib/uuid"
 import type { Turn, ArchivedTurn, ArchivedToolCall, Branch, UndoState } from "../../shared/session/types"
 import { getUserMessageText } from "../../shared/session/parser"
 import { isSynthesized } from "../../shared/session/edit-calls"
@@ -162,7 +163,7 @@ export function createBranch(
   const label = firstPrompt.length > 60 ? firstPrompt.slice(0, 57) + "..." : firstPrompt
 
   return {
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     createdAt: new Date().toISOString(),
     branchPointTurnIndex,
     ...(branchPointTurnId !== undefined ? { branchPointTurnId } : {}),

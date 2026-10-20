@@ -119,7 +119,7 @@ async function login(options: CallOptions = {}) {
     json: () => JSON.parse(raw) as Record<string, unknown>,
     cookie: () => responseHeaders.get("set-cookie") ?? null,
     shareToken: () => {
-      const match = /__Host-cogpit_share=([^;]+)/.exec(responseHeaders.get("set-cookie") ?? "")
+      const match = /(?:__Host-cogpit_share|cogpit_share_http)=([^;]+)/.exec(responseHeaders.get("set-cookie") ?? "")
       return match?.[1] ?? null
     },
   }
@@ -141,10 +141,21 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  vi.unstubAllEnvs()
   await rm(registryRoot, { recursive: true, force: true })
 })
 
 describe("POST /api/share/verify", () => {
+  it("issues a scoped share cookie over HTTP only when opted in", async () => {
+    vi.stubEnv("COGPIT_ALLOW_HTTP", "1")
+    const result = await login({ body: { sessionId: SESSION_ID, passphrase }, https: false })
+    expect(result.res.statusCode).toBe(200)
+    expect(result.cookie()).toContain("cogpit_share_http=")
+    expect(result.cookie()).not.toContain("Secure")
+    expect(result.cookie()).not.toContain("cogpit_session_http=")
+    expect(validateShareToken(result.shareToken()!, UA)).toBe(SESSION_ID)
+  })
+
   it("issues a share cookie and never puts the token in the body", async () => {
     const result = await login({ body: { sessionId: SESSION_ID, passphrase } })
 

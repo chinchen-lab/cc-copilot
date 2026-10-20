@@ -1,3 +1,4 @@
+import { randomUUID } from "@/lib/uuid"
 import { useMemo, useState, useSyncExternalStore } from "react"
 import { X } from "lucide-react"
 import type { CommandReceipt } from "../../shared/contracts/orchestration"
@@ -53,7 +54,7 @@ function DeliveryProblems({ storageKey, commands: receipts, readOnly, onAction }
         <Button size="xs" variant="outline" disabled={busy} onClick={() => void action({ action: "resolve", commandId: command.id, disposition: "failed" })}>History confirms failure</Button>
         <Button size="xs" variant="outline" disabled={busy} onClick={() => setResending(command.id)}>Resend…</Button>
       </div>}
-      {resending === command.id && <Alert><AlertTitle>This may send a duplicate</AlertTitle><AlertDescription>Review the conversation first. Cogpit could not confirm the original delivery.<Button size="xs" variant="destructive" disabled={busy} onClick={() => void action({ action: "resend", commandId: command.id, newCommandId: crypto.randomUUID(), confirmDuplicateRisk: true })}>Confirm resend</Button><Button size="xs" variant="ghost" onClick={() => setResending(null)}>Keep waiting</Button></AlertDescription></Alert>}
+      {resending === command.id && <Alert><AlertTitle>This may send a duplicate</AlertTitle><AlertDescription>Review the conversation first. Cogpit could not confirm the original delivery.<Button size="xs" variant="destructive" disabled={busy} onClick={() => void action({ action: "resend", commandId: command.id, newCommandId: randomUUID(), confirmDuplicateRisk: true })}>Confirm resend</Button><Button size="xs" variant="ghost" onClick={() => setResending(null)}>Keep waiting</Button></AlertDescription></Alert>}
     </div>)}
   </section>
 }

@@ -13,6 +13,7 @@ import { shareRequestAllowed } from "./share/allowlist"
 import { getShareWithHash, touchShare } from "./share/registry"
 import { markShareGuestRequest } from "./share/requestGuest"
 import { clearRequestAuthentication, setRequestAuthentication } from "./requestAuthentication"
+import { allowsHttpBrowserAccess } from "./lib/browserTransport"
 
 // ── Network auth helpers ─────────────────────────────────────────────
 
@@ -26,7 +27,9 @@ const FORWARDING_HEADERS = [
 ] as const
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"])
-const BROWSER_SESSION_COOKIE = "__Host-cogpit_session"
+function browserSessionCookieName(): string {
+  return allowsHttpBrowserAccess() ? "cogpit_session_http" : "__Host-cogpit_session"
+}
 const SESSION_ACTIVITY_PERSIST_INTERVAL_MS = 60 * 1000
 
 // Defined in ./sessionConstants so an edition's session modules can share them
@@ -140,27 +143,27 @@ function bearerToken(req: IncomingMessage): string | null {
 }
 
 export function getRequestSessionToken(req: IncomingMessage): string | null {
-  return bearerToken(req) ?? cookieValue(req, BROWSER_SESSION_COOKIE)
+  return bearerToken(req) ?? cookieValue(req, browserSessionCookieName())
 }
 
 function writeSessionCookie(res: ServerResponse, name: string, token: string | null): void {
   const maxAge = token === null ? 0 : Math.floor(SESSION_ABSOLUTE_TTL_MS / 1000)
   res.setHeader(
     "Set-Cookie",
-    `${name}=${token ?? ""}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`,
+    `${name}=${token ?? ""}; Path=/; HttpOnly;${allowsHttpBrowserAccess() ? "" : " Secure;"} SameSite=Strict; Max-Age=${maxAge}`,
   )
 }
 
 export function setBrowserSessionCookie(res: ServerResponse, token: string): void {
-  writeSessionCookie(res, BROWSER_SESSION_COOKIE, token)
+  writeSessionCookie(res, browserSessionCookieName(), token)
 }
 
 export function clearBrowserSessionCookie(res: ServerResponse): void {
-  writeSessionCookie(res, BROWSER_SESSION_COOKIE, null)
+  writeSessionCookie(res, browserSessionCookieName(), null)
 }
 
 export function canIssueBrowserSession(req: IncomingMessage): boolean {
-  return requestUsesHttps(req) && hasTrustedMutationSource(req)
+  return (requestUsesHttps(req) || allowsHttpBrowserAccess()) && hasTrustedMutationSource(req)
 }
 
 /**
@@ -187,7 +190,7 @@ export function websocketUpgradeRejection(
 
   const origin = req.headers.origin
   if (origin) {
-    const token = cookieValue(req, BROWSER_SESSION_COOKIE)
+    const token = cookieValue(req, browserSessionCookieName())
     if (!hasSameOrigin(req)) return 403
     if (!token || !validateSessionToken(token, req.headers["user-agent"])) return 401
     return null
@@ -229,7 +232,7 @@ function namedUserWebsocketRejection(req: IncomingMessage, url: URL): 401 | 403 
   let token: string | null
   if (req.headers.origin) {
     if (!hasSameOrigin(req)) return 403
-    token = cookieValue(req, BROWSER_SESSION_COOKIE)
+    token = cookieValue(req, browserSessionCookieName())
     if (!token || !validateSessionToken(token, req.headers["user-agent"])) return 401
   } else {
     token = url.searchParams.get("token")
@@ -610,7 +613,9 @@ setInterval(() => {
 // persist to the edition's session store, and never appear in
 // getConnectedDevices().
 
-const SHARE_COOKIE = "__Host-cogpit_share"
+function shareCookieName(): string {
+  return allowsHttpBrowserAccess() ? "cogpit_share_http" : "__Host-cogpit_share"
+}
 
 interface ShareTokenInfo {
   sessionId: string
@@ -765,7 +770,7 @@ export function countShareGuests(sessionId: string): number {
 }
 
 export function setShareCookie(res: ServerResponse, token: string): void {
-  writeSessionCookie(res, SHARE_COOKIE, token)
+  writeSessionCookie(res, shareCookieName(), token)
 }
 
 /**
@@ -774,7 +779,7 @@ export function setShareCookie(res: ServerResponse, token: string): void {
  * full-access branch of every middleware that reads a bearer header.
  */
 export function getRequestShareToken(req: IncomingMessage): string | null {
-  return cookieValue(req, SHARE_COOKIE)
+  return cookieValue(req, shareCookieName())
 }
 
 /** Clears only the in-memory share map — the tokens are never persisted. */
@@ -929,7 +934,7 @@ export function isPublicPath(url: string): boolean {
 /** The presented main-session token, or null when there is no valid one. */
 export function validSessionToken(req: IncomingMessage): string | null {
   const bearer = bearerToken(req)
-  const browserCookie = cookieValue(req, BROWSER_SESSION_COOKIE)
+  const browserCookie = cookieValue(req, browserSessionCookieName())
   const token = bearer ?? browserCookie
   if (!token) return null
   // A bearer token is a machine client, which has no user agent to pin against.

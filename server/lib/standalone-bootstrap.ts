@@ -1,6 +1,15 @@
 import { readFileSync } from "node:fs"
 import { homedir, type NetworkInterfaceInfo } from "node:os"
 import { join } from "node:path"
+import { parseArgs } from "node:util"
+
+export function parseStandaloneOptions(args: string[]): { httpOnly: boolean; help: boolean } {
+  const { values } = parseArgs({ args, options: {
+    "http-only": { type: "boolean", default: false },
+    help: { type: "boolean", short: "h", default: false },
+  } })
+  return { httpOnly: values["http-only"], help: values.help }
+}
 
 /**
  * Pure, side-effect-light helpers for the headless standalone bootstrap.

@@ -4,6 +4,7 @@ import { withBase } from "./device"
 import { announceGate } from "./gateEvents"
 import { announceRefusal } from "./sessionAccessEvents"
 import { knownSignIn, rememberSignIn } from "./serverSignIn"
+import { setHttpBrowserMode } from "./browserCrypto"
 import { MINT_FAILURE_CODES } from "../../shared/contracts/hub"
 import { isCogpitEdition, type CogpitEdition, type SignInMode } from "../../shared/contracts/identity"
 
@@ -59,7 +60,8 @@ function probeServerHello(): Promise<ServerHello> {
   })
     .then(async (res) => {
       if (!res.ok) throw new Error(`Hello handshake failed (${res.status})`)
-      const data = await res.json() as { edition?: unknown; signIn?: unknown; setupRequired?: unknown }
+      const data = await res.json() as { edition?: unknown; signIn?: unknown; setupRequired?: unknown; httpOnly?: unknown }
+      setHttpBrowserMode(data.httpOnly === true)
       const signIn: SignInMode = data.signIn === "account" ? "account" : "password"
       rememberSignIn(signIn)
       return {
@@ -69,6 +71,7 @@ function probeServerHello(): Promise<ServerHello> {
       }
     })
     .catch(() => {
+      setHttpBrowserMode(false)
       helloPromise = null
       return PERSONAL_HELLO
     })
@@ -102,6 +105,7 @@ export function getServerSignIn(): Promise<SignInMode> {
 }
 
 export function __resetServerHelloForTest(): void {
+  setHttpBrowserMode(false)
   helloPromise = null
   rememberSignIn(null)
 }

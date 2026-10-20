@@ -36,6 +36,7 @@ import { NotificationsBell } from "@/components/NotificationsBell"
 import { PowerMonitor } from "@/components/PowerMonitor"
 import { SessionPill } from "@/components/SessionPill"
 import { ShareButton } from "@/components/ShareButton"
+import { ThemeToggleButton } from "@/components/ThemeToggleButton"
 import { TokenUsageIndicator } from "@/components/TokenUsageWidget"
 import { UsageCostDialog } from "@/components/UsageCostDialog"
 import { FLOATING_PILL } from "@/components/header-shared"
@@ -217,6 +218,7 @@ export const FloatingChrome = memo(function FloatingChrome({
         </div>
 
         <div className="electron-no-drag window-inset-end pointer-events-auto flex shrink-0 items-center gap-1.5">
+          <ThemeToggleButton className={cn(FLOATING_PILL, "size-8 shrink-0")} />
           <div className={cn(FLOATING_PILL, PILL_ROW, "empty:hidden")}>
             <LeakIndicator />
           </div>
