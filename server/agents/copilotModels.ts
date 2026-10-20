@@ -1,4 +1,4 @@
-import { copilotRuntime as transport, type CopilotModel } from "./copilotTransport"
+import { CopilotRuntime, type CopilotModel } from "./copilotTransport"
 import { effortLabel, MODEL_FETCH_TIMEOUT_MS, type ModelOption } from "./modelCatalog"
 import { withTimeout } from "./timeout"
 
@@ -49,6 +49,9 @@ export function mapCopilotModels(models: CopilotModel[]): ModelOption[] | null {
 }
 
 export async function fetchCopilotModels(): Promise<ModelOption[] | null> {
+  // A running session may keep an older CLI process alive after an upgrade.
+  // Read the catalog through a fresh process, without disrupting live turns.
+  const transport = new CopilotRuntime()
   try {
     return mapCopilotModels(await withTimeout(
       transport.listModels(),
@@ -57,5 +60,7 @@ export async function fetchCopilotModels(): Promise<ModelOption[] | null> {
     ))
   } catch {
     return null
+  } finally {
+    await transport.shutdown().catch(() => {})
   }
 }

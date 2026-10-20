@@ -329,6 +329,44 @@ describe("ChatInputSettings", () => {
     expect(screen.getByRole("dialog", { name: "Model settings" })).toBeInTheDocument()
   })
 
+  it.each(["", "reasoning-model"])("edits Copilot's catalog-advertised reasoning for model %j", async (selectedModel) => {
+    const capabilities = {
+      supportsEffort: true,
+      defaultReasoningEffort: "low",
+      supportedReasoningEfforts: [{ value: "low", label: "Light" }, { value: "high", label: "High" }],
+    }
+    setDynamicModelOptions("copilot", [
+      { value: "", label: "Default", resolvedModel: "reasoning-model", ...capabilities },
+      { value: "reasoning-model", label: "Reasoning model", ...capabilities },
+      { value: "auto", label: "Auto", supportsEffort: false },
+    ])
+    const onEffortChange = vi.fn()
+    const onApplySettings = vi.fn().mockResolvedValue(undefined)
+    const props = {
+      agentKind: "copilot" as const, selectedModel, onModelChange: vi.fn(),
+      selectedEffort: "low", onEffortChange, isNewSession: false, onApplySettings,
+    }
+    const { rerender } = render(<ChatInputSettings {...props} />)
+    const panel = openModelPicker(/^Copilot/)
+    const slider = within(panel).getByRole("slider", { name: /Reasoning/ })
+    expect(slider).toHaveAttribute("aria-valuetext", "Light")
+    expect(slider).toHaveAttribute("max", "1")
+    fireEvent.change(slider, { target: { value: "1" } })
+    expect(onEffortChange).toHaveBeenCalledExactlyOnceWith("high")
+    await waitFor(() => expect(onApplySettings).toHaveBeenCalledOnce())
+    expect(screen.getByRole("dialog", { name: "Model settings" })).toBeInTheDocument()
+
+    rerender(<ChatInputSettings {...props} selectedModel="auto" />)
+    expect(within(panel).queryByRole("slider", { name: /Reasoning/ })).not.toBeInTheDocument()
+  })
+
+  it("does not offer Copilot reasoning when only the offline fallback is available", () => {
+    render(<ChatInputSettings agentKind="copilot" selectedModel="auto" onModelChange={vi.fn()}
+      selectedEffort="high" onEffortChange={vi.fn()} isNewSession />)
+    const panel = openModelPicker(/^Copilot/)
+    expect(within(panel).queryByRole("slider", { name: /Reasoning/ })).not.toBeInTheDocument()
+  })
+
   it("enables Fast only for models that advertise the tier", () => {
     setDynamicModelOptions("codex", [
       { value: "", label: "Default" },

@@ -204,6 +204,20 @@ describe("mapCodexModels", () => {
 })
 
 describe("mapCopilotModels", () => {
+  it("preserves new model families and their advertised reasoning levels", () => {
+    const options = mapCopilotModels([
+      { id: "auto", name: "Auto" },
+      { id: "gemini-4-argon", name: "Gemini 4 Argon", policy: { state: "enabled" },
+        supportedReasoningEfforts: ["low", "medium", "high"], defaultReasoningEffort: "medium" },
+    ])!
+    expect(options.find((model) => model.value === "gemini-4-argon")).toMatchObject({
+      label: "Gemini 4 Argon", supportsEffort: true, defaultReasoningEffort: "medium",
+      supportedReasoningEfforts: [
+        { value: "low", label: "Light" }, { value: "medium", label: "Medium" }, { value: "high", label: "High" },
+      ],
+    })
+  })
+
   it("maps the live multi-provider catalog and its capabilities", () => {
     const options = mapCopilotModels([
       {

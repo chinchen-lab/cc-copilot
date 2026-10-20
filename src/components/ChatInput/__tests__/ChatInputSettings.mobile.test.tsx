@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { ChatInputSettings } from "../ChatInputSettings"
-import { resetDynamicModelOptions } from "@/lib/utils"
+import { resetDynamicModelOptions, setDynamicModelOptions } from "@/lib/utils"
+import { loadModelCatalog } from "@/hooks/useModelOptions"
 
 afterEach(() => {
   cleanup()
@@ -11,6 +12,28 @@ afterEach(() => {
 })
 
 describe("ChatInputSettings mobile", () => {
+  it("uses Copilot's model-specific reasoning choices and hides them for Auto", async () => {
+    await loadModelCatalog()
+    setDynamicModelOptions("copilot", [
+      { value: "reasoning-model", label: "Reasoning model", defaultReasoningEffort: "low",
+        supportedReasoningEfforts: [{ value: "low", label: "Light" }, { value: "high", label: "High" }] },
+      { value: "auto", label: "Auto", supportsEffort: false },
+    ])
+    const user = userEvent.setup()
+    const onEffortChange = vi.fn()
+    const props = { mobile: true, agentKind: "copilot" as const, selectedModel: "reasoning-model",
+      onModelChange: vi.fn(), selectedEffort: "low", onEffortChange, isNewSession: true }
+    const { rerender } = render(<ChatInputSettings {...props} />)
+    await user.click(screen.getByRole("button", { name: "Session controls" }))
+    const sheet = await screen.findByRole("dialog", { name: "Session controls" })
+    await user.click(within(sheet).getByRole("combobox", { name: "Reasoning effort" }))
+    expect(screen.queryByRole("option", { name: "Medium" })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole("option", { name: "High" }))
+    expect(onEffortChange).toHaveBeenCalledExactlyOnceWith("high")
+    rerender(<ChatInputSettings {...props} selectedModel="auto" />)
+    expect(within(sheet).queryByRole("combobox", { name: "Reasoning effort" })).not.toBeInTheDocument()
+  })
+
   it("opens a bottom sheet with the core controls and applies selections", async () => {
     const user = userEvent.setup()
     const onAgentKindChange = vi.fn()

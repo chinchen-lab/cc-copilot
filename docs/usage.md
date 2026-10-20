@@ -47,6 +47,14 @@ Press **Enter** to send a message or **Shift+Enter** for a new line. When using 
 
 The model chip beside Send opens the provider, model, reasoning effort, and available speed controls. You can change several settings before clicking outside to close it. Image drag-and-drop and paste appear for models that accept images. Slash command suggestions include supported built-in commands and project skills and commands. Claude sessions offer `/output-style` to list output styles or switch to one.
 
+Use **Refresh models** beside the model list (or in the mobile session controls)
+after a CLI upgrade or when a newly available model is missing. It bypasses the
+browser and server catalog caches and asks the installed CLIs again. Models and
+reasoning levels come from the CLI on the server running Cogpit; Copilot reasoning
+controls appear only when the selected model advertises supported levels. Copilot
+catalog queries use a fresh CLI process, so a running conversation does not keep
+the model list tied to a pre-upgrade CLI process.
+
 On capable Claude models, Ultracode turns on standing multi-agent orchestration for the current session, at whichever effort you pick. It is off until you enable it and does not carry into another session.
 
 Full access is the default permission mode. Choose a more restrictive profile to require approvals or limit operations. Native approval requests show the command or operation and the decisions the runtime accepts. Codex requests from nested subagents also appear in the composer.

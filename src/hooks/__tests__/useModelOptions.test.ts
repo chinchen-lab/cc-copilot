@@ -112,6 +112,55 @@ describe("loadModelCatalog", () => {
     expect(mockedAuthFetch).toHaveBeenCalledTimes(1)
   })
 
+  it("bypasses browser and server caches to discover newly available models", async () => {
+    const before = [{ value: "auto", label: "Auto" }]
+    const after = [...before, { value: "gemini-4-argon", label: "Gemini 4 Argon" }]
+    mockedAuthFetch.mockResolvedValueOnce(jsonResponse({ copilot: before }))
+      .mockResolvedValueOnce(jsonResponse({ copilot: after }))
+    await loadModelCatalog()
+    await loadModelCatalog(true)
+    expect(mockedAuthFetch).toHaveBeenNthCalledWith(2, "/api/models?refresh=1")
+    expect(getModelOptions("copilot")).toEqual(after)
+  })
+
+  it("shares a forced refresh after an ordinary request already in flight", async () => {
+    let complete!: (response: Response) => void
+    mockedAuthFetch.mockImplementationOnce(() => new Promise<Response>((resolve) => { complete = resolve }))
+      .mockResolvedValueOnce(jsonResponse({ copilot: [{ value: "gemini-4-argon", label: "Gemini 4 Argon" }] }))
+    const initial = loadModelCatalog()
+    const first = loadModelCatalog(true)
+    const second = loadModelCatalog(true)
+    complete(jsonResponse({ copilot: [{ value: "auto", label: "Auto" }] }))
+    await Promise.all([initial, first, second])
+    expect(mockedAuthFetch).toHaveBeenCalledTimes(2)
+    expect(mockedAuthFetch).toHaveBeenLastCalledWith("/api/models?refresh=1")
+    expect(getModelOptions("copilot").map((model) => model.value)).toEqual(["gemini-4-argon"])
+  })
+
+  it("reports a manual refresh failure without breaking background callers or losing the last good list", async () => {
+    const models = [{ value: "gemini-4-argon", label: "Gemini 4 Argon" }]
+    mockedAuthFetch.mockResolvedValueOnce(jsonResponse({ copilot: models }))
+    await loadModelCatalog()
+    let fail!: (error: Error) => void
+    mockedAuthFetch.mockImplementationOnce(() => new Promise<Response>((_resolve, reject) => { fail = reject }))
+    const refresh = loadModelCatalog(true)
+    const background = loadModelCatalog()
+    const rejected = expect(refresh).rejects.toThrow("offline")
+    fail(new Error("offline"))
+    await rejected
+    await expect(background).resolves.toBeUndefined()
+    expect(getModelOptions("copilot")).toEqual(models)
+  })
+
+  it("lets a manual refresh retry immediately after a failed automatic load", async () => {
+    mockedAuthFetch.mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(jsonResponse({ copilot: [{ value: "auto", label: "Auto" }] }))
+    await loadModelCatalog()
+    await loadModelCatalog(true)
+    expect(mockedAuthFetch).toHaveBeenCalledTimes(2)
+    expect(mockedAuthFetch).toHaveBeenLastCalledWith("/api/models?refresh=1")
+  })
+
   it("refetches once the catalog is stale so a CLI upgrade shows up", async () => {
     const before = [{ value: "", label: "Default" }, { value: "gpt-5.6-sol", label: "GPT-5.6 Sol" }]
     const after = [{ value: "", label: "Default" }, { value: "gpt-6-astra", label: "GPT-6 Astra" }]

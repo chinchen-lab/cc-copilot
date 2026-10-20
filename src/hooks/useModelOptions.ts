@@ -17,6 +17,7 @@ export const CATALOG_RETRY_MS = 30 * 1000
 
 let nextFetchAt = 0
 let inFlight: Promise<void> | null = null
+let inFlightIsRefresh = false
 let catalogScope = ""
 let catalogGeneration = 0
 const scopeKey = () => JSON.stringify([getActiveDeviceScope(), getActiveIdentity()])
@@ -34,11 +35,11 @@ function isModelOptionArray(value: unknown): value is ModelOption[] {
   )
 }
 
-async function fetchModelCatalog(): Promise<void> {
+async function fetchModelCatalog(forceRefresh: boolean): Promise<void> {
   const generation = catalogGeneration
   const scope = scopeKey()
   try {
-    const res = await authFetch("/api/models")
+    const res = await authFetch(forceRefresh ? "/api/models?refresh=1" : "/api/models")
     if (!res.ok) throw new Error(`GET /api/models → ${res.status}`)
     const data = await res.json() as Record<string, unknown> | null
     if (generation !== catalogGeneration || scope !== scopeKey()) return
@@ -47,9 +48,10 @@ async function fetchModelCatalog(): Promise<void> {
       if (isModelOptionArray(options)) setDynamicModelOptions(kind, options)
     }
     nextFetchAt = Date.now() + CATALOG_TTL_MS
-  } catch {
+  } catch (error) {
     // Offline / server error — static fallback lists stay in effect
     if (generation === catalogGeneration && scope === scopeKey()) nextFetchAt = Date.now() + CATALOG_RETRY_MS
+    if (forceRefresh) throw error
   }
 }
 
@@ -60,12 +62,21 @@ async function fetchModelCatalog(): Promise<void> {
  * CLI upgraded underneath a running app shows its new models within
  * `CATALOG_TTL_MS`. Any provider that fails keeps its static fallback list.
  */
-export function loadModelCatalog(): Promise<void> {
+export function loadModelCatalog(forceRefresh = false): Promise<void> {
   if (catalogScope !== scopeKey()) { resetModelCatalogFetch(); resetDynamicModelOptions(); catalogScope = scopeKey() }
-  if (inFlight) return inFlight
-  if (Date.now() < nextFetchAt) return Promise.resolve()
-  const request = fetchModelCatalog().finally(() => {
-    if (inFlight === request) inFlight = null
+  if (inFlight) {
+    // A manual refresh must still bypass the server cache after an ordinary
+    // request settles. Concurrent manual callers share that follow-up request.
+    if (forceRefresh && !inFlightIsRefresh) {
+      const scope = scopeKey()
+      return inFlight.then(() => { if (scope === scopeKey()) return loadModelCatalog(true) })
+    }
+    return forceRefresh ? inFlight : inFlight.catch(() => {})
+  }
+  if (!forceRefresh && Date.now() < nextFetchAt) return Promise.resolve()
+  inFlightIsRefresh = forceRefresh
+  const request = fetchModelCatalog(forceRefresh).finally(() => {
+    if (inFlight === request) { inFlight = null; inFlightIsRefresh = false }
   })
   inFlight = request
   return inFlight
@@ -97,6 +108,7 @@ export function resetModelCatalogFetch() {
   catalogGeneration++
   nextFetchAt = 0
   inFlight = null
+  inFlightIsRefresh = false
 }
 
 /**

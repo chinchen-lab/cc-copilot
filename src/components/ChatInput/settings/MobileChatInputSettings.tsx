@@ -29,6 +29,7 @@ import { getPermissionModeOptions, type PermissionModeOption } from "./permissio
 import type { CommonSettingsControlProps, SettingOption } from "./types"
 import type { McpServer } from "../../../../shared/contracts/projectTools"
 import { capabilitiesFor } from "@/lib/agents"
+import { ModelCatalogRefresh } from "./ModelCatalogRefresh"
 
 interface MobileControlProps {
   label: string
@@ -143,9 +144,12 @@ function MobileModelControls({
         <h3 id="mobile-model-controls" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Model and behavior
         </h3>
-        {capabilitiesFor(agentKind).configurableContextWindow && onContextWindowTokensChange && (
-          <ContextWindowControl value={contextWindowTokens ?? null} onChange={onContextWindowTokensChange} />
-        )}
+        <div className="flex items-center gap-1">
+          <ModelCatalogRefresh />
+          {capabilitiesFor(agentKind).configurableContextWindow && onContextWindowTokensChange && (
+            <ContextWindowControl value={contextWindowTokens ?? null} onChange={onContextWindowTokensChange} />
+          )}
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
         {onAgentKindChange && (

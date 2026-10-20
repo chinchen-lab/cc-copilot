@@ -62,8 +62,9 @@ function isShortcutTarget(event: globalThis.KeyboardEvent): boolean {
  * The first screen: where the next piece of work starts; what is blocked on
  * the user, across every session and crew, answerable one request at a time;
  * and the sessions the user started, each with its crew, searchable across
- * all of them. The composer and search stay put; only the lists scroll, and
- * the queue takes a column only while something is waiting.
+ * all of them. The page scrolls as a whole so projects and sessions stay
+ * reachable in short windows and at larger text sizes. The queue takes a
+ * column only while something is waiting.
  */
 export function MissionHome({ onOpenSession, onBrowseProjects, onSelectProject, start }: MissionHomeProps) {
   const inventory = useSessionInventory()
@@ -124,7 +125,7 @@ export function MissionHome({ onOpenSession, onBrowseProjects, onSelectProject, 
   }, [])
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto">
       <div className="mx-auto flex w-full max-w-6xl shrink-0 flex-col gap-8 px-6 pt-16 lg:px-10">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <div className="flex flex-col gap-3">
@@ -135,11 +136,11 @@ export function MissionHome({ onOpenSession, onBrowseProjects, onSelectProject, 
         </div>
         {start && <HomeComposer recent={recent} start={start} />}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
+      <div className="shrink-0">
         <div
           className={cn(
-            "mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 pb-10 pt-10 lg:h-full lg:px-10",
-            queue.length > 0 && "lg:grid lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]",
+            "mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 pb-10 pt-10 lg:px-10",
+            queue.length > 0 && "lg:grid lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start",
           )}
         >
           {queue.length > 0 ? (
@@ -150,7 +151,7 @@ export function MissionHome({ onOpenSession, onBrowseProjects, onSelectProject, 
               Nothing is waiting on you.
             </p>
           )}
-          <div className="flex min-w-0 flex-col gap-6 lg:min-h-0 lg:flex-1">
+          <div className="flex min-w-0 flex-col gap-6">
             {onSelectProject && <YourProjects onSelectProject={onSelectProject} />}
             <YourSessions
               sessions={yours}
@@ -238,7 +239,7 @@ function NeedsYouQueue({
   }
 
   return (
-    <section aria-label="Needs you" tabIndex={0} onKeyDown={onKeyDown} className="min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring lg:min-h-0 lg:overflow-y-auto">
+    <section aria-label="Needs you" tabIndex={0} onKeyDown={onKeyDown} className="min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
       <SectionHeading title="Needs you" count={queue.length}>
         {queue.length > 1 && (
           <span className="flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
@@ -332,7 +333,7 @@ function YourSessions({
     searchRef.current?.focus()
   }
   return (
-    <section aria-label="Your sessions" className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1">
+    <section aria-label="Your sessions" className="flex min-w-0 flex-col">
       <SectionHeading title="Your sessions" count={searching ? sessions.length : total}>
         <div className="relative w-full max-w-64">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -370,7 +371,7 @@ function YourSessions({
           </EmptyHeader>
         </Empty>
       ) : (
-        <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+        <ul className="flex flex-col">
           {sessions.map((entry) => (
             <SessionRow key={entry.session.sessionId} entry={entry} nameOf={nameOf} projectLabel={projectLabel} onOpen={onOpen} onRename={onRename} />
           ))}

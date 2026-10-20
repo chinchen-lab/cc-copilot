@@ -7,6 +7,7 @@ import { capabilitiesFor, type AgentKind } from "@/lib/agents"
 import { loadModelCatalog } from "@/hooks/useModelOptions"
 import { cn, type ServiceTierOption } from "@/lib/utils"
 import { SettingsSlider } from "./SettingsSlider"
+import { ModelCatalogRefresh } from "./ModelCatalogRefresh"
 import { AGENT_OPTIONS } from "./modelOptions"
 import {
   PickerChip,
@@ -71,7 +72,7 @@ export function ModelPicker({
   // A row for every option the provider has, greyed out when the selected
   // model lacks it, so switching models explains what changed instead of
   // silently dropping a control.
-  const showEffort = capabilities.reasoningEffort
+  const showEffort = capabilities.reasoningEffort || effortOptions.length > 0
   const showContext = capabilities.configurableContextWindow && !!onContextWindowTokensChange
   const showFast = capabilities.fastTier
   const showUltracode = capabilities.ultracode
@@ -150,6 +151,7 @@ export function ModelPicker({
           <div className="flex min-h-0 flex-col p-1.5">
             <div className="flex items-center justify-between gap-2 pr-0.5">
               <PickerSectionLabel id={modelLabelId}>Model</PickerSectionLabel>
+              <ModelCatalogRefresh />
               {(showContext || showFast || showUltracode) && (
                 <div className="flex items-center gap-1">
                   {showContext && (
