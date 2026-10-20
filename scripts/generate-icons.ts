@@ -6,7 +6,7 @@
  */
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '')
 const SOURCE = `${ROOT}/public/cogpit.svg`
@@ -139,8 +139,12 @@ async function main(): Promise<void> {
   writeFileSync(APPLE_TOUCH_ICON, assertOpaque(await render(bleed, 180), rel(APPLE_TOUCH_ICON)))
   console.log(`  ${rel(APPLE_TOUCH_ICON)} — 180×180, full-bleed`)
 
-  writeFileSync(IOS_ICON, assertOpaque(await render(bleed, 1024), rel(IOS_ICON)))
-  console.log(`  ${rel(IOS_ICON)} — 1024×1024, full-bleed, no alpha`)
+  if (existsSync(dirname(IOS_ICON))) {
+    writeFileSync(IOS_ICON, assertOpaque(await render(bleed, 1024), rel(IOS_ICON)))
+    console.log(`  ${rel(IOS_ICON)} — 1024×1024, full-bleed, no alpha`)
+  } else {
+    console.log('  skipped iOS icon — native checkout is absent')
+  }
 }
 
 await main()

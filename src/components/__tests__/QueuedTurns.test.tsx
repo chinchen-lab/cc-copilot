@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { act, fireEvent, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { CommandReceipt } from "../../../shared/contracts/orchestration"
 import type { ConversationState } from "@/lib/conversationState"
@@ -55,6 +55,21 @@ describe("waitingCommands", () => {
 })
 
 describe("QueuedTurns", () => {
+  it("preserves a queued edit while Enter confirms Chinese input", async () => {
+    withCommands([command({ id: "first" })])
+    render(<QueuedTurns sessionId="s1" turns={[]} pendingMessages={[]} canManage isMobile={false} />)
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }))
+    const editor = screen.getByRole("textbox", { name: "Edit queued message" })
+    fireEvent.compositionStart(editor)
+    fireEvent.change(editor, { target: { value: "中文修改" } })
+    fireEvent.keyDown(editor, { key: "Enter" })
+    fireEvent.compositionEnd(editor)
+    fireEvent.keyDown(editor, { key: "Enter", keyCode: 229 })
+    expect(owner.action).not.toHaveBeenCalled()
+    expect(editor).toHaveValue("中文修改")
+    await act(async () => { fireEvent.keyDown(editor, { key: "Enter" }) })
+    expect(owner.action).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ action: "edit", commandId: "first", message: "中文修改" }))
+  })
   it("puts the queue controls inside each queued message", async () => {
     withCommands([command({ id: "first", position: 1, message: "first" }), command({ id: "second", position: 2, message: "second" })])
     render(<QueuedTurns sessionId="s1" turns={[makeTurn()]} pendingMessages={[]} canManage isMobile={false} />)

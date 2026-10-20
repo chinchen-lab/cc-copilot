@@ -7,7 +7,7 @@ import { WebSocket } from "ws"
 const mockPtySpawn = vi.hoisted(() => vi.fn())
 const mockExecFileSync = vi.hoisted(() => vi.fn())
 
-vi.mock("node-pty", () => ({ spawn: mockPtySpawn }))
+vi.mock("../pty-backend", () => ({ spawnPty: mockPtySpawn }))
 vi.mock("node:child_process", () => ({ execFileSync: mockExecFileSync }))
 
 import { PtySessionManager } from "../pty-server"
@@ -132,7 +132,7 @@ describe("PtySessionManager", () => {
       expect(mockPtySpawn).toHaveBeenCalledWith(
         "C:\\Windows\\system32\\cmd.exe",
         [],
-        expect.objectContaining({ name: "xterm-256color" }),
+        expect.objectContaining({ env: expect.objectContaining({ TERM: "xterm-256color" }) }),
       )
     })
 

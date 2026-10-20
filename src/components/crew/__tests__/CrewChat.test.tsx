@@ -19,6 +19,19 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe("CrewChat", () => {
+  it("does not send a composing Ctrl+Enter until an ordinary shortcut follows", async () => {
+    render(<CrewChat rootId="lead" />)
+    await screen.findByText("Found the issue")
+    const field = screen.getByRole("textbox", { name: "Message the crew" })
+    fireEvent.compositionStart(field)
+    fireEvent.change(field, { target: { value: "中文訊息" } })
+    fireEvent.keyDown(field, { key: "Enter", ctrlKey: true })
+    fireEvent.compositionEnd(field)
+    fireEvent.keyDown(field, { key: "Enter", ctrlKey: true, keyCode: 229 })
+    expect(mocks.json).not.toHaveBeenCalled()
+    fireEvent.keyDown(field, { key: "Enter", ctrlKey: true })
+    await waitFor(() => expect(mocks.json).toHaveBeenCalledOnce())
+  })
   it("shows shared messages, who they are for and per-member listening controls", async () => {
     render(<CrewChat rootId="lead" />)
     expect(await screen.findByText("Found the issue")).toBeInTheDocument()

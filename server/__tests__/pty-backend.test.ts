@@ -6,7 +6,18 @@ import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const mockPtySpawn = vi.hoisted(() => vi.fn())
-vi.mock("node-pty", () => ({ spawn: mockPtySpawn }))
+const mockNativeLoad = vi.hoisted(() => vi.fn())
+vi.mock("node:module", async (original) => {
+  const actual = await original<typeof import("node:module")>()
+  return { ...actual, createRequire: (url: string) => {
+    const require = actual.createRequire(url)
+    return (name: string) => {
+      if (name !== "node-pty") return require(name)
+      mockNativeLoad()
+      return { spawn: mockPtySpawn }
+    }
+  } }
+})
 
 import { bunTerminalRuntime, spawnPty, type BunTerminalRuntime } from "../pty-backend"
 
@@ -50,6 +61,19 @@ function fakeBunRuntime() {
 }
 
 describe("bunTerminalRuntime", () => {
+  it("does not load a native addon when Bun provides a terminal", async () => {
+    vi.stubGlobal("Bun", { Terminal: class {}, spawn() {} })
+    vi.resetModules()
+    try {
+      const backend = await import("../pty-backend")
+      expect(backend.bunTerminalRuntime()).not.toBeNull()
+      expect(mockNativeLoad).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+      vi.resetModules()
+    }
+  })
+
   it("is null outside Bun and on Windows", () => {
     expect(bunTerminalRuntime({})).toBeNull()
     expect(bunTerminalRuntime({ Bun: { spawn() {} } })).toBeNull()

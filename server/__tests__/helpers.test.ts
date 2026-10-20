@@ -154,6 +154,10 @@ describe("hashPassword / verifyPassword", () => {
 // ── validatePasswordStrength ────────────────────────────────────────────
 
 describe("validatePasswordStrength", () => {
+  it("accepts six characters and rejects five", () => {
+    expect(validatePasswordStrength("123456")).toBeNull()
+    expect(validatePasswordStrength("12345")).toBe("Password must be at least 6 characters")
+  })
   it("returns error for too short password", () => {
     const result = validatePasswordStrength("short")
     expect(result).toContain(`at least ${PASSWORD_MIN_LENGTH} characters`)

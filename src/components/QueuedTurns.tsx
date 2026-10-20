@@ -10,6 +10,7 @@ import { UserMessage } from "@/components/timeline/UserMessage"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { useImeComposition } from "@/hooks/useImeComposition"
 
 const noopSubscribe = () => () => {}
 const emptySnapshot = () => EMPTY_CONVERSATION
@@ -82,6 +83,7 @@ interface QueuedTurnsProps {
 }
 
 export function QueuedTurns({ sessionId, turns = NO_TURNS, pendingMessages, canManage, isMobile }: QueuedTurnsProps) {
+  const { isComposingEvent, onCompositionStart, onCompositionEnd } = useImeComposition()
   const owner = useMemo(() => sessionId && canManage ? conversationStateFor(sessionId) : null, [sessionId, canManage])
   const state = useSyncExternalStore(owner?.subscribe ?? noopSubscribe, owner?.snapshot ?? emptySnapshot)
   const waiting = useMemo(() => waitingCommands(state.commands, turns), [state.commands, turns])
@@ -158,9 +160,12 @@ export function QueuedTurns({ sessionId, turns = NO_TURNS, pendingMessages, canM
                   value={draft}
                   className="min-h-0 resize-none rounded-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 md:text-sm"
                   onChange={(event) => setEditing({ id: command.id, message: event.target.value })}
+                  onCompositionStart={onCompositionStart}
+                  onCompositionEnd={onCompositionEnd}
                   onKeyDown={(event) => {
+                    if (isComposingEvent(event)) return
                     if (event.key === "Escape") setEditing(null)
-                    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); saveEdit(command.id, draft) }
+                    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); saveEdit(command.id, draft) }
                   }}
                 />
                 <div className="mt-2 flex justify-end gap-1">

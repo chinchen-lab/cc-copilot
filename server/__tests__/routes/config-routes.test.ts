@@ -250,7 +250,7 @@ describe("config routes", () => {
         claudeDir: "/x", networkAccess: true, networkPassword: "legacy-hash",
       })
       mockedVerifyPasswordAsync.mockResolvedValueOnce(true)
-      mockedValidatePasswordStrength.mockReturnValueOnce("Password must be at least 16 characters")
+      mockedValidatePasswordStrength.mockReturnValueOnce("Password must be at least 6 characters")
 
       await handler(req, res, next)
 
@@ -918,7 +918,7 @@ describe("config routes", () => {
         valid: true, resolved: "/home/.claude",
       })
       mockedGetConfig.mockReturnValueOnce(null)
-      mockedValidatePasswordStrength.mockReturnValueOnce("Password must be at least 16 characters")
+      mockedValidatePasswordStrength.mockReturnValueOnce("Password must be at least 6 characters")
 
       await handler(req, res, next)
       sendBody()
@@ -926,7 +926,7 @@ describe("config routes", () => {
       await vi.waitFor(() => {
         expect(res._getStatus()).toBe(400)
       })
-      expect(JSON.parse(res._getData()).error).toContain("16 characters")
+      expect(JSON.parse(res._getData()).error).toContain("6 characters")
     })
 
     it("hashes password and revokes sessions when password changes", async () => {
@@ -1076,7 +1076,7 @@ describe("config routes", () => {
 
       it("reports nothing for a save it refused", async () => {
         const reportAuthEvent = reportedAuthEvents()
-        mockedValidatePasswordStrength.mockReturnValueOnce("Password must be at least 16 characters")
+        mockedValidatePasswordStrength.mockReturnValueOnce("Password must be at least 6 characters")
 
         expect((await save({ networkAccess: true, networkPassword: "short" })).status).toBe(400)
 

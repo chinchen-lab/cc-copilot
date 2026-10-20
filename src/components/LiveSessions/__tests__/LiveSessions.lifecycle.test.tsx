@@ -79,13 +79,15 @@ vi.mock("@/contexts/PendingHumanInputContext", () => ({
 }))
 vi.mock("@/contexts/PtyContext", () => ({ usePty: () => ({ send: mocks.ptySend }) }))
 vi.mock("@/hooks/useIsMobile", () => ({ useIsMobile: () => false }))
-vi.mock("@/hooks/useLocalStorage", () => ({
-  useLocalStorage: (key: string) => {
+vi.mock("@/hooks/useLocalStorage", async (original) => {
+  const actual = await original<typeof import("@/hooks/useLocalStorage")>()
+  return { useLocalStorage: (key: string) => {
+    const [scope, setScope] = actual.useLocalStorage<string | null>(key, mocks.projectScope)
     if (key.includes("show-archived")) return [mocks.showArchived, mocks.setShowArchived]
-    if (key.includes("project-scope")) return [mocks.projectScope, mocks.setProjectScope]
+    if (key.includes("project-scope")) return [scope, (value: string | null) => { mocks.setProjectScope(value); setScope(value) }]
     return [{}, mocks.setCollapsedGroups]
-  },
-}))
+  } }
+})
 vi.mock("@/hooks/useProjectNames", () => ({
   useProjectNames: () => ({ names: {}, rename: mocks.renameProject }),
 }))
@@ -254,6 +256,49 @@ afterEach(() => {
 })
 
 describe("LiveSessions committed-state synchronization", () => {
+  it("follows the open chat across projects while preserving manual scope changes until navigation", async () => {
+    const app = { ...session("app"), dirName: "-home-me-app", cwd: "/home/me/app" }
+    const lib = { ...session("lib"), dirName: "-home-me-lib", cwd: "/home/me/lib" }
+    writeCachedList(activeSessionsCacheKey(null), [app, lib])
+    const select = vi.fn()
+    const refreshRef: MutableRefObject<(() => void) | null> = { current: null }
+    const { rerender } = renderLive(<LiveSessions activeSessionKey={`${app.dirName}/${app.fileName}`} onSelectSession={select} refreshRef={refreshRef} />)
+    expect(screen.getByRole("button", { name: "Focused on me/app. Change project" })).toBeInTheDocument()
+    expect(screen.queryByTestId("card-lib")).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("option", { name: /All projects/ }))
+    expect(screen.getByTestId("card-lib")).toBeInTheDocument()
+    mocks.authFetch.mockImplementation(async (url: string) => jsonResponse(url === "/api/running-processes" ? [] : [app, lib]))
+    await act(async () => { refreshRef.current?.() })
+    expect(screen.getByRole("button", { name: "Choose a project to focus on" })).toBeInTheDocument()
+
+    rerender(<LiveSessions activeSessionKey={`${lib.dirName}/${lib.fileName}`} onSelectSession={select} />)
+    expect(screen.getByRole("button", { name: "Focused on me/lib. Change project" })).toBeInTheDocument()
+    expect(screen.queryByTestId("card-app")).not.toBeInTheDocument()
+  })
+
+  it("waits for the inventory before following a restored chat", async () => {
+    mocks.projectScope = "me/previous"
+    mocks.authFetch.mockImplementation(async (url: string) => jsonResponse(url === "/api/running-processes" ? [] : [{ ...session("restored"), cwd: "/home/me/app" }]))
+    await act(async () => {
+      renderLive(<LiveSessions activeSessionKey="project-a/restored.jsonl" onSelectSession={vi.fn()} />)
+    })
+    expect(screen.getByRole("button", { name: "Focused on me/app. Change project" })).toBeInTheDocument()
+  })
+
+  it("groups an open worktree with its parent and follows a new session before it is listed", () => {
+    const { rerender } = renderLive(<LiveSessions activeSessionKey="worktree/old.jsonl" activeProject={{ dirName: "worktree", cwd: "/home/me/app/.worktrees/feature" }} onSelectSession={vi.fn()} />)
+    expect(mocks.setProjectScope).toHaveBeenLastCalledWith("me/app")
+    rerender(<LiveSessions activeSessionKey={null} pendingSession={{ dirName: "-home-me-lib", cwd: "/home/me/lib" }} onSelectSession={vi.fn()} />)
+    expect(mocks.setProjectScope).toHaveBeenLastCalledWith("me/lib")
+  })
+
+  it("keeps the remembered scope when no chat is open", () => {
+    mocks.projectScope = "me/lib"
+    renderLive(<LiveSessions activeSessionKey={null} onSelectSession={vi.fn()} />)
+    expect(mocks.setProjectScope).not.toHaveBeenCalled()
+  })
+
   it("does not expose or send a PTY resume action for a member", () => {
     setMe({
       authenticated: true,

@@ -17,14 +17,17 @@ import {
 import { allowsHttpBrowserAccess } from "./lib/browserTransport"
 import { editionModule, editionOwnsSignIn } from "./edition"
 import { startStandaloneServer } from "./standalone-runtime"
+import brand from "../shared/brand.json"
+import { applyDeploymentEnvironment, deploymentName, setDeploymentValue } from "./lib/deploymentEnvironment"
 
+applyDeploymentEnvironment()
 try {
   const options = parseStandaloneOptions(process.argv.slice(2))
   if (options.help) {
-    console.log("Usage: bun server/standalone.ts [--http-only]\n\n  --http-only  Allow browser login over HTTP (also COGPIT_ALLOW_HTTP=1). Password authentication remains required for remote access.")
+    console.log(`Usage: ./${brand.prefix}-${brand.name} [--https | --http-only]\n       bun server/standalone.ts [--https | --http-only]\n\nHTTP browser login is enabled by default. Remote access requires a password of at least 6 characters.\n  --https      Require HTTPS browser sessions behind a TLS reverse proxy (also ${deploymentName("COGPIT_ALLOW_HTTP")}=0). Does not serve TLS directly.\n  --http-only  Explicitly allow HTTP browser login, overriding ${deploymentName("COGPIT_ALLOW_HTTP")}=0.\n  -h, --help   Show this help.\n\nEnvironment: ${deploymentName("COGPIT_HOST")} (0.0.0.0), ${deploymentName("COGPIT_PORT")} (19384), ${deploymentName("COGPIT_DATA_DIR")}, ${deploymentName("COGPIT_NETWORK_PASSWORD")} or ${deploymentName("COGPIT_NETWORK_PASSWORD_FILE")}.`)
     process.exit(0)
   }
-  if (options.httpOnly) process.env.COGPIT_ALLOW_HTTP = "1"
+  setDeploymentValue("COGPIT_ALLOW_HTTP", options.httpOnly ? "1" : "0")
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error))
   process.exit(1)
@@ -65,6 +68,7 @@ const banner = buildBootBanner({
 for (const line of banner) console.log(line)
 console.log(`Data directory: ${dataDir}`)
 if (allowsHttpBrowserAccess()) console.log("HTTP mode enabled: browser sessions are allowed over unencrypted HTTP. Use a trusted network or VPN.")
+else console.log("HTTPS browser sessions required: place a TLS reverse proxy in front of this HTTP listener.")
 if (runtime.envPassword && !editionOwnsSignIn()) {
   console.log("Network access: enabled via environment (password kept in memory only)")
 }

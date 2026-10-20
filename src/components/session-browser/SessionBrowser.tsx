@@ -5,6 +5,7 @@ import type { SessionBrowserProps } from "./types"
 
 export const SessionBrowser = memo(function SessionBrowser({
   activeSessionKey,
+  activeProject,
   onSelectSession,
   onNewSession,
   creatingSession,
@@ -27,6 +28,7 @@ export const SessionBrowser = memo(function SessionBrowser({
       {header}
       <LiveSessions
         activeSessionKey={activeSessionKey}
+        activeProject={activeProject}
         onSelectSession={onSelectSession}
         onDuplicateSession={onDuplicateSession}
         onDeleteSession={onDeleteSession}

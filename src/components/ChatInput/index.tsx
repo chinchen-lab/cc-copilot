@@ -20,6 +20,7 @@ import { submitCopilotPlanResponse } from "@/lib/copilotPlanApi"
 import { useCapability } from "@/hooks/useCapability"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { useImeComposition } from "@/hooks/useImeComposition"
 
 export interface ChatInputHandle {
   focus: () => void
@@ -358,7 +359,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
     if (textareaRef.current) textareaRef.current.style.height = "auto"
   }, [text, images, allowImages, onSend, clearImages, restoreImages, updateMultiline, pendingInteraction, submitUserQuestion, submitPlanResponse, sessionId])
 
+  const { isComposingEvent, onCompositionStart, onCompositionEnd } = useImeComposition()
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (isComposingEvent(e)) return
     if (showFiles && e.key === "Escape") {
       e.preventDefault()
       setFileSuggestionsDismissed(true)
@@ -377,7 +380,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
     }
     if (e.key === "Escape" && canInterrupt && onInterrupt) { e.preventDefault(); onInterrupt(); return }
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleSubmit() }
-  }, [handleSubmit, canInterrupt, onInterrupt, showFiles, fileSuggestions.files, fileSelectedIndex, handleFileSelect, showSlash, filteredSlashList, slashSelectedIndex, handleSlashSelect])
+  }, [isComposingEvent, handleSubmit, canInterrupt, onInterrupt, showFiles, fileSuggestions.files, fileSelectedIndex, handleFileSelect, showSlash, filteredSlashList, slashSelectedIndex, handleSlashSelect])
 
   const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => { setText(e.target.value); setFileSuggestionsDismissed(false); updateMultiline(autoResize(e.target, isMultilineRef.current)) }, [updateMultiline])
 
@@ -514,6 +517,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
               value={text}
               onChange={handleInput}
               onKeyDown={handleKeyDown}
+              onCompositionStart={onCompositionStart}
+              onCompositionEnd={onCompositionEnd}
               onPaste={handlePaste}
               onFocus={() => {
                 // On mobile, scroll textarea into view after virtual keyboard opens

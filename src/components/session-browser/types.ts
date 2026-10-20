@@ -11,6 +11,8 @@ export interface PendingSessionInfo {
 
 export interface SessionBrowserProps {
   activeSessionKey: string | null
+  /** Loaded chat's project, including sessions outside the recent inventory. */
+  activeProject?: PendingSessionInfo | null
   onSelectSession: (dirName: string, fileName: string) => void
   onNewSession?: (dirName: string, cwd?: string) => void
   creatingSession?: boolean

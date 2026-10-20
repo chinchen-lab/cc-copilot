@@ -54,29 +54,85 @@ bun install
 bun run build
 
 # Loopback only. Safe default, not reachable from the network.
-COGPIT_HOST=127.0.0.1 bun server/standalone.ts
+CC_COPILOT_UI_HOST=127.0.0.1 bun server/standalone.ts
 ```
 
 It prints the `host:port` it bound. This example listens on `127.0.0.1:19384`.
+
+### Build a portable server on RHEL 9
+
+Run the build on the Linux architecture you will deploy to (`x86_64` or `aarch64`).
+The output is a portable directory with a bundled Bun runtime, not a single static
+executable. Other machines with the same OS/architecture can run it without
+installing Bun, Node, npm, Electron, or build tools. The agent CLIs and their logins
+are still required on each server. Build on RHEL 9 for RHEL 9 deployments.
+
+```bash
+# Build prerequisites (Bun must also be installed and on PATH).
+sudo dnf install -y git tar gzip unzip curl
+# If Bun is not installed, use the official installer:
+curl -fsSL https://bun.sh/install | bash
+export PATH="$HOME/.bun/bin:$PATH"
+
+# From this repository (Bun >= 1.3.5):
+./build-server.sh
+# Equivalent: bun run build:server
+
+# On an x86_64 Linux machine:
+cd release/cc-copilot-linux-x64
+CC_COPILOT_UI_PASSWORD='replace-with-your-own-long-password' ./CC-Copilot
+```
+
+Open `http://<server-ip>:19384` from Windows over the VPN. The default bind address
+is `0.0.0.0`; remote access still requires a password of at least 6 characters.
+Set `CC_COPILOT_UI_PORT` for another port, or `CC_COPILOT_UI_HOST=127.0.0.1` for local access only.
+If the server's firewall filters inbound traffic, allow the selected port from
+your VPN clients.
+
+The build installs locked dependencies with Electron lifecycle scripts disabled,
+builds the web app, and packages production dependencies. It produces
+`release/cc-copilot-linux-x64.tar.gz` (or `linux-arm64`). Copy and extract the
+**entire archive** on the destination, then run `./CC-Copilot` inside it. Keep
+`app/` and `runtime/` beside the launcher. The launcher works from another working
+directory and forwards arguments and shutdown signals to the server. Builds on
+macOS produce a macOS package for local verification, not a Linux package.
+The portable package includes the personal edition.
+
+Configuration and session data stay in `~/.config/cogpit`, separate from the
+release directory. Override this with `CC_COPILOT_UI_DATA_DIR=/your/data/path`. Existing
+`CC_COPILOT_UI_PASSWORD_FILE` settings also work. Runtime plugins and background
+workers are included; browser automation additionally needs its usual browser and
+agent-browser installation on the host.
+
+For HTTPS browser sessions behind a TLS reverse proxy:
+
+```bash
+CC_COPILOT_UI_HOST=127.0.0.1 \
+CC_COPILOT_UI_PASSWORD='replace-with-your-own-long-password' \
+./CC-Copilot --https
+```
+
+`--https` requires secure browser sessions; it does not load certificates or
+create a TLS listener itself. See the proxy examples below.
 
 ### Reachable from your network
 
 It refuses to bind a non-loopback address without a password. That is deliberate.
 
 ```bash
-COGPIT_HOST=0.0.0.0 \
-COGPIT_NETWORK_PASSWORD='a genuinely long passphrase' \
+CC_COPILOT_UI_HOST=0.0.0.0 \
+CC_COPILOT_UI_PASSWORD='a genuinely long passphrase' \
 bun server/standalone.ts
 ```
 
-The password is read from the environment and never written to disk. Minimum 16 characters,
+The password is read from the environment and never written to disk. Minimum 6 characters,
 enforced. It is stored as a versioned scrypt hash using the OWASP profile.
 
 If you would rather not put a secret in the environment directly, use a file. This works with
 systemd `LoadCredential`:
 
 ```bash
-COGPIT_NETWORK_PASSWORD_FILE=/run/credentials/cogpit/password bun server/standalone.ts
+CC_COPILOT_UI_PASSWORD_FILE=/run/credentials/cogpit/password bun server/standalone.ts
 ```
 
 ### Starting a session in a folder
@@ -84,7 +140,7 @@ COGPIT_NETWORK_PASSWORD_FILE=/run/credentials/cogpit/password bun server/standal
 **Browse folders** in the project switcher lists the server's folders and can make a new one,
 so a remote user can start a session somewhere that is not a project yet. It starts in the
 projects root: the home directory of the account Cogpit runs as, unless `projectsRoot` in
-`config.local.json` or `COGPIT_PROJECTS_ROOT` names another absolute path (the environment
+`config.local.json` or `CC_COPILOT_UI_PROJECTS_ROOT` names another absolute path (the environment
 wins). Anyone who may start a session may browse and make folders.
 
 Scripts use the same API: `GET /api/folders?path=<absolute>` lists a folder's subfolders (no
@@ -96,13 +152,15 @@ names the folder.
 
 ## Remote browser access
 
-This is the part people trip on, so it is worth being blunt about.
+The standalone server allows HTTP browser login by default, including
+`http://192.168.x.x:19384` from a Windows browser over a private network or VPN.
+Password authentication, session expiry and API/WebSocket authorization remain
+required for remote clients.
 
-By default, Cogpit keeps a browser session in a host-only, `HttpOnly`, `Secure`, `SameSite=Strict` cookie.
-A `Secure` cookie cannot be issued over plaintext HTTP. **So a plain `http://192.168.x.x:19384`
-URL cannot log you in from a browser unless you explicitly enable HTTP mode.**
-
-Put a TLS terminator in front of the loopback listener and open the HTTPS origin instead.
+To require HTTPS browser sessions, start with `--https` (or set
+`CC_COPILOT_UI_ALLOW_HTTP=0`) and put a TLS terminator in front of the loopback listener.
+Open the HTTPS origin instead. This mode uses host-only `HttpOnly; Secure;
+SameSite=Strict` cookies and rejects plaintext remote browser login.
 
 ```caddyfile
 cogpit.example.com {
@@ -134,25 +192,27 @@ Two things to get right:
    timeline sits still and then arrives in a lump.
 
 A displayed `http://` LAN address stays usable for authenticated Cogpit hub and device
-traffic. Browser login over that address requires HTTP mode below.
+traffic. With `--https`, use the HTTPS proxy address for browser login.
 
 ### HTTP mode for a private network or VPN
 
-To use a Linux server directly from a Windows browser over HTTP, opt in at startup:
+To use a Linux server directly from a Windows browser over HTTP, start normally:
 
 ```bash
-COGPIT_HOST=0.0.0.0 \
-COGPIT_NETWORK_PASSWORD='replace-with-your-own-long-password' \
-bun server/standalone.ts --http-only
+CC_COPILOT_UI_HOST=0.0.0.0 \
+CC_COPILOT_UI_PASSWORD='replace-with-your-own-long-password' \
+bun server/standalone.ts
 ```
 
 Open `http://<linux-server-ip>:19384` in the Windows browser. No reverse proxy or
 certificate installation is needed. Build the frontend with `bun run build` when
 updating the server so its HTTP-compatible browser code is included.
 
-For systemd, containers, or other launchers, `COGPIT_ALLOW_HTTP=1` enables the same
-mode without a command-line flag. Omit the flag and unset that variable to return
-to the default HTTPS requirement. `bun server/standalone.ts --help` lists the flag.
+HTTP is the standalone default. Set `CC_COPILOT_UI_ALLOW_HTTP=0` or pass `--https` to
+require HTTPS sessions. `--https` overrides `CC_COPILOT_UI_ALLOW_HTTP=1`; the legacy
+`--http-only` flag explicitly enables HTTP and overrides `CC_COPILOT_UI_ALLOW_HTTP=0`.
+Passing both flags is an error. `./CC-Copilot --help` lists the options. Other
+entry points retain their HTTPS policy unless explicitly configured for HTTP.
 
 HTTP mode retains password verification, login rate limits, session expiry,
 same-origin checks, and API/WebSocket authorization. Browser sessions use separate
@@ -224,22 +284,25 @@ Every one of these is read by the server. Edition packages document their own.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `COGPIT_HOST` | `0.0.0.0` | Bind address. Non-loopback requires a password. Set `127.0.0.1` for local-only access. |
-| `COGPIT_ALLOW_HTTP` | off | Set `1` to allow browser login over HTTP on a trusted private network or VPN. Same as `--http-only` in the standalone entry point. |
-| `COGPIT_PORT` | `19384` | Bind port. |
-| `COGPIT_DATA_DIR` | `~/.config/cogpit` | Where config lives. |
-| `COGPIT_EDITION` | `personal` | Selects an installed edition package. Standalone server only; wins over the config file. |
-| `COGPIT_NETWORK_PASSWORD` | none | Network password. Minimum 16 chars. Never written to disk. |
-| `COGPIT_NETWORK_PASSWORD_FILE` | none | Read the password from a file instead. |
-| `COGPIT_DEVICE_NAME` | hostname | Label shown in the multi-device switcher. |
-| `COGPIT_PROJECTS_ROOT` | home of the account Cogpit runs as | Absolute path where [Browse folders](#starting-a-session-in-a-folder) starts. Wins over `projectsRoot` in the config file. |
-| `COGPIT_STREAM_PARTIAL` | on | Set `0`, `false`, `off` or `no` to disable token-level streaming. Completed session updates still arrive. |
-| `COGPIT_NTFY_TOPIC` | none | ntfy topic for phone push. Push is off until set. |
-| `COGPIT_NTFY_URL` | `https://ntfy.sh` | ntfy base URL. Self-hosted works. |
-| `COGPIT_NTFY_TOKEN` | none | Sent as `Authorization: Bearer` for protected topics. |
-| `COGPIT_PUBLIC_URL` | none | Reachable Cogpit base URL. Without it, pushes carry no click target instead of a dead `127.0.0.1` link. |
+| `CC_COPILOT_UI_HOST` | `0.0.0.0` | Bind address. Non-loopback requires a password. Set `127.0.0.1` for local-only access. |
+| `CC_COPILOT_UI_ALLOW_HTTP` | on (standalone) | Set `0` to require HTTPS browser sessions. `--https` and `--http-only` override this variable. Other entry points require explicit `1` to allow HTTP. |
+| `CC_COPILOT_UI_PORT` | `19384` | Bind port. |
+| `CC_COPILOT_UI_DATA_DIR` | `~/.config/cogpit` | Where config lives. |
+| `CC_COPILOT_UI_EDITION` | `personal` | Selects an installed edition package. Standalone server only; wins over the config file. |
+| `CC_COPILOT_UI_PASSWORD` | none | Network password. Minimum 6 chars. Never written to disk. |
+| `CC_COPILOT_UI_PASSWORD_FILE` | none | Read the password from a file instead. |
+| `CC_COPILOT_UI_DEVICE_NAME` | hostname | Label shown in the multi-device switcher. |
+| `CC_COPILOT_UI_PROJECTS_ROOT` | home of the account Cogpit runs as | Absolute path where [Browse folders](#starting-a-session-in-a-folder) starts. Wins over `projectsRoot` in the config file. |
+| `CC_COPILOT_UI_STREAM_PARTIAL` | on | Set `0`, `false`, `off` or `no` to disable token-level streaming. Completed session updates still arrive. |
+| `CC_COPILOT_UI_NTFY_TOPIC` | none | ntfy topic for phone push. Push is off until set. |
+| `CC_COPILOT_UI_NTFY_URL` | `https://ntfy.sh` | ntfy base URL. Self-hosted works. |
+| `CC_COPILOT_UI_NTFY_TOKEN` | none | Sent as `Authorization: Bearer` for protected topics. |
+| `CC_COPILOT_UI_PUBLIC_URL` | none | Reachable Cogpit base URL. Without it, pushes carry no click target instead of a dead `127.0.0.1` link. |
 
-Env changes to the ntfy settings take effect without a restart.
+Standalone startup maps these names to the internal settings. Restart after changing
+environment variables. Legacy `COGPIT_*` deployment names are still accepted; the
+corresponding `CC_COPILOT_UI_*` value takes precedence when both are set. The
+internal session CLI continues to receive `COGPIT_PORT` with the actual bound port.
 
 ---
 
@@ -255,10 +318,10 @@ After=network-online.target
 Type=simple
 User=you
 WorkingDirectory=/opt/cogpit
-Environment=COGPIT_HOST=127.0.0.1
-Environment=COGPIT_DEVICE_NAME=build-box
+Environment=CC_COPILOT_UI_HOST=127.0.0.1
+Environment=CC_COPILOT_UI_DEVICE_NAME=build-box
 LoadCredential=password:/etc/cogpit/password
-Environment=COGPIT_NETWORK_PASSWORD_FILE=%d/password
+Environment=CC_COPILOT_UI_PASSWORD_FILE=%d/password
 ExecStart=/usr/local/bin/bun server/standalone.ts
 Restart=on-failure
 
@@ -314,7 +377,7 @@ port to `~/.cogpit/port` on start and removes it on exit.
 
 Anything integrating with a running Cogpit should resolve the port in this order:
 
-1. `$COGPIT_PORT`
+1. `$COGPIT_PORT` (the actual bound port forwarded to agents; configured at startup with `CC_COPILOT_UI_PORT`)
 2. `~/.cogpit/port`
 3. `19384`
 
@@ -354,12 +417,13 @@ network. The bar it is built to is "reachable on my LAN," not "reachable from an
 ## Troubleshooting
 
 **It exits immediately with a message about authentication.**
-You set a non-loopback `COGPIT_HOST` without a password. Set `COGPIT_NETWORK_PASSWORD`, or
-`COGPIT_NETWORK_PASSWORD_FILE`, or bind `127.0.0.1`.
+You set a non-loopback `CC_COPILOT_UI_HOST` without a password. Set `CC_COPILOT_UI_PASSWORD`, or
+`CC_COPILOT_UI_PASSWORD_FILE`, or bind `127.0.0.1`.
 
 **The login page loads over HTTP but the password never sticks.**
-By default, the session cookie is `Secure` and cannot be set over plaintext. Put TLS
-in front, or explicitly enable `--http-only` on a trusted private network or VPN.
+Check whether `--https` or `CC_COPILOT_UI_ALLOW_HTTP=0` is enabled. That mode requires
+TLS at the reverse proxy. For direct HTTP on your private network or VPN, omit
+`--https` and unset that variable, or explicitly pass `--http-only`.
 
 **The timeline freezes and then jumps.**
 Proxy buffering. Set `proxy_buffering off` in nginx. Caddy does not buffer by default.

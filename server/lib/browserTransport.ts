@@ -1,4 +1,6 @@
-/** Plain HTTP browser access is an explicit per-process deployment choice. */
+import { deploymentValue } from "./deploymentEnvironment"
+
+/** HTTP access follows the configured deployment transport policy. */
 export function allowsHttpBrowserAccess(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.COGPIT_ALLOW_HTTP === "1"
+  return deploymentValue("COGPIT_ALLOW_HTTP", env) === "1"
 }

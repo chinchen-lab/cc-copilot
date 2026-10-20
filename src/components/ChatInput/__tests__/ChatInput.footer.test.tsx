@@ -81,6 +81,33 @@ describe("ChatInput footer", () => {
 })
 
 describe("ChatInput sending", () => {
+  it("lets Enter confirm Chinese input and only sends on the next ordinary Enter", async () => {
+    mocks.sendMessage.mockResolvedValue(true)
+    render(<ChatInput />)
+    const message = screen.getByRole("combobox", { name: "Message" })
+    fireEvent.compositionStart(message)
+    fireEvent.change(message, { target: { value: "中文訊息" } })
+    // Some IMEs omit isComposing, so the composition lifecycle also guards Enter.
+    fireEvent.keyDown(message, { key: "Enter", isComposing: false })
+    expect(mocks.sendMessage).not.toHaveBeenCalled()
+    fireEvent.compositionEnd(message)
+    // WebKit can end composition before its confirming keydown.
+    fireEvent.keyDown(message, { key: "Enter", keyCode: 229, isComposing: false })
+    expect(mocks.sendMessage).not.toHaveBeenCalled()
+    expect(message).toHaveValue("中文訊息")
+    await act(async () => { fireEvent.keyDown(message, { key: "Enter" }) })
+    expect(mocks.sendMessage).toHaveBeenCalledExactlyOnceWith("中文訊息", undefined)
+  })
+
+  it("ignores native composing Enter and preserves Shift+Enter", () => {
+    render(<ChatInput />)
+    const message = screen.getByRole("combobox", { name: "Message" })
+    fireEvent.change(message, { target: { value: "中文" } })
+    fireEvent.keyDown(message, { key: "Enter", isComposing: true })
+    fireEvent.keyDown(message, { key: "Enter", shiftKey: true })
+    expect(mocks.sendMessage).not.toHaveBeenCalled()
+    expect(message).toHaveValue("中文")
+  })
   beforeEach(() => {
     mocks.sendMessage.mockReset()
     mocks.restoreImages.mockReset()

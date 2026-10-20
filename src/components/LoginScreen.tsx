@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
-import { AlertCircle, Eye, EyeOff, Info, Lock } from "lucide-react"
+import { AlertCircle, Eye, EyeOff, Info } from "lucide-react"
+import { BrandLogo } from "@/components/BrandLogo"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -101,10 +102,8 @@ export function LoginScreen({ onAuthenticated, setupRequired = false }: LoginScr
       <form onSubmit={handleSubmit} className="w-full max-w-sm">
         <Card>
           <CardHeader>
-            <div className="mb-2 flex size-9 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
-              <Lock className="size-4" />
-            </div>
-            <CardTitle>Sign in to Cogpit</CardTitle>
+            <BrandLogo className="mb-3" />
+            <CardTitle>Sign in</CardTitle>
             <CardDescription>
               {usesAccounts ? "Sign in with your account to continue." : "Enter the server password to continue."}
             </CardDescription>

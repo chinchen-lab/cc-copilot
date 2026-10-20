@@ -24,6 +24,7 @@ import {
   shouldFailClosed,
 } from "./lib/standalone-bootstrap"
 import { validatePasswordStrength } from "./security"
+import { applyDeploymentEnvironment, deploymentName } from "./lib/deploymentEnvironment"
 import { editionOwnsSignIn, loadEdition } from "./edition"
 
 export interface StartStandaloneServerOptions {
@@ -82,6 +83,7 @@ export async function startStandaloneServer({
   publishPort = false,
   legacyClickUpPath,
 }: StartStandaloneServerOptions): Promise<RunningStandaloneServer> {
+  applyDeploymentEnvironment(env)
   const legacyPluginHost = await captureLegacyPluginHost(dataDir)
   mkdirSync(dataDir, { recursive: true })
 
@@ -113,7 +115,7 @@ export async function startStandaloneServer({
     envPassword = resolveEnvPassword(env)
   } catch (error) {
     throw new Error(
-      `Cannot read COGPIT_NETWORK_PASSWORD_FILE: ${error instanceof Error ? error.message : String(error)}`,
+      `Cannot read ${deploymentName("COGPIT_NETWORK_PASSWORD_FILE")}: ${error instanceof Error ? error.message : String(error)}`,
     )
   }
 
@@ -132,7 +134,7 @@ export async function startStandaloneServer({
     editionOwnsSignIn(),
   )) {
     throw new Error(
-      `Refusing to bind ${host}:${port} without a network password. Bind loopback or configure COGPIT_NETWORK_PASSWORD.`,
+      `Refusing to bind ${host}:${port} without a network password. Bind loopback or configure ${deploymentName("COGPIT_NETWORK_PASSWORD")}.`,
     )
   }
 

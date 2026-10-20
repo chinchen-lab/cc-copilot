@@ -11,6 +11,12 @@ useStandaloneRuntimeFixture()
 const WEAK_PASSWORD = { COGPIT_NETWORK_PASSWORD: "weak" }
 
 describe("startStandaloneServer", () => {
+  it("accepts a six-character password under the new deployment name", async () => {
+    const { staticDir, dataDir } = await fixture()
+    const runtime = await startStandaloneServer({ staticDir, dataDir, host: "0.0.0.0", port: 0, env: { CC_COPILOT_UI_PASSWORD: "123456" } })
+    runningServers.push(runtime)
+    expect(runtime.envPassword).toBe(true)
+  })
   it("binds an available port and serves the app lifecycle", async () => {
     const { staticDir, dataDir } = await fixture()
     const runtime = await startStandaloneServer({

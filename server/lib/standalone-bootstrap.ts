@@ -2,13 +2,19 @@ import { readFileSync } from "node:fs"
 import { homedir, type NetworkInterfaceInfo } from "node:os"
 import { join } from "node:path"
 import { parseArgs } from "node:util"
+import { deploymentValue } from "./deploymentEnvironment"
 
-export function parseStandaloneOptions(args: string[]): { httpOnly: boolean; help: boolean } {
+export function parseStandaloneOptions(args: string[], env: NodeJS.ProcessEnv = process.env): { httpOnly: boolean; help: boolean } {
   const { values } = parseArgs({ args, options: {
     "http-only": { type: "boolean", default: false },
+    https: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   } })
-  return { httpOnly: values["http-only"], help: values.help }
+  if (values.https && values["http-only"]) throw new Error("Use either --https or --http-only, not both")
+  return {
+    httpOnly: values.https ? false : values["http-only"] || deploymentValue("COGPIT_ALLOW_HTTP", env) !== "0",
+    help: values.help,
+  }
 }
 
 /**
@@ -34,12 +40,12 @@ export function resolveEnvPassword(
   env: NodeJS.ProcessEnv = process.env,
   readFileFn: (path: string) => string = (p) => readFileSync(p, "utf-8"),
 ): string | null {
-  const file = env.COGPIT_NETWORK_PASSWORD_FILE
+  const file = deploymentValue("COGPIT_NETWORK_PASSWORD_FILE", env)
   if (file && file.length > 0) {
     const trimmed = readFileFn(file).replace(/\r?\n$/, "")
     return trimmed.length > 0 ? trimmed : null
   }
-  const inline = env.COGPIT_NETWORK_PASSWORD
+  const inline = deploymentValue("COGPIT_NETWORK_PASSWORD", env)
   return inline && inline.length > 0 ? inline : null
 }
 
@@ -137,11 +143,11 @@ export function defaultDataDir(): string {
 
 /** The standalone data directory: COGPIT_DATA_DIR, else the default. */
 export function resolveDataDir(env: NodeJS.ProcessEnv = process.env): string {
-  return env.COGPIT_DATA_DIR || defaultDataDir()
+  return deploymentValue("COGPIT_DATA_DIR", env) || defaultDataDir()
 }
 
 /** Device name advertised to the hub (COGPIT_DEVICE_NAME overrides hostname). */
 export function resolveDeviceName(env: NodeJS.ProcessEnv, hostname: string): string {
-  const name = env.COGPIT_DEVICE_NAME
+  const name = deploymentValue("COGPIT_DEVICE_NAME", env)
   return name && name.trim().length > 0 ? name.trim() : hostname
 }

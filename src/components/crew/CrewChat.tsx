@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useCrewChat } from "@/hooks/useCrewChat"
+import { useImeComposition } from "@/hooks/useImeComposition"
 import type { AgentKind } from "@/lib/agents"
 import { CREW_CHAT_MAX_LENGTH, type CrewChatMember } from "../../../shared/contracts/crewChat"
 import { CrewAvatar, CrewChatDay, CrewChatRunView } from "./CrewChatRun"
@@ -17,6 +18,7 @@ const NO_KINDS: ReadonlyMap<string, AgentKind> = new Map()
 
 /** `kinds` names each member's agent, for its provider mark. */
 export function CrewChat({ rootId, kinds = NO_KINDS, active = true }: { rootId: string; kinds?: ReadonlyMap<string, AgentKind>; active?: boolean }) {
+  const { isComposingEvent, onCompositionStart, onCompositionEnd } = useImeComposition()
   const chat = useCrewChat(rootId)
   const [draft, setDraft] = useState("")
   const end = useRef<HTMLDivElement>(null)
@@ -87,8 +89,9 @@ export function CrewChat({ rootId, kinds = NO_KINDS, active = true }: { rootId: 
         <FieldGroup className="gap-2">
           <Field data-invalid={Boolean(chat.error)}>
             <FieldLabel htmlFor={`crew-chat-${rootId}`} className="sr-only">Message the crew</FieldLabel>
-            <Textarea id={`crew-chat-${rootId}`} value={draft} rows={3} maxLength={CREW_CHAT_MAX_LENGTH} placeholder="Message the crew… use @ to tag an agent" disabled={!chat.page?.canPost} aria-invalid={Boolean(chat.error)} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => {
-              if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) { event.preventDefault(); void send() }
+            <Textarea id={`crew-chat-${rootId}`} value={draft} rows={3} maxLength={CREW_CHAT_MAX_LENGTH} placeholder="Message the crew… use @ to tag an agent" disabled={!chat.page?.canPost} aria-invalid={Boolean(chat.error)} onChange={(event) => setDraft(event.target.value)} onCompositionStart={onCompositionStart} onCompositionEnd={onCompositionEnd} onKeyDown={(event) => {
+              if (isComposingEvent(event)) return
+              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void send() }
             }} />
             {chat.error && <p role="alert" className="text-xs text-destructive">{chat.error}</p>}
           </Field>

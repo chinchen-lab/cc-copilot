@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react"
 import { ChevronLeft, ChevronRight, FolderOpen, Pencil, Search, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { BrandLogo } from "@/components/BrandLogo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Empty, EmptyHeader, EmptyDescription } from "@/components/ui/empty"
@@ -123,7 +124,10 @@ export function MissionHome({ onOpenSession, onBrowseProjects, start }: MissionH
     <div className="flex h-full min-h-0 flex-col">
       <div className="mx-auto flex w-full max-w-6xl shrink-0 flex-col gap-8 px-6 pt-16 lg:px-10">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h1 className="text-xl font-semibold tracking-tight">Mission Control</h1>
+          <div className="flex flex-col gap-3">
+            <BrandLogo />
+            <h1 className="text-sm font-medium text-muted-foreground">Mission Control</h1>
+          </div>
           {running > 0 && <p className="text-xs text-muted-foreground">{running} {running === 1 ? "agent" : "agents"} running on this machine</p>}
         </div>
         {start && <HomeComposer recent={recent} start={start} />}

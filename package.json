@@ -21,6 +21,7 @@
     "dev": "bun run build:plugin-api && vite --host",
     "build": "bun run typecheck && bun run build:web",
     "build:web": "bun run build:plugin-api && vite build",
+    "build:server": "bun scripts/build-server.ts",
     "lint": "eslint .",
     "check:agents": "bun scripts/check-agents.ts",
     "check:codex-protocol": "bun scripts/generate-codex-protocol.ts --check",

@@ -26,18 +26,24 @@ function remoteRequest(headers: Record<string, string> = {}): IncomingMessage {
 }
 
 describe("HTTP mode configuration", () => {
-  it("requires an explicit flag or environment opt-in", () => {
-    expect(parseStandaloneOptions([])).toEqual({ httpOnly: false, help: false })
-    expect(parseStandaloneOptions(["--http-only"])).toEqual({ httpOnly: true, help: false })
+  it("defaults standalone startup to HTTP and lets flags override the environment", () => {
+    expect(parseStandaloneOptions([], {})).toEqual({ httpOnly: true, help: false })
+    expect(parseStandaloneOptions([], { COGPIT_ALLOW_HTTP: "0" }).httpOnly).toBe(false)
+    expect(parseStandaloneOptions(["--http-only"], { COGPIT_ALLOW_HTTP: "0" })).toEqual({ httpOnly: true, help: false })
+    expect(parseStandaloneOptions(["--https"], { COGPIT_ALLOW_HTTP: "1" })).toEqual({ httpOnly: false, help: false })
     expect(parseStandaloneOptions(["--help"]).help).toBe(true)
     expect(() => parseStandaloneOptions(["--http-onyl"])).toThrow()
+    expect(() => parseStandaloneOptions(["--http-only", "--https"])).toThrow("not both")
+  })
+
+  it("keeps other server entry points strict unless standalone bootstrap enables HTTP", () => {
     for (const value of [undefined, "", "0", "false", "yes"]) {
       expect(allowsHttpBrowserAccess({ COGPIT_ALLOW_HTTP: value })).toBe(false)
     }
     expect(allowsHttpBrowserAccess({ COGPIT_ALLOW_HTTP: "1" })).toBe(true)
   })
 
-  it("keeps HTTPS-only sessions as the default and ignores the HTTP cookie", () => {
+  it("ignores HTTP cookies when HTTPS sessions are required", () => {
     vi.stubEnv("COGPIT_ALLOW_HTTP", "0")
     expect(canIssueBrowserSession(remoteRequest())).toBe(false)
     expect(canIssueBrowserSession(remoteRequest({ origin: "https://cogpit.internal:19384", "x-forwarded-proto": "https" }))).toBe(true)

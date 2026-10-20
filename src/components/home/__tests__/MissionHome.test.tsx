@@ -122,6 +122,21 @@ describe("MissionHome", () => {
     expect(field).toHaveValue("")
   })
 
+  it("does not start a session when Enter confirms an IME candidate", () => {
+    const starter = start()
+    render(<MissionHome onOpenSession={vi.fn()} start={starter} />)
+    const field = screen.getByRole("textbox", { name: "First message" })
+    fireEvent.compositionStart(field)
+    fireEvent.change(field, { target: { value: "修正問題" } })
+    fireEvent.keyDown(field, { key: "Enter", isComposing: false })
+    fireEvent.compositionEnd(field)
+    fireEvent.keyDown(field, { key: "Enter", keyCode: 229 })
+    expect(starter.onStart).not.toHaveBeenCalled()
+    expect(field).toHaveValue("修正問題")
+    fireEvent.keyDown(field, { key: "Enter" })
+    expect(starter.onStart).toHaveBeenCalledExactlyOnceWith("-workspace", "/workspace", "修正問題")
+  })
+
   it("starts in the same folder with another agent when the picker switches provider", () => {
     const starter = start()
     render(<MissionHome onOpenSession={vi.fn()} start={starter} />)

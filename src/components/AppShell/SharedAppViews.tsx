@@ -64,7 +64,7 @@ export function PrimarySessionBrowser({
   mobile = false,
   header,
 }: PrimarySessionBrowserProps) {
-  const { sessionSource } = useSessionContext()
+  const { sessionSource, session } = useSessionContext()
   const activeSessionKey = sessionSource
     ? `${sessionSource.dirName}/${sessionSource.fileName}`
     : null
@@ -72,6 +72,7 @@ export function PrimarySessionBrowser({
   return (
     <SessionBrowser
       activeSessionKey={activeSessionKey}
+      activeProject={sessionSource && session ? { dirName: sessionSource.dirName, cwd: session.cwd } : null}
       onSelectSession={navigation.actions.handleDashboardSelect}
       onNewSession={navigation.onStartNewSession}
       creatingSession={navigation.creatingSession}

@@ -1,6 +1,6 @@
 import { accessSync, constants } from "node:fs"
 import { delimiter, join } from "node:path"
-import { spawn as nodePtySpawn } from "node-pty"
+import { createRequire } from "node:module"
 
 /** The node-pty surface the PTY server drives; Bun's terminal is bridged to it. */
 export interface PtyProcess {
@@ -63,7 +63,12 @@ export function spawnPty(
   options: PtySpawnOptions,
   runtime: BunTerminalRuntime | null = bunTerminalRuntime(),
 ): PtyProcess {
-  if (!runtime) return nodePtySpawn(command, args, { name: "xterm-256color", ...options })
+  if (!runtime) {
+    // Bun uses its built-in terminal and needs no native Node addon. Load
+    // the Node backend only when used, including in the Electron bundle.
+    const { spawn: nodePtySpawn } = createRequire(import.meta.url)("node-pty") as typeof import("node-pty")
+    return nodePtySpawn(command, args, { name: "xterm-256color", ...options })
+  }
   return spawnBunTerminal(runtime, command, args, options)
 }
 

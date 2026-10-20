@@ -40,6 +40,7 @@ export type { ActiveSessionInfo, RunningProcess } from "./types"
 
 interface LiveSessionsProps {
   activeSessionKey: string | null
+  activeProject?: PendingSessionInfo | null
   onSelectSession: (dirName: string, fileName: string) => void
   onDuplicateSession?: (dirName: string, fileName: string) => void
   onDeleteSession?: DeleteSession
@@ -55,7 +56,7 @@ interface LiveSessionsProps {
 
 const ALL_PROJECTS: OlderSessionsTarget = { key: "all" }
 
-export const LiveSessions = memo(function LiveSessions({ activeSessionKey, onSelectSession, onDuplicateSession, onDeleteSession, onNewSession, creatingSession, pendingSession, refreshRef, onPrefetchSession }: LiveSessionsProps) {
+export const LiveSessions = memo(function LiveSessions({ activeSessionKey, activeProject, onSelectSession, onDuplicateSession, onDeleteSession, onNewSession, creatingSession, pendingSession, refreshRef, onPrefetchSession }: LiveSessionsProps) {
   const { names: sessionNames, rename: renameSession } = useSessionNames()
   const { names: projectNames, rename: renameProject } = useProjectNames()
   const pty = usePty()
@@ -98,6 +99,29 @@ export const LiveSessions = memo(function LiveSessions({ activeSessionKey, onSel
     deviceScopedKey("live-sessions-project-scope"),
     null,
   )
+  const activeListedSession = activeSessionKey
+    ? sessions.find((session) => `${session.dirName}/${session.fileName}` === activeSessionKey)
+    : null
+  const chatProject = pendingSession ?? activeProject ?? activeListedSession
+  const chatScope = chatProject
+    ? projectGroupKey(chatProject.cwd || dirNameToPath(chatProject.dirName))
+    : null
+  const chatTarget = pendingSession
+    ? `pending:${pendingSession.dirName}:${pendingSession.cwd ?? ""}`
+    : activeSessionKey
+  // Follow navigation, while allowing an explicit scope choice in this chat.
+  // Inventory polling creates new objects without changing this identity.
+  const followedChat = useRef<{ target: string; scope: string } | null>(null)
+  useEffect(() => {
+    if (!chatTarget) {
+      followedChat.current = null
+      return
+    }
+    if (!chatScope) return
+    if (followedChat.current?.target === chatTarget && followedChat.current.scope === chatScope) return
+    followedChat.current = { target: chatTarget, scope: chatScope }
+    setProjectScope(chatScope)
+  }, [chatTarget, chatScope, setProjectScope])
   // Sessions another session started through Cogpit fold under it; a search lists every match on its own.
   const [groupCrewsSetting, setGroupCrews] = useLocalStorage<boolean>(
     deviceScopedKey("live-sessions-group-crews"),

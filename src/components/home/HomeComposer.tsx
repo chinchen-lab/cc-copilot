@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { agentKindForDirName, projectDirNameFor, type AgentKind } from "@/lib/agents"
 import { projectName } from "@/lib/format"
 import { cn } from "@/lib/utils"
+import { useImeComposition } from "@/hooks/useImeComposition"
 
 export interface HomeProject {
   dirName: string
@@ -40,6 +41,7 @@ const MAX_CHIPS = 6
  * composer takes over from there.
  */
 export function HomeComposer({ recent, start }: { recent: readonly HomeProject[]; start: HomeStart }) {
+  const { isComposingEvent, onCompositionStart, onCompositionEnd } = useImeComposition()
   const [picked, setPicked] = useState<HomeProject | null>(null)
   const [text, setText] = useState("")
   const project = picked ?? recent[0] ?? null
@@ -63,7 +65,8 @@ export function HomeComposer({ recent, start }: { recent: readonly HomeProject[]
     setText("")
   }
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+    if (isComposingEvent(event)) return
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
       submit()
     }
@@ -106,6 +109,8 @@ export function HomeComposer({ recent, start }: { recent: readonly HomeProject[]
               setText(event.target.value)
             }}
             onKeyDown={onKeyDown}
+            onCompositionStart={onCompositionStart}
+            onCompositionEnd={onCompositionEnd}
             placeholder={project ? `Describe the task for ${project.name}` : "Pick a project, then describe the task"}
             rows={1}
             className="max-h-48 min-h-9 flex-1 resize-none rounded-none border-0 bg-transparent px-0 py-2 shadow-none focus-visible:border-transparent focus-visible:ring-0"
