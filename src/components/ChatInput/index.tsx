@@ -21,6 +21,7 @@ import { useCapability } from "@/hooks/useCapability"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useImeComposition } from "@/hooks/useImeComposition"
+import { ExpandablePromptEditor } from "@/components/ExpandablePromptEditor"
 
 export interface ChatInputHandle {
   focus: () => void
@@ -500,10 +501,20 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
             />
           )}
           <div className={cn(
-            "min-w-0",
+            "relative min-w-0",
             stacked ? "flex flex-col" : "grid items-end",
             !stacked && (isMultiline ? "grid-cols-[1fr_auto]" : "grid-cols-[auto_minmax(0,1fr)_auto]"),
           )}>
+            <ExpandablePromptEditor
+              value={text}
+              inputRef={textareaRef}
+              onPaste={handlePaste}
+              onChange={(value) => {
+                setText(value)
+                setFileSuggestionsDismissed(false)
+                requestAnimationFrame(() => updateMultiline(autoResize(textareaRef.current, isMultilineRef.current)))
+              }}
+            />
             {leadingAccessory && (
               <div className={cn(
                 "flex shrink-0 items-center",
@@ -535,6 +546,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
               className={cn(
                 "min-h-0 w-full resize-none rounded-none border-0 bg-transparent text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0",
                 getTextareaLayoutClass(stacked, isMultiline, compact),
+                text.includes("\n") && "pr-10",
               )}
             />
             <div className={cn(

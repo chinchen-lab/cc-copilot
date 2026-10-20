@@ -14,7 +14,10 @@ import type { MainView } from "@/hooks/useSessionState"
 const contextMocks = vi.hoisted(() => ({
   useAppContext: vi.fn(),
   useSessionContext: vi.fn(),
+  useOpenSessionCrew: vi.fn(),
 }))
+
+vi.mock("@/hooks/useOpenSessionCrew", () => ({ useOpenSessionCrew: contextMocks.useOpenSessionCrew }))
 
 vi.mock("@/contexts/AppContext", () => ({
   useAppContext: contextMocks.useAppContext,
@@ -268,6 +271,7 @@ function makeProps(
 describe("DesktopWorkspace", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    contextMocks.useOpenSessionCrew.mockReturnValue(null)
   })
 
   it("renders the fresh SessionContext session when AppContext intentionally omits it", () => {
@@ -288,7 +292,7 @@ describe("DesktopWorkspace", () => {
     expect(await screen.findByTestId("config-browser")).toHaveTextContent("/fresh/session")
     expect(screen.queryByTestId("chat-area")).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Config" })).toHaveAttribute("aria-pressed", "true")
-    expect(screen.getByRole("button", { name: "Mission Control" })).toHaveAttribute("aria-pressed", "false")
+    expect(screen.queryByRole("button", { name: "Mission Control" })).not.toBeInTheDocument()
   })
 
   describe("an edition main view", () => {
@@ -411,16 +415,26 @@ describe("DesktopWorkspace", () => {
     expect(screen.getByTestId("stats-panel")).toBeInTheDocument()
   })
 
-  it("moves Mission Control and Config into the activity rail", async () => {
+  it("keeps Config in the activity rail without a duplicate Mission Control action", async () => {
     setContexts({ mainView: "mission" })
     const props = makeProps()
 
     render(<DesktopWorkspace {...props} />)
 
     expect(await screen.findByTestId("mission-control")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Mission Control" })).toHaveAttribute("aria-pressed", "true")
-    expect(screen.getByRole("button", { name: "Mission Control" })).toHaveClass("bg-sidebar-primary")
+    expect(screen.queryByRole("button", { name: "Mission Control" })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Config" })).toHaveAttribute("aria-pressed", "false")
+  })
+
+  it("keeps the right panel collapsed when opening a session with a crew", () => {
+    setContexts({ session: makeSession() })
+    contextMocks.useOpenSessionCrew.mockReturnValue({ rootId: "session-1", size: 2, needsYou: 0, working: 1 })
+    const props = makeProps()
+    render(<DesktopWorkspace {...props} />)
+    expect(props.navigation.panels.openWorkspacePanel).not.toHaveBeenCalled()
+    expect(screen.queryByRole("button", { name: "Mission Control" })).not.toBeInTheDocument()
+    expect(screen.queryByTestId("file-changes")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("stats-panel")).not.toBeInTheDocument()
   })
 
   it("opens worktrees inside the resizable workspace panel", async () => {

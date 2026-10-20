@@ -19,14 +19,16 @@ describe("SidebarHeader", () => {
 
     expect(container.firstElementChild).toHaveClass("electron-drag", "window-inset-start")
 
-    // The spacer comes first, so every action sits on the sidebar's right edge
-    // and the left inset belongs to the traffic lights alone.
-    expect(container.firstElementChild?.firstElementChild).toHaveClass("flex-1")
+    const home = screen.getByRole("button", { name: "Home" })
+    expect(home).toHaveAttribute("title", "Mission Control")
+    expect(home.querySelector("use")).toHaveAttribute("href", "/cogpit.svg#mark")
+    expect(screen.getByRole("img", { name: "CC Copilot" })).toBeVisible()
+    expect(screen.queryByText("Pro")).not.toBeInTheDocument()
     expect(
       screen.getAllByRole("button").map((button) => button.getAttribute("aria-label")),
     ).toEqual(["Home", "Search (⌘K)", "Hide sidebar (⌘B)"])
 
-    fireEvent.click(screen.getByRole("button", { name: "Home" }))
+    fireEvent.click(home)
     fireEvent.click(screen.getByRole("button", { name: "Search (⌘K)" }))
     fireEvent.click(screen.getByRole("button", { name: "Hide sidebar (⌘B)" }))
 

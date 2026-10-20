@@ -64,7 +64,7 @@ const CLOSE_MAIN_VIEW = {
 } as const satisfies Record<Exclude<MainView, "sessions">, SessionAction>
 
 function initialWorkspacePanel(): string | null {
-  if (typeof window === "undefined") return BUILT_IN_WORKSPACE_PANEL_IDS.fileChanges
+  if (typeof window === "undefined") return null
   try {
     if (JSON.parse(localStorage.getItem("panel-worktrees-visible") ?? "false") === true) {
       return BUILT_IN_WORKSPACE_PANEL_IDS.worktrees
@@ -72,13 +72,13 @@ function initialWorkspacePanel(): string | null {
     if (JSON.parse(localStorage.getItem("panel-stats-visible") ?? "false") === true) {
       return BUILT_IN_WORKSPACE_PANEL_IDS.sessionInfo
     }
-    if (JSON.parse(localStorage.getItem("panel-file-changes-visible") ?? "true") === false) {
-      return null
+    if (JSON.parse(localStorage.getItem("panel-file-changes-visible") ?? "false") === true) {
+      return BUILT_IN_WORKSPACE_PANEL_IDS.fileChanges
     }
   } catch {
     // Ignore corrupt legacy state and use the shipped default.
   }
-  return BUILT_IN_WORKSPACE_PANEL_IDS.fileChanges
+  return null
 }
 
 export function usePanelState(

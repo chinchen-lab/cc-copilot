@@ -1,6 +1,7 @@
 import { memo } from "react"
-import { Eye, PanelLeftClose, Search } from "lucide-react"
+import { PanelLeftClose, Search } from "lucide-react"
 import { HeaderIconButton } from "@/components/header-shared"
+import { BrandLogo } from "@/components/BrandLogo"
 
 interface SidebarHeaderProps {
   onToggleSidebar: () => void
@@ -12,8 +13,8 @@ interface SidebarHeaderProps {
 
 /**
  * With no title bar, the sidebar's top row owns the window's top-left corner:
- * the traffic lights get the left inset to themselves and every action sits
- * together on the sidebar's right edge.
+ * the traffic lights keep their inset, the compact home link sits on the
+ * left and utility actions stay on the right.
  */
 export const SidebarHeader = memo(function SidebarHeader({
   onToggleSidebar,
@@ -24,8 +25,15 @@ export const SidebarHeader = memo(function SidebarHeader({
 }: SidebarHeaderProps) {
   return (
     <div className="electron-drag window-inset-start flex h-12 shrink-0 items-center gap-1 px-2">
-      <div className="flex-1" />
-      <HeaderIconButton icon={Eye} label="Home" onClick={onGoHome} size="default" />
+      <button
+        type="button"
+        aria-label="Home"
+        title="Mission Control"
+        onClick={onGoHome}
+        className="mr-auto min-w-0 rounded-md px-1 py-1.5 outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <BrandLogo compact />
+      </button>
       <HeaderIconButton
         icon={Search}
         label={`Search (${commandPaletteShortcut})`}

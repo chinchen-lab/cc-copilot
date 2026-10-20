@@ -11,4 +11,13 @@ describe("BrandLogo", () => {
     expect(screen.getByText("Copilot")).toBeVisible()
     expect(screen.getByText("Pro")).toBeVisible()
   })
+
+  it("offers a compact sidebar wordmark without the badge", () => {
+    render(<BrandLogo compact />)
+    const logo = screen.getByRole("img", { name: "CC Copilot" })
+    expect(logo.querySelector("use")).toHaveAttribute("href", "/cogpit.svg#mark")
+    expect(screen.getByText("CC")).toBeVisible()
+    expect(screen.getByText("Copilot")).toBeVisible()
+    expect(screen.queryByText("Pro")).not.toBeInTheDocument()
+  })
 })

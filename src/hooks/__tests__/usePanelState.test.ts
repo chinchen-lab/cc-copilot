@@ -79,7 +79,7 @@ describe("usePanelState", () => {
   it("starts from the shipped defaults when nothing is stored", () => {
     const { result } = render()
     expect(result.current.showSidebar).toBe(true)
-    expect(result.current.activeWorkspacePanel).toBe(BUILT_IN_WORKSPACE_PANEL_IDS.fileChanges)
+    expect(result.current.activeWorkspacePanel).toBeNull()
     expect(result.current.showWorkflows).toBe(false)
   })
 
@@ -101,7 +101,23 @@ describe("usePanelState", () => {
     localStorage.setItem("workspace-panel-active", "{not json")
     const { result } = render()
     expect(result.current.showSidebar).toBe(true)
-    expect(result.current.activeWorkspacePanel).toBe(BUILT_IN_WORKSPACE_PANEL_IDS.fileChanges)
+    expect(result.current.activeWorkspacePanel).toBeNull()
+  })
+
+  it("keeps the right panel closed on the next launch after the user closes it", () => {
+    const first = render()
+    act(() => first.result.current.openWorkspacePanel(BUILT_IN_WORKSPACE_PANEL_IDS.projectFiles))
+    act(() => first.result.current.closeWorkspacePanel())
+    first.unmount()
+    expect(render().result.current.activeWorkspacePanel).toBeNull()
+  })
+
+  it.each([true, 42, {}])("starts with the right panel closed for invalid preference %j", (value) => {
+    localStorage.setItem("workspace-panel-active", JSON.stringify(value))
+    const { result } = render()
+    expect(result.current.activeWorkspacePanel).toBeNull()
+    act(() => result.current.toggleWorkspacePanel(BUILT_IN_WORKSPACE_PANEL_IDS.projectFiles))
+    expect(result.current.activeWorkspacePanel).toBe(BUILT_IN_WORKSPACE_PANEL_IDS.projectFiles)
   })
 
   it("never restores the transient overlays", () => {
@@ -152,6 +168,7 @@ describe("usePanelState", () => {
   })
 
   it("keeps a persisted panel open when its rail button is selected from Config", () => {
+    localStorage.setItem("workspace-panel-active", JSON.stringify(BUILT_IN_WORKSPACE_PANEL_IDS.fileChanges))
     const dispatch = vi.fn()
     const configState = { mainView: "config" } as SessionState
     const { result } = renderHook(() => usePanelState(configState, dispatch))
@@ -171,6 +188,7 @@ describe("usePanelState", () => {
     ["mission", { type: "CLOSE_MISSION" }],
     ["extension", { type: "CLOSE_EXTENSION_VIEW" }],
   ] as const)("opens an already-selected panel when toggled from %s", (mainView, closeAction) => {
+    localStorage.setItem("workspace-panel-active", JSON.stringify(BUILT_IN_WORKSPACE_PANEL_IDS.fileChanges))
     const dispatch = vi.fn()
     const alternateState = { mainView } as SessionState
     const { result } = renderHook(() => usePanelState(alternateState, dispatch))
@@ -198,6 +216,11 @@ describe("usePanelState", () => {
     const { result } = render()
 
     expect(result.current.activeWorkspacePanel).toBe(BUILT_IN_WORKSPACE_PANEL_IDS.sessionInfo)
+  })
+
+  it.each([true, false])("honors an explicit legacy file-changes preference of %s", (open) => {
+    localStorage.setItem("panel-file-changes-visible", JSON.stringify(open))
+    expect(render().result.current.activeWorkspacePanel).toBe(open ? BUILT_IN_WORKSPACE_PANEL_IDS.fileChanges : null)
   })
 
   it("migrates an open legacy worktree sheet into the workspace panel", () => {

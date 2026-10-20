@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { PendingHumanInput } from "@/contexts/PendingHumanInputContext"
 import type { ActiveSessionInfo } from "@/components/LiveSessions/types"
@@ -49,6 +49,23 @@ beforeEach(() => {
 })
 
 describe("MissionHome", () => {
+  it("expands the first-message draft and only starts a session after returning to the composer", async () => {
+    const starter = start()
+    render(<MissionHome onOpenSession={vi.fn()} start={starter} />)
+    const message = screen.getByRole("textbox", { name: "First message" })
+    fireEvent.change(message, { target: { value: "first\nsecond" } })
+    fireEvent.click(screen.getByRole("button", { name: "Expand prompt editor" }))
+    const editor = await screen.findByRole("textbox", { name: "Expanded prompt" })
+    fireEvent.change(editor, { target: { value: "first\nrevised" } })
+    fireEvent.keyDown(editor, { key: "Enter" })
+    expect(starter.onStart).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("button", { name: "Done" }))
+    await waitFor(() => expect(message).toHaveFocus())
+    expect(message).toHaveValue("first\nrevised")
+    fireEvent.keyDown(message, { key: "Enter" })
+    expect(starter.onStart).toHaveBeenCalledExactlyOnceWith("-workspace", "/workspace", "first\nrevised")
+  })
+
   it("lists roots once and opens the coordinator, keeping members in its crew", () => {
     const onOpenSession = vi.fn()
     render(<MissionHome onOpenSession={onOpenSession} />)

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mocks = vi.hoisted(() => ({
@@ -81,6 +81,25 @@ describe("ChatInput footer", () => {
 })
 
 describe("ChatInput sending", () => {
+  it("edits a multiline prompt in the expanded view without sending until the composer submits", async () => {
+    mocks.sendMessage.mockResolvedValue(true)
+    render(<ChatInput />)
+    const message = screen.getByRole("combobox", { name: "Message" })
+    expect(screen.queryByRole("button", { name: "Expand prompt editor" })).not.toBeInTheDocument()
+    fireEvent.change(message, { target: { value: "first\nsecond" } })
+    fireEvent.click(screen.getByRole("button", { name: "Expand prompt editor" }))
+    const editor = await screen.findByRole("textbox", { name: "Expanded prompt" })
+    fireEvent.change(editor, { target: { value: "first\nrevised\n中文" } })
+    fireEvent.keyDown(editor, { key: "Enter" })
+    fireEvent.keyDown(editor, { key: "Enter", isComposing: true })
+    expect(mocks.sendMessage).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("button", { name: "Done" }))
+    await waitFor(() => expect(message).toHaveFocus())
+    expect(message).toHaveValue("first\nrevised\n中文")
+    await act(async () => fireEvent.keyDown(message, { key: "Enter" }))
+    expect(mocks.sendMessage).toHaveBeenCalledExactlyOnceWith("first\nrevised\n中文", undefined)
+  })
+
   it("lets Enter confirm Chinese input and only sends on the next ordinary Enter", async () => {
     mocks.sendMessage.mockResolvedValue(true)
     render(<ChatInput />)

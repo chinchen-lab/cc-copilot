@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type KeyboardEvent } from "react"
+import { useRef, useState, type FormEvent, type KeyboardEvent } from "react"
 import { FolderOpen, Send } from "lucide-react"
 import { ChatInputSettings } from "@/components/ChatInput/ChatInputSettings"
 import { ProjectFavicon } from "@/components/ProjectFavicon"
@@ -10,6 +10,7 @@ import { agentKindForDirName, projectDirNameFor, type AgentKind } from "@/lib/ag
 import { projectName } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { useImeComposition } from "@/hooks/useImeComposition"
+import { ExpandablePromptEditor } from "@/components/ExpandablePromptEditor"
 
 export interface HomeProject {
   dirName: string
@@ -44,6 +45,7 @@ export function HomeComposer({ recent, start }: { recent: readonly HomeProject[]
   const { isComposingEvent, onCompositionStart, onCompositionEnd } = useImeComposition()
   const [picked, setPicked] = useState<HomeProject | null>(null)
   const [text, setText] = useState("")
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const project = picked ?? recent[0] ?? null
   const chips = (picked && !recent.some((candidate) => sameFolder(candidate, picked)) ? [picked, ...recent] : [...recent]).slice(0, MAX_CHIPS)
   const message = text.trim()
@@ -99,8 +101,10 @@ export function HomeComposer({ recent, start }: { recent: readonly HomeProject[]
         <ProjectPicker defaultAgentKind={start.defaultAgentKind} onChoose={choose} onChooseFolder={chooseFolder} anyListed={chips.length > 0} />
       </div>
       <form onSubmit={submit} className="min-w-0">
-        <div className="flex items-end gap-2 rounded-xl border bg-popover py-2 pl-4 pr-2 shadow-lg shadow-black/5 transition-[border-color,box-shadow] duration-150 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+        <div className={cn("relative flex items-end gap-2 rounded-xl border bg-popover py-2 pl-4 pr-2 shadow-lg shadow-black/5 transition-[border-color,box-shadow] duration-150 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50", text.includes("\n") && "flex-col items-stretch pt-9")}>
+          <ExpandablePromptEditor value={text} onChange={setText} inputRef={inputRef} />
           <Textarea
+            ref={inputRef}
             aria-label="First message"
             value={text}
             onChange={(event) => {
@@ -115,7 +119,7 @@ export function HomeComposer({ recent, start }: { recent: readonly HomeProject[]
             rows={1}
             className="max-h-48 min-h-9 flex-1 resize-none rounded-none border-0 bg-transparent px-0 py-2 shadow-none focus-visible:border-transparent focus-visible:ring-0"
           />
-          <div className="flex shrink-0 items-center gap-1 pb-0.5">
+          <div className="flex shrink-0 items-center justify-end gap-1 pb-0.5">
             {project && (
               <ChatInputSettings
                 isNewSession

@@ -33,6 +33,12 @@ The sidebar and mobile Sessions tab show live and recent sessions, with status a
 
 Opening, switching, or starting a chat automatically focuses the sidebar on that chat's project. Worktree sessions use their parent project's group. You can still choose **All projects** or another project in the scope picker: background refreshes preserve that choice until you navigate to another chat. With no chat open, the sidebar keeps its remembered scope for that device.
 
+On desktop, the left sidebar starts expanded in project and conversation views;
+the Mission Control home hides it. Click its compact wordmark to return home.
+Right workspace panels start collapsed until you select a
+tool from the right rail; a saved panel preference is restored on later visits.
+Opening a conversation with a crew does not automatically expand the Crew panel.
+
 Archive a finished session to keep the sidebar short: hover a row and use the archive button, or right-click it. Focus the sidebar on a project and right-click its name at the top to archive every idle session in that project at once. Archiving only hides the session from the list; the transcript is untouched, and the toast offers Undo. The archive toggle next to the search box lists archived sessions again, dimmed with an archive mark, and a search always looks through them. Archived sessions come back on their own when they get new activity, including a message sent from Cogpit. Sessions with no activity for two weeks are archived automatically; restoring one keeps it listed until you archive it again. The archive is stored on the server, so every device sees the same list.
 
 The timeline contains messages, expandable thinking blocks, tool calls, diffs, and compaction markers. Images and videos that an agent references with markdown image syntax render inline: images open in a zoomable viewer, and `mp4`, `m4v`, `webm` and `mov` files play with controls. Local files are served by the Cogpit server, so they show up on remote devices too. Expand a command to inspect its output. Adjacent shell calls share a card, and failures stay attached to the command that produced them.
@@ -44,6 +50,11 @@ Claude token streaming is on by default. For standalone deployments, set `CC_COP
 ## Messages, models, and permissions
 
 Press **Enter** to send a message or **Shift+Enter** for a new line. When using a Chinese, Japanese, or Korean input method, Enter confirms the candidate without sending; a subsequent ordinary Enter sends the committed text. This also applies to the first-message composer on the home screen and queued-message editing. Crew chat uses **Cmd+Enter** or **Ctrl+Enter** to send and ignores those shortcuts while composing text.
+
+After adding a newline, use the expand button in the input's upper-right corner
+to edit a long prompt in a larger window. Enter adds newlines there; **Done**,
+Escape, or closing the window keeps your edits and returns to the original input
+without sending. This is available in chats and the home screen's first message.
 
 The model chip beside Send opens the provider, model, reasoning effort, and available speed controls. You can change several settings before clicking outside to close it. Image drag-and-drop and paste appear for models that accept images. Slash command suggestions include supported built-in commands and project skills and commands. Claude sessions offer `/output-style` to list output styles or switch to one.
 

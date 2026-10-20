@@ -1,8 +1,8 @@
 import { resolvePluginPanelPreference } from "@/plugins/panelAliases"
 import { useOpenSessionCrew } from "@/hooks/useOpenSessionCrew"
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
+import { lazy, Suspense, useCallback, useState } from "react"
 import type { ReactNode } from "react"
-import { Code2, FolderSearch, LayoutGrid, Puzzle, SlidersHorizontal, TerminalSquare } from "lucide-react"
+import { Code2, FolderSearch, Puzzle, SlidersHorizontal, TerminalSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DisabledHint } from "@/components/ui/disabled-hint"
 import { ChatArea } from "@/components/ChatArea"
@@ -21,7 +21,6 @@ import { isBuiltInEditorEnabled, openProject, revealInFolder } from "@/lib/fileO
 import { dirNameToPath } from "@/lib/format"
 import { shortcutLabel } from "@/lib/keybindings"
 import { cn } from "@/lib/utils"
-import { BUILT_IN_WORKSPACE_PANEL_IDS } from "@/plugins/builtInPanelIds"
 import type { ProjectPromptContext, WorkspacePanelContext } from "@/plugin-api"
 import { useRuntimePlugins } from "@/plugins/useRuntimePlugins"
 import { useRuntimeWorkspacePanels } from "@/plugins/runtimeWorkspacePanels"
@@ -279,13 +278,6 @@ export function DesktopWorkspace({
   )
 
   const isHome = view === "mission" || (view === "dashboard" && !state.dashboardProject)
-  const visitedCrews = useRef(new Set<string>())
-  const openWorkspacePanel = navigation.panels.openWorkspacePanel
-  useEffect(() => {
-    if (isHome || !openCrew || visitedCrews.current.has(openCrew.rootId)) return
-    visitedCrews.current.add(openCrew.rootId)
-    openWorkspacePanel(BUILT_IN_WORKSPACE_PANEL_IDS.crew)
-  }, [isHome, openCrew, openWorkspacePanel])
   const sidebarRendered = navigation.panels.showSidebar && state.mainView !== "config" && !isHome
 
   const panelContext: WorkspacePanelContext = {
@@ -370,13 +362,6 @@ export function DesktopWorkspace({
         onClosePanel={navigation.panels.closeWorkspacePanel}
         onTogglePanel={toggleWorkspacePanel}
         actions={[
-          {
-            id: "mission-control",
-            title: "Mission Control",
-            icon: LayoutGrid,
-            active: isHome,
-            onSelect: navigation.panels.handleToggleMission,
-          },
           ...(can("configWrite") ? [{
             id: "plugins",
             title: "Plugins",
