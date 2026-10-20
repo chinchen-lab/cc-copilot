@@ -66,6 +66,7 @@ export async function planCrews(
 ): Promise<CrewPlan> {
   const parents = await sessionParents()
   const byId = new Map(candidates.map((candidate) => [listedSessionId(candidate), candidate]))
+  const hostByMember = new Map<string, string>()
   const titleOf = async (sessionId: string): Promise<string | undefined> => {
     const named = parents.get(sessionId)?.name
     if (named) return named
@@ -76,12 +77,14 @@ export async function planCrews(
     const link = parents.get(sessionId)
     if (!link) return undefined
     const rootId = crewRootOf(sessionId, parents)
+    const hostId = listedOnItsOwn ? undefined : hostByMember.get(sessionId)
     const [rootTitle, parentTitle] = listedOnItsOwn
       ? await Promise.all([titleOf(rootId), titleOf(link.parentSessionId)])
       : [undefined, undefined]
     return {
       rootId,
       parentId: link.parentSessionId,
+      ...(hostId && { hostId }),
       startedAt: link.createdAt,
       ...(link.name && { name: link.name }),
       ...(rootTitle && { rootTitle }),
@@ -101,6 +104,9 @@ export async function planCrews(
     // A member that will not be listed must not move its crew up the list.
     counts: (sessionId) => listsMember(sessionId) && seen(sessionId),
   })
+  for (const [hostId, members] of membersOf) {
+    for (const member of members) hostByMember.set(listedSessionId(member), hostId)
+  }
   return { units, membersOf, membership }
 }
 

@@ -5,14 +5,12 @@ import {
 import {
   getSessionMeta,
   getSessionStatus,
-  join,
-  readdir,
   searchSessionMessages,
-  stat,
 } from "../../helpers"
 import { descriptorForDirName } from "../../../shared/session/agent-descriptors"
 import { teamLeadFor, type TeamConfigCache } from "../../agents/lineage"
 import { listedSessionId } from "../../agents/listedSession"
+import { sessionAgentsRunning } from "../../agents/agentsRunning"
 import { runtimeFor } from "../../agents/runtimes"
 import type { TopLevelSessionInfo } from "../../agents/types"
 import { getOrLoadSessionMeta } from "../../lib/sessionMetaCache"
@@ -30,45 +28,6 @@ export interface ActiveSessionQuery {
   archivedById: ReadonlyMap<string, ArchiveReason>
   /** Teammate sessions carry a teamName; each team's config is read once per request. */
   teamConfigs: TeamConfigCache
-}
-
-/**
- * Whether a session's background agents are demonstrably still writing their
- * own transcripts. The parent JSONL goes silent while background agents and
- * workflows run, so mtime-recency on the parent alone would triage the
- * session as finished. Checked only for sessions whose derived status is
- * awaiting_agents, and outside the mtime-keyed meta cache — freshness is
- * exactly what the cache cannot answer.
- */
-async function hasFreshAgentTranscripts(sessionFilePath: string, now = Date.now()): Promise<boolean> {
-  const FRESH_MS = 60_000
-  const sessionDir = sessionFilePath.replace(/\.jsonl$/, "")
-  const queue = [{ dir: sessionDir, depth: 0 }]
-  let statBudget = 200
-
-  while (queue.length > 0 && statBudget > 0) {
-    const { dir, depth } = queue.shift()!
-    let entries
-    try {
-      entries = await readdir(dir, { withFileTypes: true })
-    } catch {
-      continue
-    }
-    for (const entry of entries) {
-      if (statBudget-- <= 0) break
-      const fullPath = join(dir, entry.name)
-      if (entry.isDirectory()) {
-        if (depth < 2) queue.push({ dir: fullPath, depth: depth + 1 })
-        continue
-      }
-      if (!entry.name.endsWith(".jsonl")) continue
-      try {
-        const s = await stat(fullPath)
-        if (now - s.mtimeMs < FRESH_MS) return true
-      } catch { /* skip */ }
-    }
-  }
-  return false
 }
 
 /** A listed session's metadata and status, shared with every route that lists it through the meta cache. */
@@ -149,8 +108,10 @@ export async function readActiveSessionRow(c: TopLevelSessionInfo, query: Active
     // The runtime's own turn state, for an agent whose transcript lags it.
     const isRuntimeActive = descriptor.capabilities.turnLiveness === "runtime"
       && runtimeFor(descriptor.kind).activity(sessionId).running
+    // Checked outside the mtime-keyed meta cache: the parent transcript stays
+    // untouched while its agents work, which is exactly what it cannot see.
     const hasRunningAgents = statusInfo.status === "awaiting_agents"
-      && await hasFreshAgentTranscripts(c.filePath)
+      && await sessionAgentsRunning(c.dirName, sessionId)
     const archivedReason = query.archivedById.get(sessionId)
 
     return {

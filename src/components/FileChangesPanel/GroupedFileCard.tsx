@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, memo, useCallback, startTransition } from "react"
-import { useNearViewport } from "@/hooks/useNearViewport"
+import { useRevealNearViewport } from "@/hooks/useRevealNearViewport"
 import { ChevronDown, ChevronRight, Code2, GitCompareArrows } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -22,7 +22,7 @@ interface GroupedFileCardProps {
 }
 
 export const GroupedFileCard = memo(function GroupedFileCard({ file, defaultOpen, isHighlighted, diffMode }: GroupedFileCardProps) {
-  const { ref: nearRef, isNear } = useNearViewport()
+  const { ref: nearRef, revealed } = useRevealNearViewport()
   const [open, setOpen] = useState(defaultOpen)
   // Deferred open: the card header updates immediately, diff content renders
   // as a lower-priority transition so the UI stays responsive.
@@ -58,7 +58,7 @@ export const GroupedFileCard = memo(function GroupedFileCard({ file, defaultOpen
   const hasPerEditDiff = file.edits.some((e) => Boolean(e.oldString || e.newString))
   const hasDiff = diffMode === "per-edit" ? hasPerEditDiff : hasNetDiff
 
-  const showDiff = deferredOpen && isNear && hasDiff
+  const showDiff = deferredOpen && revealed && hasDiff
   const [lastDiffHeight, setLastDiffHeight] = useState(0)
   const measureDiff = useCallback((node: HTMLDivElement | null) => {
     if (!node) return

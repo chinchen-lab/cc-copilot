@@ -44,9 +44,13 @@ class ConversationStateOwner {
   admit(receipt: CommandReceipt): void {
     if (!this.state.commands.some((command) => command.id === receipt.id)) this.apply({ ...this.state, commands: [...this.state.commands, receipt] })
   }
-  private apply(state: ConversationState): void { this.state = state; for (const listener of this.listeners) listener() }
+  private apply(state: ConversationState): void {
+    if (JSON.stringify(this.state) === JSON.stringify(state)) return
+    this.state = state
+    for (const listener of this.listeners) listener()
+  }
   private async fetch(): Promise<void> {
-    if (this.stopped || this.pending || !this.listeners.size) return
+    if (this.stopped || this.pending || !this.listeners.size || document.visibilityState === "hidden") return
     clearTimeout(this.timer)
     const controller = new AbortController(); this.pending = controller
     let denied = false

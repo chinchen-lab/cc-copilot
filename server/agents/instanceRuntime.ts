@@ -12,7 +12,7 @@ import { orchestrationStore } from "../orchestration/storage"
 import type { CodexAsyncQuestion } from "./codexQuestions"
 import type { UsageCostRecord } from "./usageScanners"
 import * as streamBus from "../lib/streamBus"
-import { AgentRuntimeError, reportSessionId, type AgentRuntime, type PendingApproval, type PendingQuestion, type PendingPlan, type SendOutcome, type StartSessionRequest, type TurnResult } from "./runtimeTypes"
+import { AgentRuntimeError, NO_ACTIVITY, reportSessionId, type AgentRuntime, type PendingApproval, type PendingQuestion, type PendingPlan, type RuntimeActivity, type SendOutcome, type StartSessionRequest, type TurnResult } from "./runtimeTypes"
 
 interface Call { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>; identity?: (id: string) => void }
 export function providerInstanceEnvironment(instance: ProviderInstance, dataRoot: string): NodeJS.ProcessEnv {
@@ -37,7 +37,7 @@ export function createInstanceRuntime(instance: ProviderInstance, dataRoot: stri
   const completions = new Map<number, { resolve: (value: TurnResult) => void; reject: (error: Error) => void }>()
   const earlyCompletions = new Map<number, { value?: TurnResult; error?: string }>()
   let active: Array<{ sessionId: string; turnId?: string }> = []
-  let activity: Record<string, { live: boolean; running: boolean }> = {}
+  let activity: Record<string, RuntimeActivity> = {}
   let approvals: PendingApproval[] = []
   let questions: PendingQuestion[] = []
   let plans: PendingPlan[] = []
@@ -126,7 +126,7 @@ export function createInstanceRuntime(instance: ProviderInstance, dataRoot: stri
     },
     interrupt: (id) => rpc("interrupt", [native(id)]), stop: (id) => rpc("stop", [native(id)]), stopAll: () => rpc("stopAll", []),
     deleteSession: (id, path) => rpc("deleteSession", [native(id), path]),
-    activity: (id) => splitInstanceSessionId(id).instanceId === instance.id ? activity[native(id)] ?? { live: false, running: false } : { live: false, running: false },
+    activity: (id) => splitInstanceSessionId(id).instanceId === instance.id ? activity[native(id)] ?? NO_ACTIVITY : NO_ACTIVITY,
     hasSession: (id) => { const parts = splitInstanceSessionId(id); return parts.instanceId === instance.id && Boolean(activity[parts.nativeId]?.live || activity[parts.nativeId]?.running || [...approvals, ...questions, ...plans].some((request) => request.sessionId === parts.nativeId)) },
     listActive: () => active.map((s) => ({ ...s, sessionId: qualified(s.sessionId) })),
     listPendingApprovals: (id) => id && splitInstanceSessionId(id).instanceId !== instance.id ? [] : approvals.filter((q) => !id || q.sessionId === native(id)).map((q) => ({ ...q, sessionId: qualified(q.sessionId) })),

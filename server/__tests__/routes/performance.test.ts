@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 
 vi.mock("../../lib/systemProcesses", () => ({
   captureSystemProcesses: vi.fn(),
+  stopSystemProcesses: vi.fn(),
 }))
 
 vi.mock("../../lib/leakReaper", () => ({
@@ -12,14 +13,14 @@ vi.mock("../../lib/leakReaper", () => ({
 }))
 
 import type { SystemProcessesSnapshot } from "../../../shared/contracts/performance"
-import { captureSystemProcesses } from "../../lib/systemProcesses"
+import { captureSystemProcesses, stopSystemProcesses } from "../../lib/systemProcesses"
 import { registerPerformanceRoutes } from "../../routes/performance"
 import { __resetEditionForTest } from "../../edition"
 import { useAccountSignIn } from "../edition/fakeEdition"
 import { setRequestPrincipal } from "../../requestPrincipal"
 import type { SessionPrincipal } from "../../sessionConstants"
 import type { Middleware, UseFn } from "../../http"
-import { asIncomingMessage, asServerResponse, getRouteHandler } from "../http-fixtures"
+import { asIncomingMessage, asServerResponse, getRouteHandler, createMockReqRes as createHttpReqRes } from "../http-fixtures"
 
 const ADMIN: SessionPrincipal = { userId: "u-admin", username: "alice", role: "admin" }
 const MEMBER: SessionPrincipal = { userId: "u-member", username: "bob", role: "member" }
@@ -120,5 +121,38 @@ describe("GET /api/performance system snapshot gating", () => {
     for (const key of ["cpuPercent", "eventLoopPercent", "memory", "activities", "requests", "sampleWindowSeconds"]) {
       expect(snapshot).toHaveProperty(key)
     }
+  })
+
+  it("requires host-wide authorization for process discovery and stopping", async () => {
+    useAccountSignIn()
+    const handler = getRouteHandler(handlers, "/api/system-processes")
+    for (const method of ["GET", "POST"]) {
+      const mock = createHttpReqRes(method, method === "POST" ? "/kill" : "/")
+      setRequestPrincipal(mock.req, MEMBER)
+      handler(mock.req, mock.res, mock.next)
+      expect(mock.res._getStatus()).toBe(403)
+    }
+    expect(mockedCapture).not.toHaveBeenCalled()
+    expect(stopSystemProcesses).not.toHaveBeenCalled()
+  })
+
+  it("accepts only bounded process targets with start identities", async () => {
+    const handler = getRouteHandler(handlers, "/api/system-processes")
+    const target = { pid: 53013, identity: "a".repeat(64) }
+    vi.mocked(stopSystemProcesses).mockResolvedValue([53013])
+    const allowed = createHttpReqRes("POST", "/kill", { body: JSON.stringify({ processes: [target] }) })
+    handler(allowed.req, allowed.res, allowed.next)
+    allowed.sendBody()
+    await vi.waitFor(() => expect(allowed.res.end).toHaveBeenCalled())
+    expect(stopSystemProcesses).toHaveBeenCalledWith([target])
+    expect(JSON.parse(allowed.res._getData())).toEqual({ killed: [53013], skipped: [] })
+    vi.mocked(stopSystemProcesses).mockClear()
+    for (const body of [{ pids: [53013] }, { processes: [{ ...target, pid: -1 }] }, { processes: Array(21).fill(target) }]) {
+      const denied = createHttpReqRes("POST", "/kill", { body: JSON.stringify(body) })
+      handler(denied.req, denied.res, denied.next)
+      denied.sendBody()
+      expect(denied.res._getStatus()).toBe(400)
+    }
+    expect(stopSystemProcesses).not.toHaveBeenCalled()
   })
 })

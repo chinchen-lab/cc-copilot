@@ -20,6 +20,9 @@ import type {
   SubagentFileInfo,
 } from "./types"
 
+/** Caps the files one freshness check stats; a session can hold hundreds of agent transcripts. */
+const AGENT_TRANSCRIPT_STAT_BUDGET = 1000
+
 /**
  * Claude Code keeps one directory per project under `~/.claude/projects`, named
  * by a lossy encoding of the cwd, with one `<sessionId>.jsonl` per session.
@@ -159,6 +162,37 @@ export function createClaudeStore(projectsRoot?: string, configuredDescriptor?: 
     return listing
   }
 
+  /** Background agents write to `subagents/`, workflow agents to `subagents/workflows/<run>/`. */
+  async function agentsWroteSince(dirName: string, sessionId: string, sinceMs: number): Promise<boolean> {
+    const root = sessionsRoot()
+    if (!root) return false
+    const subagentsDir = join(root, dirName, sessionId, "subagents")
+    if (!isWithinDir(root, subagentsDir)) return false
+
+    const queue = [{ dir: subagentsDir, depth: 0 }]
+    let statBudget = AGENT_TRANSCRIPT_STAT_BUDGET
+    while (queue.length > 0) {
+      const { dir, depth } = queue.shift()!
+      let entries: Dirent[]
+      try {
+        entries = await readdir(dir, { withFileTypes: true })
+      } catch {
+        continue
+      }
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          if (depth < 2) queue.push({ dir: join(dir, entry.name), depth: depth + 1 })
+          continue
+        }
+        if (!entry.name.endsWith(".jsonl")) continue
+        if (statBudget-- <= 0) return false
+        const fileStat = await stat(join(dir, entry.name)).catch(() => null)
+        if (fileStat && fileStat.mtimeMs >= sinceMs) return true
+      }
+    }
+    return false
+  }
+
   const claudeStore: AgentStore = {
     kind: descriptor.kind,
     descriptor,
@@ -231,6 +265,7 @@ export function createClaudeStore(projectsRoot?: string, configuredDescriptor?: 
     },
 
     listSubagentFiles,
+    agentsWroteSince,
 
     async sessionAddress(filePath) {
       return { dirName: basename(dirname(filePath)), fileName: basename(filePath) }

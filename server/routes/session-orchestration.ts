@@ -3,20 +3,22 @@ import { registerSessionMcpRoutes } from "./session-mcp"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import { isAbsolute } from "node:path"
 import type { PendingInputResponse } from "../agents/pendingInput"
-import type { UserQuestionAnswers } from "../agents/runtimes"
-import { sessionChildren, sessionParents } from "../lib/sessionOrigins"
-import { readSessionCrew } from "../lib/sessionCrew"
+import { runtimeForSession, type UserQuestionAnswers } from "../agents/runtimes"
+import type { TopLevelSessionInfo } from "../agents/types"
+import { sessionChildren, sessionOrigin, sessionParents } from "../lib/sessionOrigins"
+import { readSessionCrew, type CrewSources } from "../lib/sessionCrew"
+import { crewRootOf } from "../lib/crew"
+import { archiveReason, readArchive } from "../lib/sessionArchive"
 import { sessionBoard } from "../lib/sessionBoards"
 import { commandScope } from "../lib/durableSend"
 import { orchestrationStore } from "../orchestration/storage"
 import { allTopLevelSessions } from "../agents"
 import { listedSessionId } from "../agents/listedSession"
-import type { TopLevelSessionInfo } from "../agents/types"
 import { readActiveSessionRow } from "./projects/activeSessionRow"
-import { parseWaitSeconds } from "../lib/sessionWait"
+import { parseWaitSeconds, readSessionState } from "../lib/sessionWait"
 import { sendJson, singlePathParam, withJsonBody, type UseFn } from "../http"
 import { runSessionCli } from "../sessionCli/commands"
-import { hostForSession, locateSessions, SESSION_SCOPE_HEADER, waitAcrossHosts } from "../sessionHosts"
+import { hostForOrigin, hostForSession, localHost, locateSessions, SESSION_SCOPE_HEADER, waitAcrossHosts } from "../sessionHosts"
 import {
   listDelegatedRequests,
   markDelegatedRequestAnswered,
@@ -50,6 +52,87 @@ function abortOnClose(req: IncomingMessage, res: ServerResponse): AbortSignal {
 
 function scopeOf(req: IncomingMessage): { localOnly: boolean } {
   return { localOnly: req.headers[SESSION_SCOPE_HEADER] === "local" }
+}
+
+/**
+ * Where `/api/session-crew` reads a crew from. Its members are the ones the
+ * session list carries with the crew, read from one listing: sessions this
+ * machine lists and has not archived, and those a runtime here holds before
+ * their transcript is written. A member recorded on a hub device is asked
+ * there; one recorded without a device runs here, so no other device is
+ * searched for it.
+ */
+async function crewSources(req: IncomingMessage, sessionId: string): Promise<CrewSources> {
+  const [parents, listing, archive] = await Promise.all([sessionParents(), allTopLevelSessions(), readArchive()])
+  const listedById = new Map(listing.map((session) => [listedSessionId(session), session]))
+  const rootId = crewRootOf(sessionId, parents)
+  const { localOnly } = scopeOf(req)
+  const now = Date.now()
+  const canView = async (id: string) => {
+    const level = await accessLevelOf(req, id)
+    return Boolean(level && accessAtLeast(level, "view"))
+  }
+  const rows = new Map<string, ReturnType<typeof readActiveSessionRow>>()
+  const rowOf = (candidate: TopLevelSessionInfo) => {
+    const id = listedSessionId(candidate)
+    let row = rows.get(id)
+    if (!row) {
+      row = readActiveSessionRow(candidate, {
+        search: "", pullRequestSearch: null, pullRequestIndex: null, archivedById: new Map(), teamConfigs: new Map(),
+      })
+      rows.set(id, row)
+    }
+    return row
+  }
+  return {
+    parents,
+    canView: (id) => (id === sessionId ? Promise.resolve(true) : canView(id)),
+    describe: async (id) => {
+      const device = localOnly ? null : hostForOrigin(await sessionOrigin(id))
+      if (device) {
+        const [state, address] = await Promise.all([device.state(id), device.address(id)])
+        return { host: { remote: true, id: device.id, name: device.name }, state, address }
+      }
+      const candidate = listedById.get(id)
+      const required = id === sessionId || id === rootId
+      if (!required && (candidate ? archiveReason(archive, id, candidate.mtimeMs, now) : !runtimeForSession(id))) return null
+      if (!candidate) {
+        const [state, address] = await Promise.all([readSessionState(id), localHost.address(id)])
+        return { host: { remote: false, id: localHost.id, name: localHost.name }, state, address }
+      }
+      // Recent activity as the session list reads it, so both call a member working alike.
+      const row = await rowOf(candidate)
+      const lastActivityMs = Date.parse(row?.lastActivityAt ?? "") || candidate.mtimeMs
+      const state = await readSessionState(id, { filePath: candidate.filePath, lastActivityMs })
+      return {
+        host: { remote: false, id: localHost.id, name: localHost.name },
+        state,
+        address: { dirName: candidate.dirName, fileName: candidate.fileName },
+      }
+    },
+    listed: async (id) => {
+      const candidate = listedById.get(id)
+      const row = candidate && await rowOf(candidate)
+      if (!row) return null
+      return {
+        customTitle: row.customTitle,
+        aiTitle: row.aiTitle,
+        firstUserMessage: row.firstUserMessage,
+        cwd: row.cwd,
+        model: row.model,
+        turnCount: row.turnCount,
+        lastActivityAt: row.lastActivityAt,
+        pullRequests: row.pullRequests,
+      }
+    },
+    tasks: () => {
+      try {
+        return orchestrationStore().tasks(commandScope(req))
+      } catch {
+        return []
+      }
+    },
+  }
 }
 
 export function registerSessionOrchestrationRoutes(use: UseFn) {
@@ -180,48 +263,7 @@ export function registerSessionOrchestrationRoutes(use: UseFn) {
     if (!sessionId) return next()
     try {
       if (await authorizeSession(req, res, { sessionId }, "view") === null) return
-      const canView = async (id: string) => {
-        const level = await accessLevelOf(req, id)
-        return Boolean(level && accessAtLeast(level, "view"))
-      }
-      let listing: Promise<Map<string, TopLevelSessionInfo>> | null = null
-      const listedById = () => (listing ??= allTopLevelSessions().then(
-        (sessions) => new Map(sessions.map((session) => [listedSessionId(session), session])),
-      ))
-      const crew = await readSessionCrew(sessionId, {
-        parents: await sessionParents(),
-        canView: (id) => (id === sessionId ? Promise.resolve(true) : canView(id)),
-        describe: async (id) => {
-          const host = await hostForSession(id, scopeOf(req))
-          const [state, address] = await Promise.all([host.state(id), host.address(id)])
-          return { host: { remote: host.remote, id: host.id, name: host.name }, state, address }
-        },
-        listed: async (id) => {
-          const candidate = (await listedById()).get(id)
-          if (!candidate) return null
-          const row = await readActiveSessionRow(candidate, {
-            search: "", pullRequestSearch: null, pullRequestIndex: null, archivedById: new Map(), teamConfigs: new Map(),
-          })
-          if (!row) return null
-          return {
-            customTitle: row.customTitle,
-            aiTitle: row.aiTitle,
-            firstUserMessage: row.firstUserMessage,
-            cwd: row.cwd,
-            model: row.model,
-            turnCount: row.turnCount,
-            lastActivityAt: row.lastActivityAt,
-            pullRequests: row.pullRequests,
-          }
-        },
-        tasks: () => {
-          try {
-            return orchestrationStore().tasks(commandScope(req))
-          } catch {
-            return []
-          }
-        },
-      })
+      const crew = await readSessionCrew(sessionId, await crewSources(req, sessionId))
       if (!crew) return sendJson(res, 404, { error: "Session not found" })
       sendJson(res, 200, crew)
     } catch (error) {

@@ -445,6 +445,14 @@ export class CodexAppServer {
     return this.activeTurnIds.get(threadId)
   }
 
+  /** Whether a thread spawned from this one, at any depth, has a turn in flight. */
+  hasActiveDescendantTurn(threadId: string): boolean {
+    for (const activeThreadId of this.activeTurnIds.keys()) {
+      if (activeThreadId !== threadId && this.isThreadOrDescendant(activeThreadId, threadId)) return true
+    }
+    return false
+  }
+
   /** Snapshot every active native turn, including turns owned by subagents. */
   listActiveTurns(): Array<{ threadId: string; turnId: string }> {
     return [...this.activeTurnIds.entries()].map(([threadId, turnId]) => ({

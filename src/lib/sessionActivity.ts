@@ -2,18 +2,9 @@
 
 import { isSessionLive } from "@/components/LiveSessions/sessionListView"
 import type { ActiveSessionInfo, RunningProcess } from "@/components/LiveSessions/types"
+import { RECENT_ACTIVITY_MS } from "../../shared/sessionActivity"
 
-/** Statuses that mean the agent is mid-flight. */
-export const WORKING_STATUSES: ReadonlySet<string> = new Set([
-  "thinking",
-  "tool_use",
-  "processing",
-  "compacting",
-  "awaiting_agents",
-])
-
-/** How recently the session file must have changed to corroborate a status. */
-export const RECENT_ACTIVITY_MS = 120_000
+export { RECENT_ACTIVITY_MS, WORKING_STATUSES } from "../../shared/sessionActivity"
 
 export function isRecentlyActive(session: ActiveSessionInfo, now: number = Date.now()): boolean {
   const stamp = Date.parse(session.lastActivityAt || session.lastModified)

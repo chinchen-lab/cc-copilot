@@ -104,6 +104,12 @@ export interface SDKSessionState {
   /** Tools the user approved "always for this session" — canUseTool auto-allows these */
   sessionAllowedTools: Set<string>
   running: boolean
+  /**
+   * Background agents and workflows the CLI process reports live, by task id.
+   * The CLI sends the whole set on every change and nothing at startup, so it
+   * is replaced, never patched, and starts empty with each process.
+   */
+  backgroundAgents: ReadonlySet<string>
   abort: AbortController | null
   /** The live SDK Query handle. It stays alive across turn results while its input queue is open. */
   activeQuery: Query | null
@@ -137,6 +143,15 @@ export interface SDKSessionState {
 }
 
 export const sdkSessions = new Map<string, SDKSessionState>()
+
+const NO_BACKGROUND_AGENTS: ReadonlySet<string> = new Set()
+
+/**
+ * Task types that are agents working for the session. Shells, monitors and MCP
+ * calls also outlive a turn, but a dev server left running is not the session
+ * still working; an unknown type is left out so it can never pin a session busy.
+ */
+const BACKGROUND_AGENT_TASK_TYPES = new Set(["local_agent", "local_workflow", "remote_agent"])
 /**
  * The sends written to a query, by uuid. `taken` holds the ones the CLI reports
  * it took up (`command_lifecycle`); it stays null on a CLI that reports none.
@@ -493,6 +508,9 @@ function processSDKEvent(state: SDKSessionState, msg: SDKMessage): void {
       if (lifecycle.command_uuid && lifecycle.state !== "queued") turns.taken.add(lifecycle.command_uuid)
     }
   }
+  // The CLI starts some turns itself, after a background task finishes or with the notice it
+  // injects on resume about agents a stopped process lost. Their output is the only sign.
+  if (!state.running && (msg.type === "assistant" || msg.type === "stream_event") && msg.parent_tool_use_id === null) state.running = true
   if (msg.type === "system" && msg.subtype === "init") {
     state.cwd = msg.cwd
     const onInit = state.onInit
@@ -542,6 +560,14 @@ function processSDKEvent(state: SDKSessionState, msg: SDKMessage): void {
     // that the allowance came back.
     const info = (msg as unknown as { rate_limit_info?: unknown }).rate_limit_info
     streamBus.publishRateLimit(state.sessionId, readSdkRateLimit(info))
+  }
+
+  if (msg.type === "system" && msg.subtype === "background_tasks_changed") {
+    state.backgroundAgents = new Set(
+      msg.tasks
+        .filter((task) => !task.ambient && BACKGROUND_AGENT_TASK_TYPES.has(task.task_type))
+        .map((task) => task.task_id),
+    )
   }
 
   if (msg.type === "system" && msg.subtype === "task_progress") {
@@ -687,6 +713,7 @@ function runQuery(state: SDKSessionState, prompt: string, opts: {
 }): void {
   state.abort = new AbortController()
   state.running = true
+  state.backgroundAgents = NO_BACKGROUND_AGENTS
   state.stderr = ""
 
   const queryOpts = buildQueryOptions(state, opts)
@@ -735,6 +762,7 @@ function runQuery(state: SDKSessionState, prompt: string, opts: {
         state.subagentWatcher?.close()
         state.subagentWatcher = null
         state.running = false
+        state.backgroundAgents = NO_BACKGROUND_AGENTS
         streamBus.clear(state.sessionId)
       }
       if (state.messageStream === messageStream) state.messageStream = null
@@ -844,6 +872,7 @@ function initSDKSessionState(opts: SDKSessionInitOpts): SDKSessionState {
     pendingUserDialogs: new Map(),
     sessionAllowedTools: new Set(),
     running: false,
+    backgroundAgents: NO_BACKGROUND_AGENTS,
     abort: null,
     activeQuery: null,
     messageStream: null,
@@ -1472,6 +1501,7 @@ function teardownState(state: SDKSessionState): void {
   }
   state.abort?.abort()
   state.running = false
+  state.backgroundAgents = NO_BACKGROUND_AGENTS
 }
 
 export function stopSDKSession(sessionId: string): boolean {

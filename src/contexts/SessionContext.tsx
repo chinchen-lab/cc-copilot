@@ -30,7 +30,6 @@ export interface ChatState {
 
 export interface ScrollState {
   chatScrollRef: RefObject<HTMLDivElement | null>
-  scrollEndRef: RefObject<HTMLDivElement | null>
   observeChatContent?: RefCallback<HTMLDivElement>
   canScrollDown: boolean
   initialScrollDone: boolean

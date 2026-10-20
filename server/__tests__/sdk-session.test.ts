@@ -574,6 +574,24 @@ describe("sdk-session turn completion", () => {
     expect(state.running).toBe(running)
     releaseQueryAfterMessages!()
   })
+
+  it.each([
+    ["running again when the CLI starts a turn of its own", null, true],
+    ["idle while only a background agent writes", "toolu_agent", false],
+  ])("reads the session %s after a result", async (_, parentToolUseId, running) => {
+    const { createSDKSession } = await loadModule()
+    scriptedMessages = [
+      { type: "result", is_error: false, queued_turn_count: 0 },
+      { type: "assistant", parent_tool_use_id: parentToolUseId, message: { content: [] } },
+    ]
+    holdQueryAfterMessages = true
+
+    const state = createSDKSession({ sessionId: "self-started-turn", cwd: "/tmp", message: "hi" })
+    await waitUntil(() => releaseQueryAfterMessages !== null)
+
+    expect(state.running).toBe(running)
+    releaseQueryAfterMessages!()
+  })
 })
 
 describe("sdk-session send resilience", () => {
@@ -836,6 +854,68 @@ describe("sdk-session progress summaries and prompt suggestions", () => {
       "suggest",
       "Run the tests",
     ])
+  })
+})
+
+describe("sdk-session background agents", () => {
+  function tasksChanged(tasks: Array<{ task_id: string; task_type: string; ambient?: boolean }>) {
+    return {
+      type: "system",
+      subtype: "background_tasks_changed",
+      tasks: tasks.map((task) => ({ description: task.task_id, ...task })),
+    }
+  }
+
+  it("counts agents and workflows, not shells or ambient watchers", async () => {
+    holdQueryAfterMessages = true
+    scriptedMessages = [
+      tasksChanged([
+        { task_id: "agent-1", task_type: "local_agent" },
+        { task_id: "workflow-1", task_type: "local_workflow" },
+        { task_id: "remote-1", task_type: "remote_agent" },
+        { task_id: "shell-1", task_type: "local_bash" },
+        { task_id: "watcher-1", task_type: "local_agent", ambient: true },
+        { task_id: "future-1", task_type: "some_new_kind" },
+      ]),
+      { type: "result", is_error: false },
+    ]
+    const { createSDKSession } = await loadModule()
+    const state = createSDKSession({ sessionId: "bg-types", cwd: "/tmp", message: "hi" })
+
+    await waitUntil(() => releaseQueryAfterMessages !== null)
+    expect([...state.backgroundAgents].sort()).toEqual(["agent-1", "remote-1", "workflow-1"])
+    releaseQueryAfterMessages!()
+  })
+
+  it("replaces the set with each report rather than adding to it", async () => {
+    holdQueryAfterMessages = true
+    scriptedMessages = [
+      tasksChanged([{ task_id: "agent-1", task_type: "local_agent" }, { task_id: "agent-2", task_type: "local_agent" }]),
+      { type: "result", is_error: false },
+      tasksChanged([{ task_id: "agent-2", task_type: "local_agent" }]),
+    ]
+    const { createSDKSession } = await loadModule()
+    const state = createSDKSession({ sessionId: "bg-replace", cwd: "/tmp", message: "hi" })
+
+    await waitUntil(() => releaseQueryAfterMessages !== null)
+    expect([...state.backgroundAgents]).toEqual(["agent-2"])
+    releaseQueryAfterMessages!()
+  })
+
+  it("forgets the agents once the CLI process hosting them ends", async () => {
+    holdQueryAfterMessages = true
+    scriptedMessages = [
+      tasksChanged([{ task_id: "agent-1", task_type: "local_agent" }]),
+      { type: "result", is_error: false },
+    ]
+    const { createSDKSession } = await loadModule()
+    const state = createSDKSession({ sessionId: "bg-exit", cwd: "/tmp", message: "hi" })
+    await waitUntil(() => releaseQueryAfterMessages !== null)
+    expect(state.backgroundAgents.size).toBe(1)
+
+    releaseQueryAfterMessages!()
+    await captured[0].completed
+    await waitUntil(() => state.backgroundAgents.size === 0)
   })
 })
 

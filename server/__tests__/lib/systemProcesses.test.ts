@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import {
   classifyProcesses,
   parseEtimeSeconds,
   parsePsOutput,
+  collectOrphanedAgentSubtrees,
+  outputDescriptorPaths,
+  processIdentity,
+  SystemProcessMonitor,
 } from "../../lib/systemProcesses"
 
 // Modeled on a real leak incident: an orphaned claude session (ppid 1) kept a
@@ -36,6 +40,133 @@ describe("parseEtimeSeconds", () => {
   it("returns 0 for malformed input", () => {
     expect(parseEtimeSeconds("")).toBe(0)
     expect(parseEtimeSeconds("garbage")).toBe(0)
+  })
+})
+
+const PYTHON_COMMAND = "/opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python -"
+function runtimeRow(pid = 53013, cpu = 98, started = "Sat Oct 3 18:48:32 2026", uid = 501, command = PYTHON_COMMAND) {
+  return `${pid} 1 ${uid} ${cpu} 40000 15-01:00:00 ${started} ${command}`
+}
+
+function runtimeMonitor() {
+  let now = 0
+  const deps = {
+    list: vi.fn(async () => runtimeRow()),
+    inspect: vi.fn(async () => ["/tmp/task.output"]),
+    owner: vi.fn(async () => undefined),
+    read: vi.fn(async (pid: number) => parsePsOutput(runtimeRow(pid))[0]),
+    signal: vi.fn(),
+    now: () => now,
+    uid: 501,
+    selfPid: 9999,
+  }
+  return { monitor: new SystemProcessMonitor(deps), deps, advance: (ms: number) => { now += ms } }
+}
+
+describe("sustained runtime monitoring", () => {
+  it("parses a native Python stdin process with stable start and user identity", () => {
+    const row = parsePsOutput(runtimeRow())[0]
+    expect(row).toMatchObject({ pid: 53013, uid: 501, startedAt: "Sat Oct 3 18:48:32 2026", command: PYTHON_COMMAND })
+    expect(processIdentity(row)).toHaveLength(64)
+    expect(processIdentity({ ...row, startedAt: "Mon Oct 19 10:00:00 2026" })).not.toBe(processIdentity(row))
+    expect(processIdentity({ ...row, uid: 502 })).not.toBe(processIdentity(row))
+  })
+
+  it("surfaces sustained unknown runtimes for manual stopping, never automatic reaping", async () => {
+    const { monitor, deps, advance } = runtimeMonitor()
+    expect((await monitor.capture()).processes[0]).toMatchObject({ kind: "script", suspectedLeak: false, canStop: false })
+    expect(deps.inspect).not.toHaveBeenCalled()
+    advance(30_000)
+    const snapshot = await monitor.capture()
+    expect(snapshot.processes[0]).toMatchObject({ pid: 53013, label: "Python", suspectedLeak: true, warning: "sustained-cpu", canStop: true })
+    expect(collectOrphanedAgentSubtrees(parsePsOutput(runtimeRow()))).toEqual([])
+    expect(deps.signal).not.toHaveBeenCalled()
+    expect(deps.inspect).toHaveBeenCalledOnce()
+    advance(60_000)
+    await monitor.capture()
+    expect(deps.inspect).toHaveBeenCalledOnce()
+    const target = snapshot.processes[0]
+    expect(await monitor.stop([{ pid: target.pid, identity: target.identity! }])).toEqual([53013])
+    expect(deps.signal).toHaveBeenCalledExactlyOnceWith(53013)
+  })
+
+  it("resets sustained observations and owner evidence when a PID is reused", async () => {
+    const { monitor, deps, advance } = runtimeMonitor()
+    await monitor.capture()
+    advance(30_000)
+    const original = (await monitor.capture()).processes[0]
+    deps.read.mockResolvedValue(parsePsOutput(runtimeRow(53013, 98, "Mon Oct 19 10:00:00 2026"))[0])
+    expect(await monitor.stop([{ pid: 53013, identity: original.identity! }])).toEqual([])
+    expect(deps.signal).not.toHaveBeenCalled()
+    deps.list.mockResolvedValue(runtimeRow(53013, 98, "Mon Oct 19 10:00:00 2026"))
+    advance(5_000)
+    expect((await monitor.capture()).processes[0]).toMatchObject({ suspectedLeak: false, canStop: false, owner: undefined })
+  })
+
+  it("requires server eligibility, the caller's identity, and the current OS user", async () => {
+    const { monitor, deps, advance } = runtimeMonitor()
+    await monitor.capture()
+    advance(30_000)
+    const metric = (await monitor.capture()).processes[0]
+    expect(await monitor.stop([{ pid: metric.pid, identity: "0".repeat(64) }, { pid: 1, identity: metric.identity! }])).toEqual([])
+    deps.read.mockResolvedValue({ ...parsePsOutput(runtimeRow())[0], uid: 502 })
+    expect(await monitor.stop([{ pid: metric.pid, identity: metric.identity! }])).toEqual([])
+    expect(deps.signal).not.toHaveBeenCalled()
+  })
+
+  it("bounds discovery and probes only suspicious runtimes, sharing cached scans", async () => {
+    const { monitor, deps, advance } = runtimeMonitor()
+    deps.list.mockResolvedValue([
+      ...Array.from({ length: 30 }, (_, i) => runtimeRow(1000 + i)),
+      runtimeRow(2000, 0), runtimeRow(2001, 99, undefined, 502), runtimeRow(2002, 99, undefined, 501, "/Applications/Spotify.app/Contents/MacOS/Spotify"),
+    ].join("\n"))
+    deps.read.mockImplementation(async (pid) => parsePsOutput(runtimeRow(pid))[0])
+    const [first, same] = await Promise.all([monitor.capture(), monitor.capture()])
+    expect(first).toBe(same)
+    expect(first.processes).toHaveLength(8)
+    expect(deps.list).toHaveBeenCalledOnce()
+    advance(30_000)
+    await monitor.capture()
+    expect(deps.inspect).toHaveBeenCalledTimes(2)
+    advance(5_000)
+    await monitor.capture()
+    expect(deps.inspect).toHaveBeenCalledTimes(4)
+  })
+
+  it("does not carry hot observations across cooling, disappearance, or a hidden gap", async () => {
+    const { monitor, deps, advance } = runtimeMonitor()
+    await monitor.capture()
+    advance(180_000)
+    expect((await monitor.capture()).suspectedLeakCount).toBe(0)
+    deps.list.mockResolvedValue(runtimeRow(53013, 1))
+    advance(5_000)
+    expect((await monitor.capture()).processes).toEqual([])
+    deps.list.mockResolvedValue(runtimeRow())
+    advance(30_000)
+    expect((await monitor.capture()).suspectedLeakCount).toBe(0)
+  })
+
+  it("monitors scratch runtimes too and requires a fresh sustained period after they cool", async () => {
+    const { monitor, deps, advance } = runtimeMonitor()
+    const row = (cpu: number) => runtimeRow(53013, cpu, undefined, 501, "node -e expensiveWork()")
+    deps.list.mockResolvedValue(row(0))
+    deps.read.mockImplementation(async () => parsePsOutput(row(98))[0])
+    await monitor.capture()
+    advance(60_000)
+    deps.list.mockResolvedValue(row(98))
+    expect((await monitor.capture()).processes[0].warning).toBeUndefined()
+    advance(30_000)
+    expect((await monitor.capture()).processes[0].warning).toBe("sustained-cpu")
+    advance(5_000)
+    deps.list.mockResolvedValue(row(0))
+    expect((await monitor.capture()).processes[0].warning).toBeUndefined()
+    advance(60_000)
+    deps.list.mockResolvedValue(row(98))
+    expect((await monitor.capture()).processes[0].warning).toBeUndefined()
+  })
+
+  it("reads only stdout/stderr descriptor paths, including deleted output files", () => {
+    expect(outputDescriptorPaths("p53013\nfcwd\nn/project\nf1w\nn/private/tmp/task.output (deleted)\nf2w\nn/private/tmp/task.output (deleted)\nf3\nn/unrelated\n")).toEqual(["/private/tmp/task.output (deleted)"])
   })
 })
 

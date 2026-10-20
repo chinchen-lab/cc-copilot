@@ -69,6 +69,7 @@ vi.mock("../../sdk-session", () => ({
 vi.mock("../../agents/codexAppServer", () => ({
   codexAppServer: {
     getActiveTurnId: mockGetActiveTurnId,
+    hasActiveDescendantTurn: vi.fn(() => false),
     listApprovalThreadIds: vi.fn(() => []),
     listActiveTurns: vi.fn(() => []),
   },
@@ -78,6 +79,7 @@ vi.mock("../../agents/copilotTransport", () => ({
   copilotRuntime: {
     isSessionActive: mockIsCopilotSessionActive,
     isTurnActive: mockIsCopilotTurnActive,
+    hasRunningSubagents: vi.fn(() => false),
     getPendingPermissions: vi.fn(() => []),
     getPendingUserInputs: vi.fn(() => []),
     getPendingExitPlans: vi.fn(() => []),
@@ -176,6 +178,7 @@ describe("GET /api/session-status/:sessionId", () => {
       outcome: "completed",
       live: false,
       running: false,
+      agentsRunning: false,
       activeNotifications: true,
       status: "completed",
       waiting: [],
@@ -193,6 +196,7 @@ describe("GET /api/session-status/:sessionId", () => {
       outcome: "error",
       live: false,
       running: false,
+      agentsRunning: false,
       activeNotifications: true,
       status: "completed",
       terminalReason: "max_turns",
@@ -204,7 +208,7 @@ describe("GET /api/session-status/:sessionId", () => {
   it("reports live=true running=false between turns of an open SDK session", async () => {
     // The stale-tail race: the query is held open for follow-ups but no turn
     // is in flight. running must NOT be inferred from query liveness.
-    mockSdkSessions.set("abc", { running: false })
+    mockSdkSessions.set("abc", { running: false, backgroundAgents: new Set() })
     mockIsSDKQueryLive.mockReturnValue(true)
 
     const { json } = await request("GET", "/abc")
@@ -213,7 +217,7 @@ describe("GET /api/session-status/:sessionId", () => {
   })
 
   it("reports running=true while an SDK turn is in flight", async () => {
-    mockSdkSessions.set("abc", { running: true })
+    mockSdkSessions.set("abc", { running: true, backgroundAgents: new Set() })
     mockIsSDKQueryLive.mockReturnValue(true)
     mockGetSessionStatus.mockResolvedValue({ status: "tool_use", toolName: "Bash" })
 
@@ -281,7 +285,7 @@ describe("GET /api/session-status/:sessionId", () => {
   })
 
   it("reports a pending approval as needs_input even though the turn is running", async () => {
-    mockSdkSessions.set("abc", { running: true })
+    mockSdkSessions.set("abc", { running: true, backgroundAgents: new Set() })
     mockIsSDKQueryLive.mockReturnValue(true)
     const waiting = [{
       kind: "permission",
@@ -295,8 +299,10 @@ describe("GET /api/session-status/:sessionId", () => {
   })
 
   it("keeps a session awaiting background agents running between turns", async () => {
+    mockSdkSessions.set("abc", { running: false, backgroundAgents: new Set() })
+    mockIsSDKQueryLive.mockReturnValue(true)
     mockGetSessionStatus.mockResolvedValue({ status: "awaiting_agents", pendingAgents: 1 })
-    expect((await request("GET", "/abc")).json()).toMatchObject({ outcome: "running", running: false })
+    expect((await request("GET", "/abc")).json()).toMatchObject({ outcome: "running", live: true, running: false })
   })
 
   it("returns 500 when the status scan fails", async () => {

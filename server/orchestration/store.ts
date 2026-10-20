@@ -57,11 +57,13 @@ export class OrchestrationStore {
           CREATE TABLE IF NOT EXISTS bindings(native_key TEXT PRIMARY KEY, conversation_id TEXT NOT NULL REFERENCES conversations(id), data TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS commands(scope TEXT NOT NULL, id TEXT NOT NULL, conversation_id TEXT NOT NULL REFERENCES conversations(id), fingerprint TEXT NOT NULL, payload TEXT NOT NULL, receipt TEXT NOT NULL, state TEXT NOT NULL, position INTEGER NOT NULL, attempt INTEGER NOT NULL DEFAULT 0, epoch INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL, PRIMARY KEY(scope,id));
           CREATE INDEX IF NOT EXISTS command_queue ON commands(conversation_id,position,state);
+          CREATE INDEX IF NOT EXISTS command_pending ON commands(state,position,scope,id);
           CREATE TABLE IF NOT EXISTS questions(instance_id TEXT NOT NULL, session_id TEXT NOT NULL, request_id TEXT NOT NULL, data TEXT NOT NULL, answer_command_id TEXT, PRIMARY KEY(instance_id,session_id,request_id));
           CREATE TABLE IF NOT EXISTS events(sequence INTEGER PRIMARY KEY AUTOINCREMENT, conversation_id TEXT NOT NULL, type TEXT NOT NULL, created_at INTEGER NOT NULL, data TEXT NOT NULL);
           CREATE INDEX IF NOT EXISTS event_conversation ON events(conversation_id,sequence);
           CREATE TABLE IF NOT EXISTS dispatcher(id INTEGER PRIMARY KEY CHECK(id=1), owner TEXT NOT NULL, epoch INTEGER NOT NULL, expires_at INTEGER NOT NULL);
           CREATE TABLE IF NOT EXISTS tasks(id TEXT PRIMARY KEY, scope TEXT NOT NULL, source_id TEXT NOT NULL, data TEXT NOT NULL, UNIQUE(scope,source_id));
+          CREATE INDEX IF NOT EXISTS task_parent ON tasks(scope,json_extract(data,'$.parentSessionId'));
           CREATE TABLE IF NOT EXISTS instances(id TEXT PRIMARY KEY, data TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS transitions(conversation_id TEXT PRIMARY KEY, operation_id TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS operations(scope TEXT NOT NULL,id TEXT NOT NULL,fingerprint TEXT NOT NULL,input TEXT NOT NULL,result TEXT,PRIMARY KEY(scope,id));
@@ -279,7 +281,11 @@ export class OrchestrationStore {
   }
   commands(conversationId: string, scope: string): CommandReceipt[] { return (this.db.prepare("SELECT * FROM commands WHERE conversation_id=? AND scope=? ORDER BY position").all(conversationId, scope) as Row[]).map(receipt) }
   pending(scope?: string): StoredCommand[] {
-    const rows = (scope === undefined ? this.db.prepare("SELECT scope,id FROM commands WHERE state IN ('queued','held','dispatching','delivered','unknown')").all() : this.db.prepare("SELECT scope,id FROM commands WHERE scope=? AND state IN ('queued','held','dispatching','delivered','unknown')").all(scope)) as Row[]
+    const rows = (scope === undefined ? this.db.prepare("SELECT scope,id FROM commands WHERE state IN ('queued','held','dispatching','delivered','unknown') ORDER BY position").all() : this.db.prepare("SELECT scope,id FROM commands WHERE scope=? AND state IN ('queued','held','dispatching','delivered','unknown') ORDER BY position").all(scope)) as Row[]
+    return rows.map((r) => this.command(String(r.scope), String(r.id))!)
+  }
+  queued(): StoredCommand[] {
+    const rows = this.db.prepare("SELECT scope,id FROM commands WHERE state='queued' ORDER BY position").all() as Row[]
     return rows.map((r) => this.command(String(r.scope), String(r.id))!)
   }
 
@@ -363,6 +369,29 @@ export class OrchestrationStore {
       this.linkAnswer(scope, payload, newId)
       this.db.prepare("UPDATE commands SET position=? WHERE scope=? AND id=?").run(command.receipt.position, scope, newId)
       return { ...updated, position: command.receipt.position }
+    })
+  }
+  /** Cancels every message still waiting for a conversation, from any account, so a stop is final. */
+  cancelWaiting(conversationId: string): number {
+    return this.transaction(() => {
+      const waiting = (this.db.prepare("SELECT scope,id FROM commands WHERE conversation_id=? AND state IN ('queued','held')").all(conversationId) as Row[])
+        .map((row) => this.command(String(row.scope), String(row.id))!)
+      for (const command of waiting) this.update(command, "cancelled", { error: "The session was stopped" })
+      return waiting.length
+    })
+  }
+  /** Stops results from a stopped session's children from waking it, from any account. */
+  muteTasksOf(parentSessionId: string): number {
+    return this.transaction(() => {
+      const rows = this.db.prepare("SELECT scope,id,data FROM tasks WHERE json_extract(data,'$.parentSessionId')=?").all(parentSessionId) as Row[]
+      let muted = 0
+      for (const row of rows) {
+        const task = decode<DelegatedTask>(row.data)
+        if (task.acknowledgedAt || task.state === "cancelled") continue
+        this.db.prepare("UPDATE tasks SET data=? WHERE scope=? AND id=?").run(JSON.stringify({ ...task, acknowledgedAt: this.now(), updatedAt: this.now() }), String(row.scope), String(row.id))
+        muted++
+      }
+      return muted
     })
   }
   resume(scope: string, conversationId: string): void {
@@ -461,11 +490,15 @@ export class OrchestrationStore {
     })
   }
   tasks(scope: string, parentSessionId?: string): DelegatedTask[] {
-    return (this.db.prepare("SELECT data FROM tasks WHERE scope=?").all(scope) as Row[]).map((r) => decode<DelegatedTask>(r.data)).filter((t) => parentSessionId === undefined || t.parentSessionId === parentSessionId)
+    const rows = (parentSessionId === undefined
+      ? this.db.prepare("SELECT data FROM tasks WHERE scope=?").all(scope)
+      : this.db.prepare("SELECT data FROM tasks WHERE scope=? AND json_extract(data,'$.parentSessionId')=?").all(scope, parentSessionId)) as Row[]
+    return rows.map((row) => decode<DelegatedTask>(row.data))
   }
-  updateTask(scope: string, id: string, patch: Partial<Pick<DelegatedTask, "state" | "result" | "wakeupCommandId" | "acknowledgedAt" | "deliveryDisposition" | "blockingDeadline">>, expectedState?: DelegatedTask["state"]): DelegatedTask {
+  updateTask(scope: string, id: string, patch: Partial<Pick<DelegatedTask, "state" | "result" | "wakeupCommandId" | "acknowledgedAt" | "deliveryDisposition" | "blockingDeadline" | "notified">>, expectedState?: DelegatedTask["state"]): DelegatedTask {
     return this.transaction(() => {
-      const old = this.tasks(scope).find((t) => t.id === id)
+      const row = this.db.prepare("SELECT data FROM tasks WHERE scope=? AND id=?").get(scope, id) as Row | undefined
+      const old = row ? decode<DelegatedTask>(row.data) : undefined
       if (!old) throw new OrchestrationError(404, "Delegated task not found")
       if (expectedState && old.state !== expectedState) return old
       if (patch.result && JSON.stringify(patch.result).length > 1024 * 1024) patch = { ...patch, result: { truncated: true, childSessionId: old.childSessionId, excerpt: JSON.stringify(patch.result).slice(0, 24000) } }

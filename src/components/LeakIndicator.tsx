@@ -11,15 +11,8 @@ import { cn } from "@/lib/utils"
 /** How long a cleared indicator stays on screen before it hides itself. */
 const CLEARED_VISIBLE_MS = 60_000
 
-/**
- * Top-bar leak monitor for agent processes (orphaned claude sessions, hot
- * headless browsers). Red when leaks are flagged, and clicking it then kills
- * all of them. A clean system shows nothing — the monitor keeps polling and
- * the power monitor still lists every process — but the indicator stays pinned
- * at zero for a minute after the last leak clears so a kill confirms itself.
- */
-export function LeakIndicator() {
-  const { leaks, killing, killLeaks, refresh } = useLeakMonitor()
+export function LeakIndicator({ onReview }: { onReview: () => void }) {
+  const { leaks } = useLeakMonitor()
   const [pinned, setPinned] = useState(false)
 
   const hasLeaks = leaks.length > 0
@@ -43,21 +36,20 @@ export function LeakIndicator() {
           variant={hasLeaks ? "destructive" : "ghost"}
           size="xs"
           aria-label={hasLeaks
-            ? `Kill ${leaks.length} leaked agent ${leaks.length === 1 ? "process" : "processes"}`
-            : "Leak monitor. No leaked agent processes"}
-          onClick={() => void (hasLeaks ? killLeaks(leaks.map((leak) => leak.pid)) : refresh())}
-          disabled={killing}
+            ? `Review ${leaks.length} flagged ${leaks.length === 1 ? "process" : "processes"}`
+            : "Leak monitor. No flagged processes"}
+          onClick={onReview}
           className={cn("mr-1 font-mono", !hasLeaks && "text-muted-foreground")}
         />
       }>
         <Flame data-icon="inline-start" />
-        <span className="tabular-nums">{killing ? "…" : leaks.length}</span>
+        <span className="tabular-nums">{leaks.length}</span>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="p-3">
         {hasLeaks ? (
           <div className="flex min-w-56 flex-col gap-2">
             <div className="text-xs font-medium">
-              Leaked agent processes · {totalCpu.toFixed(0)}% CPU
+              Flagged processes · {totalCpu.toFixed(0)}% CPU
             </div>
             {leaks.slice(0, 6).map((leak) => (
               <div key={leak.pid} className="flex items-center justify-between gap-3 text-xs">
@@ -70,14 +62,14 @@ export function LeakIndicator() {
             )}
             <Separator />
             <div className="text-xs text-muted-foreground">
-              Click to kill {leaks.length === 1 ? "it" : "all of them"}
+              Review ownership and stop individual processes
             </div>
           </div>
         ) : (
           <div className="flex min-w-48 flex-col gap-1">
             <div className="text-xs font-medium">Leak monitor</div>
             <div className="text-xs text-muted-foreground">
-              No leaked agent processes. Click to scan again.
+              No flagged processes. Click to open the power monitor.
             </div>
           </div>
         )}

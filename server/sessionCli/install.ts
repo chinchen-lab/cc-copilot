@@ -2,7 +2,8 @@ import { installBundledSkills } from "../agents/skills"
 import { join } from "node:path"
 import { writeIfChanged } from "../browser/files"
 import { binDir } from "../browser/paths"
-import { CLI_NAME } from "./commands"
+import { CLI_NAME } from "./hints"
+import { allDescriptors } from "../../shared/session/agent-descriptors"
 
 /**
  * Installs `cogpit-session` beside the agent-browser shim in `~/.cogpit/bin`,
@@ -23,6 +24,7 @@ export function sessionCliPath(platform: NodeJS.Platform = process.platform): st
 
 /** Forwards argv to `POST /api/session-cli` and prints what the server answers. */
 export function renderSessionCliScript(): string {
+  const sessionIdEnvVars = allDescriptors().flatMap(({ cli }) => cli.sessionIdEnvVar ? [cli.sessionIdEnvVar] : [])
   return `// ${HEADER}
 import { randomUUID } from "node:crypto"
 import { readFileSync } from "node:fs"
@@ -62,11 +64,18 @@ function post(url, payload) {
 const args = process.argv.slice(2)
 const argv = args.map((arg) => (arg === "-" ? readFileSync(0, "utf8") : arg))
 const url = \`http://127.0.0.1:\${port()}/api/session-cli\`
+const nativeSessionId = ${JSON.stringify(sessionIdEnvVars)}.map((key) => process.env[key]).find(Boolean)
+const instanceId = process.env.COGPIT_AGENT_INSTANCE_ID
+const callerSessionId = process.env.COGPIT_SESSION_ID || (nativeSessionId && (
+  instanceId && instanceId !== "default"
+    ? \`i-\${instanceId}__\${Buffer.from(nativeSessionId).toString("base64url")}\`
+    : nativeSessionId
+))
 const payload = JSON.stringify({
   argv,
   cwd: process.cwd(),
   invocationId: randomUUID(),
-  callerSessionId: process.env.COGPIT_SESSION_ID || undefined,
+  callerSessionId,
 })
 
 let response

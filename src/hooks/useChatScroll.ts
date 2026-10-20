@@ -7,8 +7,6 @@ interface UseChatScrollOpts {
   pendingMessages: string[]
   consumePending: (count?: number) => void
   sessionChangeKey: number
-  /** Changes identity whenever in-flight streamed content changes; used only to re-run the auto-scroll effect. */
-  partialSignal?: unknown
 }
 
 /**
@@ -23,11 +21,15 @@ function runAcrossFrames(action: () => void): void {
   })
 }
 
-export function useChatScroll({ session, isLive, pendingMessages, consumePending, sessionChangeKey, partialSignal }: UseChatScrollOpts) {
+export function useChatScroll({ session, isLive, pendingMessages, consumePending, sessionChangeKey }: UseChatScrollOpts) {
   const chatScrollRef = useRef<HTMLDivElement>(null)
-  const scrollEndRef = useRef<HTMLDivElement>(null)
   const chatIsAtBottomRef = useRef(true)
   const chatScrollOnNextRef = useRef(false)
+  const scrollIntentRef = useRef(0)
+  const resumeFollowingRef = useRef(false)
+  const pointerScrollingRef = useRef(false)
+  const lastScrollTopRef = useRef(0)
+  const lastScrollHeightRef = useRef(0)
   const prevTurnCountRef = useRef(0)
   const persistedQueuedPrompts = useMemo(() => session?.turns.flatMap((turn) => (
     turn.contentBlocks.flatMap((block) => block.kind === "queued_prompt"
@@ -50,18 +52,39 @@ export function useChatScroll({ session, isLive, pendingMessages, consumePending
   // 0 while content renders) can't spuriously trigger older-history loads.
   const [placedKey, setPlacedKey] = useState<number | null>(null)
 
-  const smoothScrollToEnd = useCallback(() => {
+  const stopFollowing = useCallback(() => {
+    scrollIntentRef.current++
+    resumeFollowingRef.current = false
+    chatIsAtBottomRef.current = false
+    chatScrollOnNextRef.current = false
+  }, [])
+
+  const scheduleScrollToBottom = useCallback(() => {
+    chatIsAtBottomRef.current = true
+    const intent = scrollIntentRef.current
     requestAnimationFrame(() => {
-      scrollEndRef.current?.scrollIntoView({ behavior: "smooth" })
+      if (intent !== scrollIntentRef.current || !chatIsAtBottomRef.current) return
+      const el = chatScrollRef.current
+      if (el) {
+        el.scrollTop = el.scrollHeight
+        lastScrollTopRef.current = el.scrollTop
+        lastScrollHeightRef.current = el.scrollHeight
+      }
     })
   }, [])
 
   const scrollToBottomInstant = useCallback(() => {
+    const intent = ++scrollIntentRef.current
+    chatIsAtBottomRef.current = true
+    chatScrollOnNextRef.current = false
     runAcrossFrames(() => {
+      if (intent !== scrollIntentRef.current) return
       const el = chatScrollRef.current
-      if (el) el.scrollTop = el.scrollHeight
-      chatIsAtBottomRef.current = true
-      chatScrollOnNextRef.current = false
+      if (el) {
+        el.scrollTop = el.scrollHeight
+        lastScrollTopRef.current = el.scrollTop
+        lastScrollHeightRef.current = el.scrollHeight
+      }
     })
   }, [])
 
@@ -91,7 +114,11 @@ export function useChatScroll({ session, isLive, pendingMessages, consumePending
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
         const viewport = chatScrollRef.current
-        if (viewport && chatIsAtBottomRef.current) viewport.scrollTop = viewport.scrollHeight
+        if (viewport && chatIsAtBottomRef.current) {
+          viewport.scrollTop = viewport.scrollHeight
+          lastScrollTopRef.current = viewport.scrollTop
+          lastScrollHeightRef.current = viewport.scrollHeight
+        }
         updateScrollIndicators()
       })
     })
@@ -102,10 +129,61 @@ export function useChatScroll({ session, isLive, pendingMessages, consumePending
   const handleScroll = useCallback(() => {
     const el = chatScrollRef.current
     if (!el) return
-    chatIsAtBottomRef.current =
-      el.scrollHeight - el.scrollTop - el.clientHeight < 150
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight
+    if (distance > 2 && (lastScrollHeightRef.current === 0 || (el.scrollHeight === lastScrollHeightRef.current && el.scrollTop < lastScrollTopRef.current))) stopFollowing()
+    else if (distance <= 2 && (resumeFollowingRef.current || (pointerScrollingRef.current && el.scrollTop > lastScrollTopRef.current))) {
+      chatIsAtBottomRef.current = true
+      resumeFollowingRef.current = false
+    }
+    lastScrollTopRef.current = el.scrollTop
+    lastScrollHeightRef.current = el.scrollHeight
     updateScrollIndicators()
-  }, [updateScrollIndicators])
+  }, [stopFollowing, updateScrollIndicators])
+
+  useEffect(() => {
+    const viewport = chatScrollRef.current
+    if (!chatContent || !viewport) return
+    let touchY = 0
+    const resume = () => {
+      resumeFollowingRef.current = true
+      if (viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= 2) {
+        chatIsAtBottomRef.current = true
+        resumeFollowingRef.current = false
+      }
+    }
+    const wheel = (event: WheelEvent) => {
+      if (event.deltaY < 0) stopFollowing()
+      else if (event.deltaY > 0) resume()
+    }
+    const pointerDown = () => { pointerScrollingRef.current = true }
+    const pointerUp = () => { pointerScrollingRef.current = false }
+    const touchStart = (event: TouchEvent) => { touchY = event.touches[0]?.clientY ?? 0 }
+    const touchMove = (event: TouchEvent) => {
+      const next = event.touches[0]?.clientY ?? touchY
+      if (next > touchY) stopFollowing()
+      else if (next < touchY) resume()
+      touchY = next
+    }
+    const keyDown = (event: KeyboardEvent) => {
+      if (event.target instanceof Element && event.target.closest("input, textarea, select, [contenteditable=true]")) return
+      if (["ArrowUp", "PageUp", "Home"].includes(event.key) || (event.key === " " && event.shiftKey)) stopFollowing()
+      else if (["ArrowDown", "PageDown", "End", " "].includes(event.key)) resume()
+    }
+    viewport.addEventListener("wheel", wheel, { passive: true })
+    viewport.addEventListener("touchstart", touchStart, { passive: true })
+    viewport.addEventListener("touchmove", touchMove, { passive: true })
+    viewport.addEventListener("keydown", keyDown)
+    viewport.addEventListener("pointerdown", pointerDown)
+    document.addEventListener("pointerup", pointerUp)
+    return () => {
+      viewport.removeEventListener("wheel", wheel)
+      viewport.removeEventListener("touchstart", touchStart)
+      viewport.removeEventListener("touchmove", touchMove)
+      viewport.removeEventListener("keydown", keyDown)
+      viewport.removeEventListener("pointerdown", pointerDown)
+      document.removeEventListener("pointerup", pointerUp)
+    }
+  }, [chatContent, stopFollowing])
 
   const resetTurnCount = useCallback((count: number) => {
     prevTurnCountRef.current = count
@@ -120,7 +198,9 @@ export function useChatScroll({ session, isLive, pendingMessages, consumePending
     const scrollToTop = scrollToTopOnNextChangeRef.current
     scrollToTopOnNextChangeRef.current = false
 
+    const intent = ++scrollIntentRef.current
     const doScroll = () => {
+      if (intent !== scrollIntentRef.current) return
       const el = chatScrollRef.current
       if (!el) return
       if (scrollToTop) {
@@ -130,6 +210,8 @@ export function useChatScroll({ session, isLive, pendingMessages, consumePending
         el.scrollTop = el.scrollHeight
         chatIsAtBottomRef.current = true
       }
+      lastScrollTopRef.current = el.scrollTop
+      lastScrollHeightRef.current = el.scrollHeight
       chatScrollOnNextRef.current = false
     }
     runAcrossFrames(doScroll)
@@ -145,9 +227,9 @@ export function useChatScroll({ session, isLive, pendingMessages, consumePending
   useEffect(() => {
     if (pendingCount > 0) {
       chatScrollOnNextRef.current = true
-      smoothScrollToEnd()
+      scheduleScrollToBottom()
     }
-  }, [pendingCount, smoothScrollToEnd])
+  }, [pendingCount, scheduleScrollToBottom])
 
   // Mid-turn Claude prompts are first shown optimistically, then persisted as
   // queue-operation entries. Once the parser exposes the persisted copy,
@@ -183,12 +265,12 @@ export function useChatScroll({ session, isLive, pendingMessages, consumePending
     if (newTurns > 0) {
       if (pendingCount > 0) consumePending(Math.min(newTurns, pendingCount))
       if (chatScrollOnNextRef.current || chatIsAtBottomRef.current) {
-        smoothScrollToEnd()
+        scheduleScrollToBottom()
         chatScrollOnNextRef.current = false
       }
     }
     prevTurnCountRef.current = turnCount
-  }, [turnCount, pendingCount, consumePending, smoothScrollToEnd])
+  }, [turnCount, pendingCount, consumePending, scheduleScrollToBottom])
 
   // Live content -- auto-scroll (keyed on turn count + tool count + content length to catch streaming)
   const lastTurn = session?.turns.at(-1)
@@ -198,17 +280,21 @@ export function useChatScroll({ session, isLive, pendingMessages, consumePending
     if (!session || !isLive) return
     if (chatIsAtBottomRef.current) {
       const el = chatScrollRef.current
-      if (el) el.scrollTop = el.scrollHeight
+      if (el) {
+        el.scrollTop = el.scrollHeight
+        lastScrollTopRef.current = el.scrollTop
+        lastScrollHeightRef.current = el.scrollHeight
+      }
     }
-    requestAnimationFrame(updateScrollIndicators)
+    const frame = requestAnimationFrame(updateScrollIndicators)
+    return () => cancelAnimationFrame(frame)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- session is only used for null check; derived counts cover reactivity
-  }, [turnCount, liveLastTurnToolCount, liveLastTurnContentLen, partialSignal, isLive, updateScrollIndicators])
+  }, [turnCount, liveLastTurnToolCount, liveLastTurnContentLen, isLive, updateScrollIndicators])
 
   const initialScrollDone = placedKey === sessionChangeKey
 
   return useMemo(() => ({
     chatScrollRef,
-    scrollEndRef,
     observeChatContent,
     canScrollDown,
     initialScrollDone,

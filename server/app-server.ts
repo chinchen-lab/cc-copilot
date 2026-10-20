@@ -37,6 +37,7 @@ import { handleHubUpgrade } from "./hub/proxy"
 import { allRuntimes, isSessionActive } from "./agents/runtimes"
 import { initBrowserSupport } from "./browser"
 import { installSessionCli } from "./sessionCli/install"
+import { resumeLocalDelegations } from "./lib/delegationAuthority"
 import { PtySessionManager } from "./pty-server"
 import { PtyAuthorizationController } from "./pty-authorization"
 import { BrowserViewerManager } from "./browser/viewerSocket"
@@ -183,6 +184,7 @@ export async function createServerComposition(
   const browserManager = new BrowserViewerManager()
   const browserSupport = initBrowserSupport(isSessionActive)
   installSessionCli()
+  resumeLocalDelegations()
   const ptyAuthorization = new PtyAuthorizationController()
   const upgradedSockets = new Set<Duplex>()
 

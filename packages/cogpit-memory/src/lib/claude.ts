@@ -11,6 +11,7 @@
  * It knows nothing about its siblings and nothing about the registry that picks
  * between them: `./agents` imports this module, never the other way round.
  */
+import { awaitingAgentsStatus, type AgentLaunch } from "./backgroundAgents"
 import { isAssistantMessage } from "./messageTypeGuards"
 import { computeStats, createEmptySessionStats } from "./sessionStats"
 import { buildTurns, buildTurnsWithStarts, findTurnStartIndices, pairAgentMessageReplies } from "./turnBuilder"
@@ -209,8 +210,8 @@ const TASK_ID_RE = /<task-id>([^<]+)<\/task-id>/g
 const TOOL_USE_ID_RE = /<tool-use-id>([^<]+)<\/tool-use-id>/g
 
 interface ClaudeBackgroundWork {
-  /** Descriptions of launched agents/workflows with no completion signal yet */
-  pendingDescriptions: string[]
+  /** Launched agents/workflows, ended once a completion signal arrived */
+  launches: AgentLaunch[]
   /** Completion notifications enqueued but not yet seen in any delivery-shaped record */
   undeliveredNotifications: number
 }
@@ -231,8 +232,8 @@ function userMessageTexts(msg: RawRecord): string[] {
 }
 
 function collectClaudeBackgroundWork(rawMessages: readonly RawRecord[]): ClaudeBackgroundWork {
-  const launches: Array<{ ids: string[]; description: string }> = []
-  const resolved = new Set<string>()
+  const launches: Array<{ ids: string[]; launch: AgentLaunch }> = []
+  const resolvedAt = new Map<string, number>() // task or tool-use id → index of its first completion signal
   // Identity, not arithmetic: real transcripts write far more notification
   // enqueues than removes, so a counter latches positive and pins finished
   // sessions at "processing" forever. A notification is undelivered only while
@@ -240,19 +241,23 @@ function collectClaudeBackgroundWork(rawMessages: readonly RawRecord[]): ClaudeB
   const queuedIds = new Set<string>()
   const deliveredIds = new Set<string>()
 
-  function noteNotifications(text: string, sink?: Set<string>) {
+  function resolve(id: string, index: number) {
+    if (!resolvedAt.has(id)) resolvedAt.set(id, index)
+  }
+
+  function noteNotifications(text: string, index: number, sink?: Set<string>) {
     if (!text.includes(TASK_NOTIFICATION_MARKER)) return
     for (const match of text.matchAll(TASK_ID_RE)) {
-      resolved.add(match[1])
+      resolve(match[1], index)
       sink?.add(match[1])
     }
     for (const match of text.matchAll(TOOL_USE_ID_RE)) {
-      resolved.add(match[1])
+      resolve(match[1], index)
       sink?.add(match[1])
     }
   }
 
-  for (const msg of rawMessages) {
+  for (const [index, msg] of rawMessages.entries()) {
     if (msg.type === "user") {
       const toolUseResult = isObject(msg.toolUseResult) ? msg.toolUseResult : null
       if (toolUseResult?.status === "async_launched") {
@@ -265,9 +270,11 @@ function collectClaudeBackgroundWork(rawMessages: readonly RawRecord[]): ClaudeB
           .filter((id): id is string => typeof id === "string" && id.length > 0)
         const description = [toolUseResult.description, toolUseResult.workflowName, toolUseResult.summary]
           .find((value): value is string => typeof value === "string" && value.length > 0) ?? ""
-        if (ids.length > 0) launches.push({ ids, description })
+        const toolUseId = toolUseIds.find((id): id is string => typeof id === "string" && id.length > 0)
+        const startedAt = typeof msg.timestamp === "string" ? msg.timestamp : undefined
+        if (ids.length > 0) launches.push({ ids, launch: { agent: { description, startedAt, toolUseId }, launchedAt: index } })
       }
-      for (const text of userMessageTexts(msg)) noteNotifications(text, deliveredIds)
+      for (const text of userMessageTexts(msg)) noteNotifications(text, index, deliveredIds)
       continue
     }
 
@@ -279,37 +286,29 @@ function collectClaudeBackgroundWork(rawMessages: readonly RawRecord[]): ClaudeB
         if (!isObject(block) || block.type !== "tool_use" || block.name !== "TaskStop") continue
         const input = isObject(block.input) ? block.input : null
         const taskId = input?.task_id ?? input?.shell_id
-        if (typeof taskId === "string") resolved.add(taskId)
+        if (typeof taskId === "string") resolve(taskId, index)
       }
       continue
     }
 
     if (msg.type === "attachment") {
       const attachment = isObject(msg.attachment) ? msg.attachment : null
-      if (typeof attachment?.prompt === "string") noteNotifications(attachment.prompt, deliveredIds)
+      if (typeof attachment?.prompt === "string") noteNotifications(attachment.prompt, index, deliveredIds)
       continue
     }
 
     if (msg.type === "queue-operation" && typeof msg.content === "string") {
       const op = (msg as { operation?: string }).operation
-      noteNotifications(msg.content, op === "enqueue" ? queuedIds : deliveredIds)
+      noteNotifications(msg.content, index, op === "enqueue" ? queuedIds : deliveredIds)
     }
   }
 
   return {
-    pendingDescriptions: launches
-      .filter((launch) => !launch.ids.some((id) => resolved.has(id)))
-      .map((launch) => launch.description),
+    launches: launches.map(({ ids, launch }) => {
+      const ends = ids.flatMap((id) => resolvedAt.get(id) ?? [])
+      return ends.length > 0 ? { ...launch, endedAt: Math.min(...ends) } : launch
+    }),
     undeliveredNotifications: [...queuedIds].filter((id) => !deliveredIds.has(id)).length,
-  }
-}
-
-function awaitingAgentsResult(pendingDescriptions: string[], pendingQueue: number): SessionStatusInfo {
-  return {
-    status: "awaiting_agents",
-    pendingQueue,
-    pendingAgents: pendingDescriptions.length,
-    pendingAgentDescriptions: pendingDescriptions.filter((description) => description.length > 0),
   }
 }
 
@@ -386,9 +385,8 @@ export function deriveClaudeSessionStatus(rawMessages: readonly RawRecord[]): Se
         // agents rather than on the user.
         const work = getBackgroundWork()
         if (deliveringNotification || work.undeliveredNotifications > 0) return result("processing")
-        if (work.pendingDescriptions.length > 0) {
-          return awaitingAgentsResult(work.pendingDescriptions, Math.max(0, pendingEnqueues))
-        }
+        const awaiting = awaitingAgentsStatus(work.launches, Math.max(0, pendingEnqueues))
+        if (awaiting) return awaiting
 
         // Scan backward from here for real user activity (typically found immediately)
         let hasActivity = false

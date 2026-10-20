@@ -14,6 +14,92 @@ const binding = { hostId: "local", agent: "codex" as const, instanceId: "default
 afterEach(() => { for (const store of stores.splice(0)) store.close(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 
 describe("durable orchestration", () => {
+  it("reads only queued commands in FIFO order on an idle dispatcher tick", () => {
+    const store = open()
+    const lease = store.acquire("host")!
+    const conversation = store.ensureConversation(binding)
+    const heldConversation = store.ensureConversation({ ...binding, sessionId: "native-held" })
+    const unknownConversation = store.ensureConversation({ ...binding, sessionId: "native-unknown" })
+    store.admit("owner", "held-command", heldConversation.id, { message: "held" })
+    store.admit("owner", "unknown-command", unknownConversation.id, { message: "unknown" })
+    for (const id of ["z-first-queued", "a-second-queued"]) store.admit("owner", id, conversation.id, { message: id })
+    const held = store.claim("owner", "held-command", lease)!
+    store.finish(held, lease, "held")
+    const unknown = store.claim("owner", "unknown-command", lease)!
+    store.finish(unknown, lease, "unknown")
+    const read = vi.spyOn(store, "command")
+    expect(store.queued().map((command) => command.receipt.id)).toEqual(["z-first-queued", "a-second-queued"])
+    expect(read.mock.calls.map(([, id]) => id)).toEqual(["z-first-queued", "a-second-queued"])
+    expect(store.pending().map((command) => command.receipt.state).sort()).toEqual(["held", "queued", "queued", "unknown"])
+  })
+
+  it("cancels what still waits for a stopped session, from every account, and mutes its children's results", () => {
+    const store = open()
+    const lease = store.acquire("host")!
+    const conversation = store.ensureConversation(binding)
+    const other = store.ensureConversation({ ...binding, sessionId: "native-other" })
+    store.admit("owner", "in-flight-turn", conversation.id, { message: "running" })
+    store.claim("owner", "in-flight-turn", lease)
+    store.admit("owner", "waiting-message", conversation.id, { message: "later" })
+    store.admit("teammate", "waiting-message-too", conversation.id, { message: "also later" })
+    store.admit("owner", "parked-message", conversation.id, { message: "held" })
+    store.finish(store.claim("owner", "parked-message", lease) ?? store.command("owner", "parked-message")!, lease, "held")
+    store.admit("owner", "elsewhere-message", other.id, { message: "another session" })
+    expect(store.cancelWaiting(conversation.id)).toBe(3)
+    expect(["waiting-message", "parked-message"].map((id) => store.command("owner", id)!.receipt)).toEqual([
+      expect.objectContaining({ state: "cancelled", error: "The session was stopped" }),
+      expect.objectContaining({ state: "cancelled" }),
+    ])
+    expect(store.command("teammate", "waiting-message-too")!.receipt.state).toBe("cancelled")
+    expect(store.command("owner", "in-flight-turn")!.receipt.state).toBe("dispatching")
+    expect(store.command("owner", "elsewhere-message")!.receipt.state).toBe("queued")
+
+    const running = store.putTask("owner", { sourceId: "stopped-parent-1", parentSessionId: "stopped", childSessionId: "helper" })
+    const done = store.putTask("teammate", { sourceId: "stopped-parent-2", parentSessionId: "stopped", childSessionId: "helper-2" })
+    store.updateTask("teammate", done.id, { state: "completed" })
+    const unrelated = store.putTask("owner", { sourceId: "other-parent", parentSessionId: "lead", childSessionId: "stopped" })
+    expect(store.muteTasksOf("stopped")).toBe(2)
+    expect(store.tasks("owner", "stopped").find((task) => task.id === running.id)).toMatchObject({ state: "running", acknowledgedAt: expect.any(Number) })
+    expect(store.tasks("teammate", "stopped")[0]?.acknowledgedAt).toEqual(expect.any(Number))
+    expect(store.tasks("owner", "lead").find((task) => task.id === unrelated.id)?.acknowledgedAt).toBeUndefined()
+  })
+
+  it("indexes queue polling in existing databases without changing saved commands", () => {
+    const root = mkdtempSync(join(tmpdir(), "cogpit-command-index-")); roots.push(root)
+    const path = join(root, "state.sqlite")
+    const original = new OrchestrationStore(path)
+    const conversation = original.ensureConversation(binding)
+    original.admit("owner", "saved-command", conversation.id, { message: "keep me" })
+    original.putTask("owner", { sourceId: "saved-task", parentSessionId: "parent", childSessionId: "child" })
+    original.close()
+    const legacy = new DatabaseSync(path)
+    legacy.exec("DROP INDEX command_pending; DROP INDEX task_parent")
+    legacy.close()
+    const reopened = open(path)
+    expect(reopened.queued()[0]?.payload).toEqual({ message: "keep me" })
+    const db = new DatabaseSync(path)
+    try {
+      const plan = db.prepare("EXPLAIN QUERY PLAN SELECT scope,id FROM commands WHERE state='queued' ORDER BY position").all()
+      expect(plan.map((row) => row.detail).join(" ")).toContain("COVERING INDEX command_pending")
+      const tasksPlan = db.prepare("EXPLAIN QUERY PLAN SELECT data FROM tasks WHERE scope=? AND json_extract(data,'$.parentSessionId')=?").all("owner", "parent")
+      expect(tasksPlan.map((row) => row.detail).join(" ")).toContain("INDEX task_parent")
+      expect(reopened.tasks("owner", "parent")[0]?.childSessionId).toBe("child")
+    } finally { db.close() }
+  })
+
+  it("filters task history by parent and owner before loading results", () => {
+    const store = open()
+    const first = store.putTask("alice", { sourceId: "first-task", parentSessionId: "parent", childSessionId: "first" })
+    store.putTask("alice", { sourceId: "other-parent", parentSessionId: "other", childSessionId: "second" })
+    store.putTask("bob", { sourceId: "other-owner", parentSessionId: "parent", childSessionId: "third" })
+    expect(store.tasks("alice", "parent").map((task) => task.id)).toEqual([first.id])
+    expect(store.tasks("alice", "missing")).toEqual([])
+    expect(store.tasks("alice")).toHaveLength(2)
+    store.updateTask("alice", first.id, { result: { reply: "finished" } })
+    expect(store.tasks("alice", "parent")[0]?.result).toEqual({ reply: "finished" })
+    expect(() => store.updateTask("bob", first.id, { state: "completed" })).toThrow("Delegated task not found")
+  })
+
   it("cancels a notice when its agent becomes idle during authorization", async () => {
     const store = open()
     const dispatcher = new CommandDispatcher(store)

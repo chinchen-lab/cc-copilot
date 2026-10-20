@@ -69,6 +69,10 @@ export interface DelegatedTask {
   wakeupCommandId?: string
   deliveryDisposition?: "blocking" | "async"
   blockingDeadline?: number
+  /** The follow-up message this task tracks; absent for the task that started the child. */
+  commandId?: string
+  /** Requests and stuck deliveries the parent has already been told about. */
+  notified?: string[]
 }
 
 export interface ProviderInstance {

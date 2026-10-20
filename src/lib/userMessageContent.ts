@@ -7,7 +7,8 @@
 // The iOS client mirrors this in `ios/CogpitKit/Sources/CogpitKit/Transcript/UserMessageContent.swift`.
 
 import { stripAnsi } from "@/lib/ansi"
-import { isTaskWakeup, parseTaskWakeup } from "../../shared/contracts/taskWakeup"
+import { isTaskWakeup, parseTaskAttention, parseTaskWakeup } from "../../shared/contracts/taskWakeup"
+import { parseCrewChatDelivery } from "../../shared/contracts/crewChat"
 
 /** Paired blocks that are pure injected context: hidden, with a "show raw" escape hatch. */
 export const SYSTEM_TAG_NAMES = [
@@ -199,6 +200,8 @@ export function taskWakeupSummary(
   nameOf?: (sessionId: string) => string | undefined,
 ): string | null {
   if (!isTaskWakeup(text)) return null
+  const attention = parseTaskAttention(text)
+  if (attention) return `${nameOf?.(attention.childSessionId) ?? "Delegated session"} needs attention`
   const wakeup = parseTaskWakeup(text)
   const failed = wakeup?.state === "error"
   const name = wakeup && nameOf?.(wakeup.childSessionId)
@@ -211,4 +214,30 @@ export function taskWakeupSummary(
 function changedFileCount(result: unknown): number {
   const filesChanged = (result as { filesChanged?: unknown } | null)?.filesChanged
   return Array.isArray(filesChanged) ? filesChanged.length : 0
+}
+
+// ── Crew chat deliveries ────────────────────────────────────────────────
+
+const CREW_PREVIEW_LENGTH = 160
+
+/**
+ * A one-line stand-in for a crew chat message that reached the session:
+ * "studio-ds in crew chat: M1 promoted" when it carried the message,
+ * "studio-ds posted in crew chat" when it only announced one.
+ */
+export function crewChatDeliverySummary(text: string): string | null {
+  const delivery = parseCrewChatDelivery(text)
+  if (!delivery) return null
+  if (delivery.text === null) return `${delivery.author} posted in crew chat`
+  const line = delivery.text.replace(/^(?:@[\w-]+[,:]?\s+)+/, "").split("\n")[0]!.trim()
+  if (!line) return `${delivery.author} in crew chat`
+  return `${delivery.author} in crew chat: ${line.length > CREW_PREVIEW_LENGTH ? `${line.slice(0, CREW_PREVIEW_LENGTH)}…` : line}`
+}
+
+/** The one-line stand-in for a prompt Cogpit wrote rather than a person, or null for one a person typed. */
+export function generatedPromptSummary(
+  text: string,
+  nameOf?: (sessionId: string) => string | undefined,
+): string | null {
+  return taskWakeupSummary(text, nameOf) ?? crewChatDeliverySummary(text)
 }

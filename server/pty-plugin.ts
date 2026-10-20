@@ -9,6 +9,7 @@ import { PtyAuthorizationController } from "./pty-authorization"
 import { BrowserViewerManager } from "./browser/viewerSocket"
 import { initBrowserSupport } from "./browser"
 import { installSessionCli } from "./sessionCli/install"
+import { resumeLocalDelegations } from "./lib/delegationAuthority"
 import { isSessionActive } from "./agents/runtimes"
 
 export function ptyPlugin(): Plugin {
@@ -21,6 +22,7 @@ export function ptyPlugin(): Plugin {
       const browserManager = new BrowserViewerManager()
       const browserSupport = initBrowserSupport(isSessionActive)
       installSessionCli()
+      resumeLocalDelegations()
       const authorization = new PtyAuthorizationController()
 
       server.httpServer!.on(

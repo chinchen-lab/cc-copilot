@@ -2,6 +2,7 @@ import { DeviceUnreachableError } from "../hub/device-client"
 import { DeviceRequestError, deviceJson } from "../hub/deviceRequest"
 import { getDevice, type HubDevice } from "../hub/registry"
 import type { PendingInput } from "../agents/pendingInput"
+import type { CommandReceipt } from "../../shared/contracts/orchestration"
 import type { SessionResult } from "../lib/sessionResult"
 import type { SessionState, WaitResult } from "../lib/sessionWait"
 import { startFields, type HostProject, type SessionAddress, type SessionHost } from "./types"
@@ -211,8 +212,16 @@ export function createRemoteHost(deviceId: string): SessionHost {
       return (await call<{ success: boolean }>("POST", "/api/interrupt-session", { sessionId })).success
     },
 
+    async queue(sessionId, action) {
+      await ensureDurableApi(deviceId)
+      const answer = action
+        ? await call<{ commands: CommandReceipt[] }>("POST", "/api/session-commands", { ...action, sessionId })
+        : await call<{ commands: CommandReceipt[] }>("GET", `/api/session-commands?sessionId=${encoded(sessionId)}`)
+      return answer.commands
+    },
+
     async stop(sessionId) {
-      return (await call<{ success: boolean }>("POST", "/api/stop-session", { sessionId })).success
+      return (await call<{ success: boolean }>("POST", "/api/stop-session", { sessionId, cancelQueued: true })).success
     },
 
     async has(sessionId) {

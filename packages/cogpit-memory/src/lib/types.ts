@@ -40,6 +40,20 @@ export interface SessionStatusInfo {
   pendingAgents?: number
   /** Short descriptions of the pending background agents, oldest first */
   pendingAgentDescriptions?: string[]
+  /** Agents launched since the oldest one still running, in launch order (status awaiting_agents) */
+  backgroundAgents?: BackgroundAgent[]
+}
+
+/** A background agent launched by the session. */
+export interface BackgroundAgent {
+  /** What the agent was asked to do; empty when the launch carried no description */
+  description: string
+  /** When the agent was launched (ISO), if the transcript records it */
+  startedAt?: string
+  /** The launching tool call, which keys the agent's live progress summaries */
+  toolUseId?: string
+  /** Finished, failed or stopped */
+  done: boolean
 }
 
 /** A raw transcript record, before any agent-specific interpretation. */

@@ -444,6 +444,7 @@ export const copilotRuntime: AgentRuntime = {
     return {
       live: transport.isSessionActive(sessionId),
       running: transport.isTurnActive(sessionId),
+      agentsRunning: transport.hasRunningSubagents(sessionId),
     }
   },
 

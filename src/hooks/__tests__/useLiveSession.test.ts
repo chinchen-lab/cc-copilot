@@ -1125,9 +1125,28 @@ describe("useLiveSession", () => {
 
       expect(workerParse).not.toHaveBeenCalled()
       expect(workerAppend).not.toHaveBeenCalled()
-      expect(result.current.streamingOverlay).toHaveLength(1)
-      expect(result.current.streamingOverlay[0].blocks[0].text).toBe("Hello world")
+      expect(result.current.streamingOverlayStore.snapshot()).toHaveLength(1)
+      expect(result.current.streamingOverlayStore.snapshot()[0].blocks[0].text).toBe("Hello world")
       expect(result.current.isLive).toBe(true)
+    })
+
+    it("publishes token updates without rendering the session owner", () => {
+      let renders = 0
+      const { result } = renderHook(() => {
+        renders++
+        return useLiveSession(source, onUpdate, workerParse, workerAppend, undefined, mockParsedSession)
+      })
+      const es = MockEventSource.instances.at(-1)!
+      act(() => { es.simulateMessage(textDeltaEvent("msg1", "first")); flushRAF() })
+      act(() => { es.simulateMessage(textDeltaEvent("msg1", " warmup")); flushRAF() })
+      const before = renders
+      const listener = vi.fn()
+      const stop = result.current.streamingOverlayStore.subscribe(listener)
+      act(() => { es.simulateMessage(textDeltaEvent("msg1", " second")); flushRAF() })
+      expect(result.current.streamingOverlayStore.snapshot()[0].blocks[0].text).toBe("first warmup second")
+      expect(listener).toHaveBeenCalledOnce()
+      expect(renders).toBe(before)
+      stop()
     })
 
     it("coalesces overlay updates to one rAF flush per burst", () => {
@@ -1144,7 +1163,7 @@ describe("useLiveSession", () => {
       expect(rafCallbacks.length).toBe(1)
 
       act(() => flushRAF())
-      expect(result.current.streamingOverlay[0].blocks[0].text).toBe("0123456789")
+      expect(result.current.streamingOverlayStore.snapshot()[0].blocks[0].text).toBe("0123456789")
     })
 
     it("stream_snapshot replaces the overlay wholesale", () => {
@@ -1168,9 +1187,9 @@ describe("useLiveSession", () => {
         flushRAF()
       })
 
-      expect(result.current.streamingOverlay).toHaveLength(1)
-      expect(result.current.streamingOverlay[0].messageId).toBe("msg_snap")
-      expect(result.current.streamingOverlay[0].blocks[0].text).toBe("mid-flight text")
+      expect(result.current.streamingOverlayStore.snapshot()).toHaveLength(1)
+      expect(result.current.streamingOverlayStore.snapshot()[0].messageId).toBe("msg_snap")
+      expect(result.current.streamingOverlayStore.snapshot()[0].blocks[0].text).toBe("mid-flight text")
     })
 
     it("incoming lines reconcile away the landed overlay message", () => {
@@ -1183,7 +1202,7 @@ describe("useLiveSession", () => {
         getLastEventSource().simulateMessage(textDeltaEvent("msg_pending", "still going"))
         flushRAF()
       })
-      expect(result.current.streamingOverlay).toHaveLength(2)
+      expect(result.current.streamingOverlayStore.snapshot()).toHaveLength(2)
 
       act(() => {
         getLastEventSource().simulateMessage({
@@ -1193,7 +1212,7 @@ describe("useLiveSession", () => {
         flushRAF()
       })
 
-      expect(result.current.streamingOverlay.map((m) => m.messageId)).toEqual(["msg_pending"])
+      expect(result.current.streamingOverlayStore.snapshot().map((m) => m.messageId)).toEqual(["msg_pending"])
     })
 
     it("stream_clear empties the overlay", () => {
@@ -1205,13 +1224,13 @@ describe("useLiveSession", () => {
         getLastEventSource().simulateMessage(textDeltaEvent("msg_1", "text"))
         flushRAF()
       })
-      expect(result.current.streamingOverlay).toHaveLength(1)
+      expect(result.current.streamingOverlayStore.snapshot()).toHaveLength(1)
 
       act(() => {
         getLastEventSource().simulateMessage({ type: "stream_clear" })
         flushRAF()
       })
-      expect(result.current.streamingOverlay).toHaveLength(0)
+      expect(result.current.streamingOverlayStore.snapshot()).toHaveLength(0)
     })
 
     it("SSE error clears the overlay (snapshot rebuilds on reconnect)", () => {
@@ -1223,13 +1242,13 @@ describe("useLiveSession", () => {
         getLastEventSource().simulateMessage(textDeltaEvent("msg_1", "text"))
         flushRAF()
       })
-      expect(result.current.streamingOverlay).toHaveLength(1)
+      expect(result.current.streamingOverlayStore.snapshot()).toHaveLength(1)
 
       act(() => {
         getLastEventSource().simulateError()
         flushRAF()
       })
-      expect(result.current.streamingOverlay).toHaveLength(0)
+      expect(result.current.streamingOverlayStore.snapshot()).toHaveLength(0)
     })
 
     it("compaction clears the overlay", () => {
@@ -1241,13 +1260,13 @@ describe("useLiveSession", () => {
         getLastEventSource().simulateMessage(textDeltaEvent("msg_1", "text"))
         flushRAF()
       })
-      expect(result.current.streamingOverlay).toHaveLength(1)
+      expect(result.current.streamingOverlayStore.snapshot()).toHaveLength(1)
 
       act(() => {
         getLastEventSource().simulateMessage({ type: "compacting", active: true })
         flushRAF()
       })
-      expect(result.current.streamingOverlay).toHaveLength(0)
+      expect(result.current.streamingOverlayStore.snapshot()).toHaveLength(0)
     })
 
     it("keeps the existing worker coalescing regression intact alongside streaming", () => {

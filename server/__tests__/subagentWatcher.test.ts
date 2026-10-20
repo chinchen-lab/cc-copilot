@@ -116,6 +116,51 @@ describe("watchSubagents", () => {
     expect(readdir).toHaveBeenCalledTimes(2)
   })
 
+  it("uses file events and a slow backstop once the directory can be watched", async () => {
+    const close = vi.fn()
+    const on = vi.fn()
+    let changed!: () => void
+    watch.mockImplementation((_path, _options, callback) => {
+      changed = callback
+      return { close, on }
+    })
+    readdir.mockResolvedValue([])
+    const watcher = watchSubagents("/tmp/session.jsonl", "session", new Map())
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(readdir).toHaveBeenCalledTimes(1)
+    changed()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(readdir).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(readdir).toHaveBeenCalledTimes(3)
+    watcher.close()
+    expect(close).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(readdir).toHaveBeenCalledTimes(3)
+  })
+
+  it("starts watching a directory created after the session and recovers from watcher errors", async () => {
+    const close = vi.fn()
+    let failed!: () => void
+    const liveWatch = () => ({ close, on: (_event: string, callback: () => void) => { failed = callback } })
+    const watcher = watchSubagents("/tmp/session.jsonl", "session", new Map())
+    watch.mockImplementation(liveWatch)
+    readdir.mockResolvedValue([])
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(watch).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(readdir).toHaveBeenCalledTimes(2)
+    watch.mockImplementation(() => { throw new Error("unavailable") })
+    failed()
+    expect(close).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(readdir).toHaveBeenCalledTimes(3)
+    watch.mockImplementation(liveWatch)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(watch).toHaveBeenCalledTimes(4)
+    watcher.close()
+  })
+
   it("retains an unterminated record and forwards it once the newline arrives", async () => {
     const line = userLine("delegate 🙂")
     let source = Buffer.from(line)

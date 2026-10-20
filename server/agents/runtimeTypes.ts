@@ -197,6 +197,19 @@ export class AgentRuntimeError extends Error {
   }
 }
 
+/** What a runtime knows about a session's work, from the process it holds. */
+export interface RuntimeActivity {
+  /** A connection exists that can take a follow-up without a resume. */
+  live: boolean
+  /** A turn is in flight right now. */
+  running: boolean
+  /** Agents the session started are still working, whether or not a turn is in flight. */
+  agentsRunning: boolean
+}
+
+/** The activity of a session no runtime holds. */
+export const NO_ACTIVITY: RuntimeActivity = Object.freeze({ live: false, running: false, agentsRunning: false })
+
 export interface AgentRuntime {
   isBusy?(): boolean
   readonly instanceId?: string
@@ -215,11 +228,7 @@ export interface AgentRuntime {
   stopAll(): Promise<StopAllResult>
   /** Delete the session's own record of itself, then its transcript. */
   deleteSession(sessionId: string, filePath: string): Promise<void>
-  /**
-   * `live`: a connection exists that can take a follow-up without a resume.
-   * `running`: a turn is in flight right now.
-   */
-  activity(sessionId: string): { live: boolean; running: boolean }
+  activity(sessionId: string): RuntimeActivity
   /** True when this runtime holds any state for the id. */
   hasSession(sessionId: string): boolean
   /** Sessions with work in flight. */

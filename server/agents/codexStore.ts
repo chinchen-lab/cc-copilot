@@ -131,6 +131,10 @@ export function createCodexStore(homeDir = process.env.CODEX_HOME || join(homedi
       return listing
     },
 
+    // A child rollout is found only by the full inventory walk, too costly to
+    // poll; the app-server reports its children's turns directly instead.
+    agentsWroteSince: async () => false,
+
     sessionAddress: (filePath) => addressFromTranscript(codexStore, filePath),
 
     transcriptPath(_dirName, sessionId) {

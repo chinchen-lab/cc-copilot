@@ -1,9 +1,14 @@
+import { stat } from "node:fs/promises"
 import { getSessionStatus } from "../helpers"
 import { listPendingInput, type PendingInput } from "../agents/pendingInput"
 import { storeForPath } from "../agents"
+import { sessionAgentsRunning } from "../agents/agentsRunning"
 import { runtimeFor, runtimeForSession } from "../agents/runtimes"
+import type { RuntimeActivity } from "../agents/runtimeTypes"
+import type { AgentStore } from "../agents/types"
 import { findJsonlPath } from "../sessionPaths"
 import type { SessionStatusInfo } from "../../shared/session/types"
+import { RECENT_ACTIVITY_MS, WORKING_STATUSES } from "../../shared/sessionActivity"
 import type { WorkspaceEnvironment, WorkspaceRunContext } from "../../shared/contracts/workspaces"
 import { workspaceDetailsForCwd } from "../workspaceTransfer/status"
 
@@ -32,8 +37,6 @@ export interface SessionState extends Partial<SessionStatusInfo> {
   run?: WorkspaceRunContext
 }
 
-const IN_FLIGHT_STATUSES = new Set(["thinking", "tool_use", "processing", "compacting", "awaiting_agents"])
-
 /**
  * Turn errors from sends that nobody waited on: a resume reports its failure
  * only on the request that started it, and the session CLI returns before then.
@@ -48,10 +51,40 @@ export function clearTurnError(sessionId: string): void {
   turnErrors.delete(sessionId)
 }
 
-export async function readSessionState(sessionId: string): Promise<SessionState> {
+/** A transcript the caller already found, so the read skips looking for it. */
+export interface KnownTranscript {
+  filePath: string
+  /** When the session last did something; the transcript's mtime when absent. */
+  lastActivityMs?: number
+}
+
+/**
+ * Whether a mid-flight tail means the session is still working. A runtime
+ * holding the session is trusted over the tail, which lags the turn boundary
+ * by a flush, except while the session waits on its agents between turns.
+ * Without one, the tail is believed only while the transcript, or its agents',
+ * is still being written: a session killed partway through a turn keeps a
+ * mid-flight tail forever.
+ */
+async function tailStillWorking(
+  sessionId: string,
+  status: string | undefined,
+  activity: RuntimeActivity,
+  transcript: { store: AgentStore; filePath: string; lastActivityMs?: number },
+): Promise<boolean> {
+  if (!status || !WORKING_STATUSES.has(status)) return false
+  if (activity.live) return status === "awaiting_agents"
+  const activeAt = transcript.lastActivityMs ?? (await stat(transcript.filePath).catch(() => null))?.mtimeMs ?? 0
+  if (Date.now() - activeAt < RECENT_ACTIVITY_MS) return true
+  if (status !== "awaiting_agents") return false
+  const address = await transcript.store.sessionAddress(transcript.filePath).catch(() => null)
+  return address !== null && await sessionAgentsRunning(address.dirName, sessionId)
+}
+
+export async function readSessionState(sessionId: string, known?: KnownTranscript): Promise<SessionState> {
   // The transcript decides whose session it is; a live session whose
   // transcript is not on disk yet falls back to the runtime holding it.
-  const filePath = await findJsonlPath(sessionId)
+  const filePath = known?.filePath ?? await findJsonlPath(sessionId)
   const store = storeForPath(filePath)
   const runtime = store ? runtimeFor(store.kind, store.instanceId) : runtimeForSession(sessionId)
   if (!runtime) {
@@ -68,10 +101,7 @@ export async function readSessionState(sessionId: string): Promise<SessionState>
   let outcome: SessionOutcome
   if (waiting.length > 0) outcome = "needs_input"
   else if (activity.running) outcome = "running"
-  // A managed session between turns is idle whatever the tail says; the tail
-  // lags the turn boundary by a flush. Background agents still resume it.
-  else if (statusInfo?.status === "awaiting_agents") outcome = "running"
-  else if (!activity.live && statusInfo && IN_FLIGHT_STATUSES.has(statusInfo.status)) outcome = "running"
+  else if (filePath && store && await tailStillWorking(sessionId, statusInfo?.status, activity, { store, filePath, lastActivityMs: known?.lastActivityMs })) outcome = "running"
   else if (error) outcome = "error"
   else outcome = "completed"
 
@@ -121,7 +151,7 @@ export async function waitForSessions(
 ): Promise<WaitResult> {
   const deadline = Date.now() + timeoutMs
   for (;;) {
-    const sessions = await Promise.all(sessionIds.map(readSessionState))
+    const sessions = await Promise.all(sessionIds.map((id) => readSessionState(id)))
     const done = mode === "all" ? sessions.every(isSettled) : sessions.some(isSettled)
     if (done) return { timedOut: false, sessions }
     if (signal?.aborted || Date.now() >= deadline) return { timedOut: true, sessions }

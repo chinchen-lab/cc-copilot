@@ -20,6 +20,8 @@ import { ProcessingIcon } from "@/components/ui/StatusIcons"
 import { TaskNotificationCard } from "./TaskNotificationCard"
 import { DelegatedResultCard } from "./DelegatedResultCard"
 import { parseTaskWakeup } from "../../../shared/contracts/taskWakeup"
+import { CrewChatDeliveryCard } from "./CrewChatDeliveryCard"
+import { parseCrewChatDelivery } from "../../../shared/contracts/crewChat"
 import { LocalCommandOutputCard } from "./LocalCommandOutput"
 import { ImageViewer, type ImageViewerItem } from "./ImageViewer"
 import { useOptionalImageGallery } from "./SessionImageGallery"
@@ -82,6 +84,7 @@ export const UserMessage = memo(function UserMessage({ content, timestamp, onEdi
   )
   const cleanText = useMemo(() => stripSystemTags(unwrappedText), [unwrappedText])
   const wakeup = useMemo(() => parseTaskWakeup(cleanText), [cleanText])
+  const crewDelivery = useMemo(() => parseCrewChatDelivery(cleanText), [cleanText])
   const { text: textAfterBanner, isSystemNotification } = useMemo(
     () => stripSystemNotificationPreamble(cleanText),
     [cleanText],
@@ -129,10 +132,10 @@ export const UserMessage = memo(function UserMessage({ content, timestamp, onEdi
   // hidden. The agent envelope and the notification banner are genuinely
   // hidden, so they still count.
   const hasTags = useMemo(
-    () => hasSystemTags(rawText) || isSystemNotification || isTeammate || wakeup !== null,
-    [rawText, isSystemNotification, isTeammate, wakeup],
+    () => hasSystemTags(rawText) || isSystemNotification || isTeammate || wakeup !== null || crewDelivery !== null,
+    [rawText, isSystemNotification, isTeammate, wakeup, crewDelivery],
   )
-  const displayText = showRaw ? rawText : wakeup ? "" : textAfterInterrupts
+  const displayText = showRaw ? rawText : wakeup || crewDelivery ? "" : textAfterInterrupts
 
   const isTruncated = displayText.length > 500 && !expanded
   const visibleText = isTruncated ? displayText.slice(0, 500) + "..." : displayText
@@ -273,6 +276,7 @@ export const UserMessage = memo(function UserMessage({ content, timestamp, onEdi
         )}
 
         {!showRaw && wakeup && <DelegatedResultCard wakeup={wakeup} />}
+        {!showRaw && crewDelivery && <CrewChatDeliveryCard delivery={crewDelivery} />}
 
         {!showRaw && notifications.length > 0 && (
           <div className="mb-2 flex flex-col gap-2">

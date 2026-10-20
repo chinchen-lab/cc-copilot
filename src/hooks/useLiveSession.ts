@@ -4,6 +4,7 @@ import { openSessionStream } from "@/lib/sessionStream"
 import type { ParsedSession } from "../../shared/session/types"
 import type { RateLimitBlock } from "../../shared/session/rateLimit"
 import type { AgentKind } from "@/lib/agents"
+import { createStreamingOverlayStore } from "@/lib/streamingOverlayStore"
 import { sessionCache } from "@/lib/sessionCache"
 import {
   applyDeltas,
@@ -62,7 +63,7 @@ export function useLiveSession(
   const [rateLimit, setRateLimit] = useState<RateLimitBlock | null>(null)
   // Ephemeral token-streaming overlay (SDK-driven sessions only). Never
   // touches the worker/ParsedSession pipeline — see src/lib/streamingOverlay.
-  const [streamingOverlay, setStreamingOverlay] = useState<StreamingOverlay>(EMPTY_OVERLAY)
+  const [streamingOverlayStore] = useState(createStreamingOverlayStore)
   const textRef = useRef("")
   const sessionRef = useRef<ParsedSession | null>(null)
   const overlayRef = useRef<StreamingOverlay>(EMPTY_OVERLAY)
@@ -172,8 +173,8 @@ export function useLiveSession(
 
     // ── Streaming overlay flushing ──────────────────────────────────────
     // Overlay deltas arrive at up to ~13 Hz; mutate the ref and publish to
-    // React state at most once per animation frame. Separate scheduler from
-    // scheduleUpdate so overlay churn never forces a session re-render.
+    // subscribers at most once per animation frame. The owner and app shell
+    // never subscribe to token updates.
     let overlayDirty = false
     let overlayRafId: number | null = null
     let staleSweep: ReturnType<typeof setInterval> | null = null
@@ -181,7 +182,7 @@ export function useLiveSession(
     const flushOverlay = () => {
       overlayDirty = false
       overlayRafId = null
-      setStreamingOverlay(overlayRef.current)
+      streamingOverlayStore.publish(overlayRef.current)
     }
 
     const scheduleOverlayFlush = () => {
@@ -292,8 +293,8 @@ export function useLiveSession(
           }
           setIsCompacting(data.active === true)
         } else if (data.type === "subagent_activity") {
-          // Background agents write only to their own transcripts, so the
-          // parent stream goes quiet while they run. Keep the session live.
+          // The server's word that agents the session started are still
+          // working; the parent stream goes quiet while they run.
           setIsLive(true)
           resetStaleTimer()
         } else if (data.type === "runtime_activity") {
@@ -373,9 +374,9 @@ export function useLiveSession(
       if (overlayRafId !== null) cancelAnimationFrame(overlayRafId)
       if (staleSweep) clearInterval(staleSweep)
       overlayRef.current = EMPTY_OVERLAY
-      setStreamingOverlay(EMPTY_OVERLAY)
+      streamingOverlayStore.publish(EMPTY_OVERLAY)
     }
-  }, [dirName, fileName, rawText, watchOffset])
+  }, [dirName, fileName, rawText, watchOffset, streamingOverlayStore])
 
-  return { isLive, sseState, isCompacting, streamingOverlay, turnError, agentProgress, promptSuggestion, rateLimit }
+  return { isLive, sseState, isCompacting, streamingOverlayStore, turnError, agentProgress, promptSuggestion, rateLimit }
 }

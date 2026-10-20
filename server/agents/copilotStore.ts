@@ -98,6 +98,7 @@ export function createCopilotStore(homeDir = process.env.COPILOT_HOME || join(ho
 
     // Sub-agents are `subagent.*` events inside the parent transcript, not files.
     listSubagentFiles: async () => [],
+    agentsWroteSince: async () => false,
 
     sessionAddress: (filePath) => addressFromTranscript(copilotStore, filePath),
 

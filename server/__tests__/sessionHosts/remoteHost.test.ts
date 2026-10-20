@@ -92,6 +92,20 @@ describe("remote session host", () => {
     expect(seen[0]).toMatchObject({ url: "/api/session-send", body: { sessionId: "s1", message: "Notice", notification: true, onlyWhileRunning: true, intent: "steer" } })
   })
 
+  it("reads and changes a device session's queue, and asks a stop to cancel what still waits", async () => {
+    const commands = [{ id: "held-message", state: "held" }]
+    const { device, seen } = await fakeDevice((req, res) => send(res, 200, req.url === "/api/stop-session" ? { success: true } : { commands }), { sessionApi: 2 })
+    const host = createRemoteHost(device.id)
+    expect(await host.queue!("s1", null)).toEqual(commands)
+    await host.queue!("s1", { action: "resume" })
+    expect(await host.stop("s1")).toBe(true)
+    expect(seen.map(({ method, url, body }) => ({ method, url, body }))).toEqual([
+      { method: "GET", url: "/api/session-commands?sessionId=s1", body: undefined },
+      { method: "POST", url: "/api/session-commands", body: { action: "resume", sessionId: "s1" } },
+      { method: "POST", url: "/api/stop-session", body: { sessionId: "s1", cancelQueued: true } },
+    ])
+  })
+
   it("returns null for an absent durable receipt so a first answer can proceed", async () => {
     const { device } = await fakeDevice((_req, res) => send(res, 404, { error: "Command not found" }), { sessionApi: 2 })
     await expect(createRemoteHost(device.id).receipt!("first-answer")).resolves.toBeNull()

@@ -1,4 +1,5 @@
 // SHARED SESSION CORE: edit shared/session only; cogpit-memory copies are generated.
+import { awaitingAgentsStatus, type AgentLaunch } from "./backgroundAgents"
 import { normalizeFunctionName } from "./codex-tool-normalization"
 import { computeStats, createEmptySessionStats, mergeTokenUsage } from "./sessionStats"
 import { appendAssistantText } from "./turnContent"
@@ -1023,37 +1024,37 @@ export function isCopilotEventType(type: unknown): type is string {
 
 /** Derive status from Copilot CLI's durable session events. */
 export function deriveCopilotSessionStatus(rawMessages: readonly RawRecord[]): SessionStatusInfo {
-  const pendingAgents = new Map<string, string>()
-  for (const event of rawMessages) {
+  // agentId → its latest launch; finished agents stay so the batch can count them
+  const agents = new Map<string, AgentLaunch>()
+  for (const [index, event] of rawMessages.entries()) {
     const agentId = typeof event.agentId === "string" ? event.agentId : ""
     if (
       !agentId
       && (event.type === "abort" || event.type === "session.shutdown" || event.type === "session.error")
     ) {
-      pendingAgents.clear()
+      agents.clear()
       continue
     }
     if (!agentId || !event.type.startsWith("subagent.")) continue
     const data = isObject(event.data) ? event.data : {}
+    const launch = agents.get(agentId)
     if (event.type === "subagent.completed" || event.type === "subagent.failed") {
-      pendingAgents.delete(agentId)
+      if (launch) launch.endedAt ??= index
       continue
     }
     if (event.type === "subagent.started" || event.type === "subagent.configured") {
       const description = [data.agentDisplayName, data.description, data.agentName]
         .find((value): value is string => typeof value === "string") ?? ""
-      pendingAgents.set(agentId, description || pendingAgents.get(agentId) || "")
+      if (!launch || launch.endedAt !== undefined) {
+        const startedAt = typeof event.timestamp === "string" ? event.timestamp : undefined
+        agents.set(agentId, { agent: { description, startedAt }, launchedAt: index })
+      } else if (description) {
+        launch.agent.description = description
+      }
     }
   }
-  if (pendingAgents.size > 0) {
-    const descriptions = [...pendingAgents.values()]
-    return {
-      status: "awaiting_agents",
-      pendingQueue: 0,
-      pendingAgents: descriptions.length,
-      pendingAgentDescriptions: descriptions.filter((description) => description.length > 0),
-    }
-  }
+  const awaiting = awaitingAgentsStatus([...agents.values()])
+  if (awaiting) return awaiting
 
   let sawUserActivity = false
   const completedPermissionRequests = new Set<string>()

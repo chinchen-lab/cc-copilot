@@ -179,6 +179,7 @@ describe("Copilot session metadata", () => {
       pendingAgents: 1,
       pendingAgentDescriptions: ["Inspect the parser"],
       pendingQueue: 0,
+      backgroundAgents: [{ description: "Inspect the parser", done: false }],
     })
   })
 

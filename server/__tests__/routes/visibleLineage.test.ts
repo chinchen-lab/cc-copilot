@@ -45,6 +45,13 @@ describe("visibleLineage", () => {
     await expect(visibleLineage(checkHiding([]))(row)).resolves.toEqual(row)
   })
 
+  it("drops a crew placement whose listed host is hidden", async () => {
+    const row = { sessionId: "reviewer", crew: { rootId: "coordinator", parentId: "auditor", hostId: "lane" } }
+    await expect(visibleLineage(checkHiding(["lane"]))(row))
+      .resolves.toStrictEqual({ sessionId: "reviewer", crew: undefined })
+    await expect(visibleLineage(checkHiding([]))(row)).resolves.toStrictEqual(row)
+  })
+
   it("checks each referenced session once", async () => {
     const check = checkHiding(["lead"])
     const lineage = visibleLineage(check)

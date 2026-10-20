@@ -1,5 +1,6 @@
-import { createContext, useContext, type ReactNode } from "react"
+import { createContext, useContext, useSyncExternalStore, type ReactNode } from "react"
 import { EMPTY_OVERLAY, type StreamingOverlay } from "@/lib/streamingOverlay"
+import type { StreamingOverlayStore } from "@/lib/streamingOverlayStore"
 
 const EMPTY_AGENT_PROGRESS: Record<string, string> = {}
 
@@ -11,7 +12,7 @@ const EMPTY_AGENT_PROGRESS: Record<string, string> = {}
  * re-render every session consumer on each flush. Only the running-turn
  * overlay and live subagent transcripts subscribe here.
  */
-const StreamingOverlayContext = createContext<StreamingOverlay>(EMPTY_OVERLAY)
+const StreamingOverlayContext = createContext<StreamingOverlay | StreamingOverlayStore>(EMPTY_OVERLAY)
 
 /**
  * Latest AI-generated progress line per running subagent, keyed by the
@@ -23,18 +24,20 @@ const StreamingOverlayContext = createContext<StreamingOverlay>(EMPTY_OVERLAY)
 const AgentProgressContext = createContext<Record<string, string>>(EMPTY_AGENT_PROGRESS)
 
 interface StreamingOverlayProviderProps {
-  value: StreamingOverlay
+  value?: StreamingOverlay
+  store?: StreamingOverlayStore
   agentProgress?: Record<string, string>
   children: ReactNode
 }
 
 export function StreamingOverlayProvider({
-  value,
+  value = EMPTY_OVERLAY,
+  store,
   agentProgress = EMPTY_AGENT_PROGRESS,
   children,
 }: StreamingOverlayProviderProps): ReactNode {
   return (
-    <StreamingOverlayContext.Provider value={value}>
+    <StreamingOverlayContext.Provider value={store ?? value}>
       <AgentProgressContext.Provider value={agentProgress}>
         {children}
       </AgentProgressContext.Provider>
@@ -42,11 +45,16 @@ export function StreamingOverlayProvider({
   )
 }
 
+const noSubscribe = () => () => {}
+
 export function useStreamingOverlay(): StreamingOverlay {
-  return useContext(StreamingOverlayContext)
+  const source = useContext(StreamingOverlayContext)
+  const store = "snapshot" in source ? source : null
+  return useSyncExternalStore(store?.subscribe ?? noSubscribe, store?.snapshot ?? (() => source as StreamingOverlay))
 }
 
 /** The running subagent's current progress line, or null before the first fork lands. */
-export function useAgentProgress(toolUseId: string): string | null {
-  return useContext(AgentProgressContext)[toolUseId] ?? null
+export function useAgentProgress(toolUseId: string | undefined): string | null {
+  const progress = useContext(AgentProgressContext)
+  return toolUseId ? progress[toolUseId] ?? null : null
 }

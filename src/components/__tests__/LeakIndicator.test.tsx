@@ -24,9 +24,6 @@ const LEAK: SystemProcessMetric = {
 function hookValue(overrides: Record<string, unknown> = {}) {
   return {
     leaks: [] as SystemProcessMetric[],
-    killing: false,
-    killLeaks: vi.fn().mockResolvedValue(undefined),
-    refresh: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }
 }
@@ -40,32 +37,33 @@ describe("LeakIndicator", () => {
   afterEach(() => vi.useRealTimers())
 
   it("renders nothing while no leaks are flagged, but keeps the monitor running", () => {
-    const { container } = render(<LeakIndicator />)
+    const { container } = render(<LeakIndicator onReview={vi.fn()} />)
 
     expect(container).toBeEmptyDOMElement()
     expect(mocks.useLeakMonitor).toHaveBeenCalled()
   })
 
-  it("appears with the leak count and kills every leaked pid on click", async () => {
+  it("opens process review without killing flagged processes", async () => {
     const value = hookValue({ leaks: [LEAK, { ...LEAK, pid: 43 }] })
     mocks.useLeakMonitor.mockReturnValue(value)
     const user = userEvent.setup()
 
-    render(<LeakIndicator />)
-    const button = screen.getByRole("button", { name: "Kill 2 leaked agent processes" })
+    const review = vi.fn()
+    render(<LeakIndicator onReview={review} />)
+    const button = screen.getByRole("button", { name: "Review 2 flagged processes" })
     expect(button).toHaveTextContent("2")
 
     await user.click(button)
-    expect(value.killLeaks).toHaveBeenCalledWith([42, 43])
+    expect(review).toHaveBeenCalledOnce()
   })
 
   it("stays pinned at zero for a cool-down after the last leak clears", () => {
     vi.useFakeTimers()
     mocks.useLeakMonitor.mockReturnValue(hookValue({ leaks: [LEAK] }))
-    const { container, rerender } = render(<LeakIndicator />)
+    const { container, rerender } = render(<LeakIndicator onReview={vi.fn()} />)
 
     mocks.useLeakMonitor.mockReturnValue(hookValue())
-    rerender(<LeakIndicator />)
+    rerender(<LeakIndicator onReview={vi.fn()} />)
 
     expect(screen.getByRole("button", { name: /Leak monitor/ })).toHaveTextContent("0")
 

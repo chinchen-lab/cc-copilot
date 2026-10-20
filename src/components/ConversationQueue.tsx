@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useSessionNamer } from "@/hooks/useSessionNamer"
-import { taskWakeupSummary } from "@/lib/userMessageContent"
+import { generatedPromptSummary } from "@/lib/userMessageContent"
 
 const noopSubscribe = () => () => {}
 const emptySnapshot = () => EMPTY_CONVERSATION
@@ -44,7 +44,7 @@ function DeliveryProblems({ storageKey, commands: receipts, readOnly, onAction }
     {commands.map((command) => <div className="flex flex-col gap-2" key={command.id}>
       <div className="flex items-center gap-2">
         <Badge variant="destructive">{command.state}</Badge>
-        <span className="min-w-0 flex-1 truncate" title={command.message}>{(command.message && taskWakeupSummary(command.message, nameOf)) || command.message || "Image attachment"}</span>
+        <span className="min-w-0 flex-1 truncate" title={command.message}>{(command.message && generatedPromptSummary(command.message, nameOf)) || command.message || "Image attachment"}</span>
         {command.state === "failed" && <Button size="icon-xs" variant="ghost" aria-label="Dismiss failed message" title="Dismiss failed message" onClick={() => setDismissals((previous) => [...(Array.isArray(previous) ? previous : []), command.id])}><X /></Button>}
       </div>
       {command.error && <p className="text-sm text-muted-foreground">{presentTurnError(command.error)}</p>}

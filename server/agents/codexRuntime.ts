@@ -864,6 +864,7 @@ export const codexRuntime: AgentRuntime = {
     return {
       live: active || Boolean(legacy && !legacy.dead),
       running: active || activeProcesses.has(sessionId),
+      agentsRunning: codexAppServer.hasActiveDescendantTurn(sessionId),
     }
   },
 

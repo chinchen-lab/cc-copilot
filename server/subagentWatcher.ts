@@ -5,6 +5,8 @@ import { randomUUID } from "node:crypto"
 import { recordActivity } from "./lib/activityMonitor"
 
 const READ_CHUNK_BYTES = 256 * 1024
+const WATCH_RETRY_MS = 2_000
+const WATCH_BACKSTOP_MS = 30_000
 
 /** Weak head-comparison length, used only when it singles out one candidate. */
 const PROMPT_HEAD_CHARS = 100
@@ -80,7 +82,7 @@ export function watchSubagents(
     return head.length === 1 ? { toolId: head[0][0], proven: false } : undefined
   }
   let dirWatcher: ReturnType<typeof watch> | null = null
-  let pollTimer: ReturnType<typeof setInterval> | null = null
+  let pollTimer: ReturnType<typeof setTimeout> | null = null
   let scanInFlight: Promise<void> | null = null
   let scanRequested = false
 
@@ -247,22 +249,39 @@ export function watchSubagents(
     return scanInFlight
   }
 
-  // Watch the subagents directory for changes
-  try {
-    dirWatcher = watch(subagentsDir, { recursive: true }, () => {
-      if (!closed) void scanDir()
-    })
-    dirWatcher.on("error", () => {}) // dir may not exist yet
-  } catch {
-    // directory doesn't exist yet — poller will pick up changes
+  function attachDirectoryWatcher(): void {
+    if (closed || dirWatcher) return
+    try {
+      const watcher = watch(subagentsDir, { recursive: true }, () => {
+        if (!closed) void scanDir()
+      })
+      dirWatcher = watcher
+      watcher.on("error", () => {
+        watcher.close()
+        if (dirWatcher !== watcher) return
+        dirWatcher = null
+        schedulePoll()
+      })
+    } catch {
+      // The directory is created only when the session starts a subagent.
+    }
   }
 
-  // Poll only as a fallback (subagents dir may be created after we start
-  // watching). fs.watch remains immediate when the directory already exists;
-  // a two-second fallback avoids four unnecessary scans out of every five.
-  pollTimer = setInterval(scanDir, 2_000)
+  function schedulePoll(): void {
+    if (pollTimer) clearTimeout(pollTimer)
+    if (closed) return
+    pollTimer = setTimeout(() => {
+      pollTimer = null
+      attachDirectoryWatcher()
+      void scanDir().finally(() => {
+        if (!closed) schedulePoll()
+      })
+    }, dirWatcher ? WATCH_BACKSTOP_MS : WATCH_RETRY_MS)
+    pollTimer.unref?.()
+  }
 
-  // Initial scan
+  attachDirectoryWatcher()
+  schedulePoll()
   void scanDir()
 
   return {
@@ -270,7 +289,7 @@ export function watchSubagents(
       closed = true
       dirWatcher?.close()
       dirWatcher = null
-      if (pollTimer) clearInterval(pollTimer)
+      if (pollTimer) clearTimeout(pollTimer)
       pollTimer = null
     },
   }

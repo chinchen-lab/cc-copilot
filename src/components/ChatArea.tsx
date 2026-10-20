@@ -53,7 +53,7 @@ export const ChatArea = memo(function ChatArea({
 
   const { searchQuery } = state
   const { pendingMessages } = chat
-  const { chatScrollRef, scrollEndRef, observeChatContent, handleScroll, canScrollDown, scrollToBottomInstant, initialScrollDone } = scroll
+  const { chatScrollRef, observeChatContent, handleScroll, canScrollDown, scrollToBottomInstant, initialScrollDone } = scroll
   const findRef = useRef<FindInSessionHandle>(null)
 
   // Cmd/Ctrl+F (or the command palette) → open find-in-session
@@ -165,7 +165,6 @@ export const ChatArea = memo(function ChatArea({
                 canManage={permissions.send && !isSubAgentView}
                 isMobile={isMobile}
               />
-              <div ref={scrollEndRef} />
             </ErrorBoundary>
           </div>
         </div>
@@ -176,8 +175,9 @@ export const ChatArea = memo(function ChatArea({
           className={cn(
             "absolute rounded-full shadow-sm transition-[opacity,transform] duration-200 ease-out active:scale-95",
             canScrollDown ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none",
-            isMobile ? "right-3 bottom-3" : "right-5 bottom-5",
+            isMobile ? "right-3 bottom-3" : "right-5",
           )}
+          style={isMobile ? undefined : { bottom: "calc(var(--session-footer-height, 0px) + 1.25rem)" }}
           onClick={scrollToBottomInstant}
           aria-label="Scroll to bottom"
         >

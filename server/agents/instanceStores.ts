@@ -28,6 +28,7 @@ export function createInstanceStore(instance: ProviderInstance): AgentStore {
     async listProjectSessionFiles(name) { const files = await store.listProjectSessionFiles(splitInstanceDirName(name).nativeDirName); return files?.map((file) => ({ ...file, dirName: dir(file.dirName), ...(file.sessionId ? { sessionId: qualify(file.sessionId) } : {}) })) ?? null },
     async listTopLevelSessions() { return (await store.listTopLevelSessions()).map((file) => ({ ...file, dirName: dir(file.dirName), ...(file.sessionId ? { sessionId: qualify(file.sessionId) } : {}) })) },
     listSubagentFiles: (name, id) => store.listSubagentFiles(splitInstanceDirName(name).nativeDirName, splitInstanceSessionId(id).nativeId),
+    agentsWroteSince: (name, id, since) => store.agentsWroteSince(splitInstanceDirName(name).nativeDirName, splitInstanceSessionId(id).nativeId, since),
     async sessionAddress(path) { const address = await store.sessionAddress(path); return address ? { ...address, dirName: dir(address.dirName) } : null },
     transcriptPath: (name, id) => store.transcriptPath(splitInstanceDirName(name).nativeDirName, splitInstanceSessionId(id).nativeId),
   }

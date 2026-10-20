@@ -295,6 +295,50 @@ describe("deriveSessionStatus — background agents (Claude)", () => {
     expect(result.pendingAgentDescriptions).toEqual(["second"])
   })
 
+  it("describes each pending agent with its launch time and tool call", () => {
+    const result = deriveSessionStatus([
+      userPrompt,
+      { ...asyncLaunch("tu1", "ag1", "Explore the parser"), timestamp: "2026-10-14T10:00:00.000Z" },
+      endTurn,
+    ])
+    expect(result.backgroundAgents).toEqual([
+      { description: "Explore the parser", startedAt: "2026-10-14T10:00:00.000Z", toolUseId: "tu1", done: false },
+    ])
+  })
+
+  it("keeps agents that finished during the current wait in the batch", () => {
+    const result = deriveSessionStatus([
+      userPrompt,
+      asyncLaunch("tu1", "ag1", "first"),
+      asyncLaunch("tu2", "ag2", "second"),
+      asyncLaunch("tu3", "ag3", "third"),
+      endTurn,
+      { type: "user", message: { role: "user", content: notificationText("tu1", "ag1") } },
+      endTurn,
+    ])
+    expect(result.pendingAgents).toBe(2)
+    expect(result.pendingAgentDescriptions).toEqual(["second", "third"])
+    expect(result.backgroundAgents?.map(({ description, done }) => ({ description, done }))).toEqual([
+      { description: "first", done: true },
+      { description: "second", done: false },
+      { description: "third", done: false },
+    ])
+  })
+
+  it("starts a new batch once every earlier agent had finished", () => {
+    const result = deriveSessionStatus([
+      userPrompt,
+      asyncLaunch("tu1", "ag1", "earlier"),
+      endTurn,
+      { type: "user", message: { role: "user", content: notificationText("tu1", "ag1") } },
+      endTurn,
+      userPrompt,
+      asyncLaunch("tu2", "ag2", "later"),
+      endTurn,
+    ])
+    expect(result.backgroundAgents?.map((agent) => agent.description)).toEqual(["later"])
+  })
+
   it("treats a TaskStop call as resolving the stopped task", () => {
     const msgs = [
       userPrompt,
@@ -391,10 +435,10 @@ describe("deriveSessionStatus — Codex collab agents", () => {
   const sessionMeta = { type: "session_meta", payload: { id: "x" } }
   const taskComplete = { type: "event_msg", payload: { type: "task_complete" } }
 
-  function spawn(callId: string, agentId: string) {
+  function spawn(callId: string, agentId: string, taskName = "researcher") {
     return [
-      { type: "response_item", payload: { type: "function_call", name: "spawn_agent", call_id: callId, arguments: `{"message":"do work","task_name":"researcher"}` } },
-      { type: "response_item", payload: { type: "function_call_output", call_id: callId, output: `{"agent_id":"${agentId}","task_name":"/root/researcher"}` } },
+      { type: "response_item", payload: { type: "function_call", name: "spawn_agent", call_id: callId, arguments: `{"message":"do work","task_name":"${taskName}"}` } },
+      { type: "response_item", payload: { type: "function_call_output", call_id: callId, output: `{"agent_id":"${agentId}","task_name":"/root/${taskName}"}` } },
     ]
   }
 
@@ -435,6 +479,37 @@ describe("deriveSessionStatus — Codex collab agents", () => {
       taskComplete,
     ]
     expect(deriveSessionStatus(msgs).status).toBe("completed")
+  })
+
+  it("keeps agents that finished during the wait in the batch", () => {
+    const result = deriveSessionStatus([
+      sessionMeta,
+      ...spawn("c1", "agA", "parser"),
+      ...spawn("c2", "agB", "renderer"),
+      { type: "response_item", payload: { type: "function_call", name: "wait_agent", call_id: "c3", arguments: "{}" } },
+      { type: "response_item", payload: { type: "function_call_output", call_id: "c3", output: `{"status":{"agA":{"completed":"done"}}}` } },
+      taskComplete,
+    ])
+    expect(result.status).toBe("awaiting_agents")
+    expect(result.pendingAgentDescriptions).toEqual(["renderer"])
+    expect(result.backgroundAgents).toEqual([
+      { description: "parser", done: true },
+      { description: "renderer", done: false },
+    ])
+  })
+
+  it("keeps a renumbered agent's place and description in the batch", () => {
+    const result = deriveSessionStatus([
+      sessionMeta,
+      ...spawn("c1", "prov1", "parser"),
+      ...spawn("c2", "agB", "renderer"),
+      { type: "event_msg", payload: { type: "sub_agent_activity", agent_thread_id: "threadZ", agent_path: "/root/parser", kind: "started", event_id: "c1" } },
+      taskComplete,
+    ])
+    expect(result.backgroundAgents).toEqual([
+      { description: "parser", done: false },
+      { description: "renderer", done: false },
+    ])
   })
 
   it("normalizes collab tool names for the tool_use status", () => {
@@ -671,7 +746,23 @@ describe("deriveSessionStatus — Copilot format", () => {
       pendingAgents: 1,
       pendingAgentDescriptions: ["New worker"],
       pendingQueue: 0,
+      backgroundAgents: [{ description: "New worker", done: false }],
     })
+  })
+
+  it("keeps a subagent that finished during the wait in the batch", () => {
+    const result = deriveSessionStatus([
+      { type: "session.start", data: { sessionId: "copilot-1" } },
+      { type: "user.message", data: { content: "delegate" } },
+      { type: "subagent.started", agentId: "a", timestamp: "2026-10-14T10:00:00.000Z", data: { agentDisplayName: "First" } },
+      { type: "subagent.started", agentId: "b", timestamp: "2026-10-14T10:00:01.000Z", data: { agentDisplayName: "Second" } },
+      { type: "subagent.completed", agentId: "a", data: {} },
+    ])
+    expect(result.pendingAgents).toBe(1)
+    expect(result.backgroundAgents).toEqual([
+      { description: "First", startedAt: "2026-10-14T10:00:00.000Z", done: true },
+      { description: "Second", startedAt: "2026-10-14T10:00:01.000Z", done: false },
+    ])
   })
 
   it("dismisses only the permission request that completed", () => {

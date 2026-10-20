@@ -5,11 +5,11 @@ import {
 } from "../helpers"
 import { descriptorForDirName } from "../../shared/session/agent-descriptors"
 import { storeForPath } from "../agents"
+import { sessionAgentsRunning } from "../agents/agentsRunning"
 import { runtimeForDirName } from "../agents/runtimes"
 import { resolveTaskOutput } from "../agents/taskOutput"
 import { authorizeStreamSession, visibilityFor } from "../edition"
 import { authorizeTranscript } from "../edition/transcript"
-import { readdir } from "node:fs/promises"
 import { StringDecoder } from "node:string_decoder"
 import { sendJson, type UseFn } from "../http"
 import * as streamBus from "../lib/streamBus"
@@ -17,6 +17,9 @@ import { beginActivity, recordActivity } from "../lib/activityMonitor"
 
 const TASK_OUTPUT_READ_CHUNK_BYTES = 256 * 1024
 const SESSION_READ_CHUNK_BYTES = 256 * 1024
+/** How often a watched session's agents are checked, and how often their activity is re-announced. */
+const AGENTS_CHECK_MS = 5000
+const AGENTS_RESEND_MS = 10_000
 
 export function registerFileWatchRoutes(use: UseFn) {
   // GET /api/task-output?path=<outputFile>[&sessionId=<id>] - SSE stream of a
@@ -203,6 +206,7 @@ export function registerFileWatchRoutes(use: UseFn) {
     let watcher: ReturnType<typeof watch> | null = null
     let pollTimer: ReturnType<typeof setInterval> | null = null
     let heartbeat: ReturnType<typeof setInterval> | null = null
+    let agentsPoller: ReturnType<typeof setInterval> | null = null
     let closed = false
     const THROTTLE_MS = 150
 
@@ -307,6 +311,25 @@ export function registerFileWatchRoutes(use: UseFn) {
         res.write(": heartbeat\n\n")
       }
     }
+    // Agents a session started can work long after its turn ends without
+    // writing to its transcript, and the client's stale timer would then show
+    // the session as finished. While they run this is said again every resend
+    // interval, so a dropped connection still lets the client lapse.
+    let agentsAnnouncedAt = 0
+    let agentsCheckInFlight = false
+    const announceRunningAgents = async () => {
+      if (closed || agentsCheckInFlight || Date.now() - agentsAnnouncedAt < AGENTS_RESEND_MS) return
+      agentsCheckInFlight = true
+      recordActivity("Subagent activity checks")
+      try {
+        if (await sessionAgentsRunning(dirName, sessionId) && !closed) {
+          agentsAnnouncedAt = Date.now()
+          res.write(`data: ${JSON.stringify({ type: "subagent_activity" })}\n\n`)
+        }
+      } finally {
+        agentsCheckInFlight = false
+      }
+    }
     if (streamBus.isCompacting(sessionId)) sendCompacting(true)
     // A block is raised once, when the turn is refused, and stays up until the
     // allowance returns — so a client opening the session afterwards has to be
@@ -339,6 +362,7 @@ export function registerFileWatchRoutes(use: UseFn) {
       if (trailingTimer) clearTimeout(trailingTimer)
       if (pollTimer) clearInterval(pollTimer)
       if (heartbeat) clearInterval(heartbeat)
+      if (agentsPoller) clearInterval(agentsPoller)
     }
 
     // Establish the baseline after the client snapshot. When the client sends
@@ -353,6 +377,7 @@ export function registerFileWatchRoutes(use: UseFn) {
         const recentlyActive = Date.now() - s.mtimeMs < 30_000
         res.write(`data: ${JSON.stringify({ type: "init", offset, recentlyActive })}\n\n`)
         if (runtimeTurnActive()) sendHeartbeat()
+        void announceRunningAgents()
         void flushNewLines()
       })
       .catch(() => {
@@ -394,47 +419,7 @@ export function registerFileWatchRoutes(use: UseFn) {
       if (!closed) flushNewLines()
     }, POLL_MS)
 
-    // ── Background-agent activity detection ──────────────────────────
-    // Background agents and workflows write only to <sessionId>/subagents/
-    // until their task-notification lands on the parent JSONL. The client's
-    // stale timer would fire mid-work and render the session as finished, so
-    // poll the subagents dir and send a synthetic SSE event while any agent
-    // transcript is fresh.
-    const sessionDir = sessionFilePath.replace(/\.jsonl$/, "")
-    const subagentsDir = sessionDir + "/subagents"
-    // Re-announce periodically rather than latching a single event, so the
-    // server keeps saying "still going" for as long as the work runs.
-    let subagentActivitySentAt = 0
-    const ACTIVITY_RESEND_MS = 10_000
-    const SUBAGENT_STAT_CAP = 100
-
-    // Only Claude writes sub-agent transcripts as sibling files to poll for.
-    const subagentPoller = descriptor.kind !== "claude"
-      ? null
-      : setInterval(async () => {
-        if (closed) return
-        recordActivity("Subagent activity checks")
-        try {
-          const files = await readdir(subagentsDir)
-          const agentFiles = files
-            .filter((f) => f.startsWith("agent-") && f.endsWith(".jsonl"))
-            .slice(0, SUBAGENT_STAT_CAP)
-          let hasFreshAgent = false
-          for (const agentFile of agentFiles) {
-            const s = await stat(subagentsDir + "/" + agentFile).catch(() => null)
-            if (s && Date.now() - s.mtimeMs < 30_000) {
-              hasFreshAgent = true
-              break
-            }
-          }
-          if (hasFreshAgent && Date.now() - subagentActivitySentAt >= ACTIVITY_RESEND_MS) {
-            subagentActivitySentAt = Date.now()
-            res.write(`data: ${JSON.stringify({ type: "subagent_activity" })}\n\n`)
-          }
-        } catch {
-          // subagents dir may not exist — that's fine
-        }
-      }, 5000)
+    agentsPoller = setInterval(() => void announceRunningAgents(), AGENTS_CHECK_MS)
 
     // Heartbeat to keep connection alive
     heartbeat = setInterval(() => {
@@ -442,9 +427,6 @@ export function registerFileWatchRoutes(use: UseFn) {
     }, 15000)
 
     // Cleanup on disconnect
-    req.on("close", () => {
-      cleanup()
-      if (subagentPoller) clearInterval(subagentPoller)
-    })
+    req.on("close", cleanup)
   })
 }

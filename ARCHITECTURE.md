@@ -166,10 +166,15 @@ owned zone, that file is the bug, not the plan.
    with the head-read identity and full metadata readers as a sibling
    `<agent>Metadata.ts`. An agent that records the project only inside the
    transcript gets its project listings from `./transcriptProjects`.
+   `agentsWroteSince` is polled while a session is watched, so it answers false
+   when the CLI's agent transcripts cannot be found cheaply.
    Register it in `server/agents/index.ts`.
 6. **`server/agents/<agent>Runtime.ts`** — implement `AgentRuntime` over whatever
    transport the CLI speaks, with the transport itself as a sibling module in the
    same directory, and the live model catalog in `<agent>Models.ts`.
+   `activity().agentsRunning` comes from the process itself, never from
+   transcript timing: `sessionAgentsRunning` in `./agentsRunning` already falls
+   back to the store for sessions no runtime holds.
    Register it in `server/agents/runtimes.ts`.
 7. **Per-record tables in `server/agents/`** — add a row to `tailRecords.ts`
    (status from the tail), `summaryFolds.ts` (Mission Control cards),

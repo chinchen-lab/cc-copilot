@@ -111,6 +111,17 @@ describe("crew chat", () => {
     expect(mocks.store.chatDeliveries("lead", "local")).toEqual([])
   })
 
+  it("answers a post without waiting on a member that is slow to accept, and keeps delivering", async () => {
+    vi.useFakeTimers()
+    let release!: () => void
+    mocks.send.mockImplementation(async (id: string) => (id === "lead" ? new Promise((resolve) => { release = () => resolve({ delivery: "queued" }) }) : { delivery: "queued" }))
+    const posted = post("Ready for review")
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect((await posted).pending).toEqual(expect.arrayContaining([expect.objectContaining({ sessionId: "lead" })]))
+    release()
+    await vi.waitFor(() => expect(mocks.store.chatDeliveries("lead", "local")).toEqual([]))
+  })
+
   it("drains a new post that arrives while another post is being delivered", async () => {
     let release!: () => void
     mocks.send.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve({ delivery: "queued" }) }))

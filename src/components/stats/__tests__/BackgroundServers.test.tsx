@@ -46,4 +46,20 @@ describe("BackgroundServers", () => {
     expect(screen.getByText("Active Servers (1)")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Stop server" })).not.toBeInTheDocument()
   })
+  it("does not restart polling when transcript arrays change", async () => {
+    vi.useFakeTimers()
+    const changed = vi.fn()
+    const { rerender, unmount } = render(<BackgroundServers cwd="/work/app" turns={[]} onServersChanged={changed} />)
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    const firstReports = changed.mock.calls.length
+    rerender(<BackgroundServers cwd="/work/app" turns={[]} onServersChanged={changed} />)
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    expect(mocks.authFetch).toHaveBeenCalledOnce()
+    await act(async () => { await vi.advanceTimersByTimeAsync(9000) })
+    expect(mocks.authFetch).toHaveBeenCalledTimes(2)
+    expect(changed).toHaveBeenCalledTimes(firstReports)
+    unmount()
+    vi.useRealTimers()
+  })
+
 })

@@ -356,7 +356,7 @@ export default function App() {
   // parsed by useSessionActions / useNewSession before dispatch).
   const reconnectHandlerRef = useRef<(() => void) | null>(null)
   const {
-    isLive, sseState, isCompacting, streamingOverlay, turnError, agentProgress, promptSuggestion, rateLimit,
+    isLive, sseState, isCompacting, streamingOverlayStore, turnError, agentProgress, promptSuggestion, rateLimit,
   } = useLiveSession(
     state.sessionSource,
     (updated) => {
@@ -567,7 +567,6 @@ export default function App() {
     pendingMessages: agentChat.pendingMessages,
     consumePending: agentChat.consumePending,
     sessionChangeKey: state.sessionChangeKey,
-    partialSignal: streamingOverlay,
   })
 
   const chatScrollRef = scroll.chatScrollRef
@@ -1242,7 +1241,7 @@ export default function App() {
       <AppProvider value={appContextValue}>
       <PtyProvider>
       <SessionProvider value={sessionContextValue} chatValue={sessionChatValue}>
-      <StreamingOverlayProvider value={streamingOverlay} agentProgress={agentProgress}>
+      <StreamingOverlayProvider store={streamingOverlayStore} agentProgress={agentProgress}>
         <PreviewAppShell
           sessionId={previewSessionId}
           loadError={previewLoadError}
@@ -1266,7 +1265,7 @@ export default function App() {
       <AppProvider value={appContextValue}>
       <PtyProvider enabled={terminalEnabled}>
       <SessionProvider value={sessionContextValue} chatValue={sessionChatValue}>
-      <StreamingOverlayProvider value={streamingOverlay} agentProgress={agentProgress}>
+      <StreamingOverlayProvider store={streamingOverlayStore} agentProgress={agentProgress}>
         <MobileAppShell
           navigation={{
             panels,
@@ -1334,7 +1333,7 @@ export default function App() {
     <AppProvider value={appContextValue}>
     <PtyProvider enabled={terminalEnabled}>
     <SessionProvider value={sessionContextValue} chatValue={sessionChatValue}>
-      <StreamingOverlayProvider value={streamingOverlay} agentProgress={agentProgress}>
+      <StreamingOverlayProvider store={streamingOverlayStore} agentProgress={agentProgress}>
         <DesktopAppShell
           navigation={{
             panels,

@@ -31,7 +31,7 @@ describe("durable session authority", () => {
   it("returns inactive read state for another provider account without launching a process", () => {
     const runtime = createInstanceRuntime({ id: "00000000-0000-4000-8000-000000000001", agent: "codex", label: "Account", homeDir: process.env.COGPIT_ORCHESTRATION_ROOT!, createdAt: 1 }, process.env.COGPIT_ORCHESTRATION_ROOT!)
     for (const id of ["native-default", instanceSessionId("00000000-0000-4000-8000-000000000002", "other")]) {
-      expect(runtime.activity(id)).toEqual({ live: false, running: false })
+      expect(runtime.activity(id)).toEqual({ live: false, running: false, agentsRunning: false })
       expect(runtime.hasSession(id)).toBe(false)
       expect(runtime.listPendingQuestions(id)).toEqual([])
       expect(runtime.listPendingApprovals(id)).toEqual([])

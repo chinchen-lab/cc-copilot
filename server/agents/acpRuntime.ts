@@ -195,7 +195,7 @@ export const acpRuntime: AgentRuntime = {
   async stop(id) { if (!sessions.has(id)) return false; await this.interrupt(id); sessions.delete(id); for (const [key, pending] of permissions) if (pending.approval.sessionId === id) { clearTimeout(pending.timer); pending.resolve({ outcome: { outcome: "cancelled" } }); permissions.delete(key) }; return true },
   async stopAll() { const ids = [...sessions.keys()]; for (const id of ids) await this.stop(id); return { stopped: ids.length, failed: 0 } },
   async deleteSession(id, filePath) { await this.stop(id); if (!acpStore.ownsPath(filePath)) throw error(403, "Transcript is outside this provider instance"); rmSync(filePath, { force: true }) },
-  activity: (id) => ({ live: sessions.has(id) && Boolean(connection && !connection.signal.aborted), running: sessions.get(id)?.running ?? false }),
+  activity: (id) => ({ live: sessions.has(id) && Boolean(connection && !connection.signal.aborted), running: sessions.get(id)?.running ?? false, agentsRunning: false }),
   hasSession: (id) => sessions.has(id), listActive: () => [...sessions].filter(([, value]) => value.running).map(([sessionId]) => ({ sessionId })),
   listPendingApprovals: (id) => [...permissions.values()].map((value) => value.approval).filter((value) => !id || value.sessionId === id),
   respondToApproval: respond,

@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react"
+import { useCallback, useState } from "react"
 import { authFetch } from "@/lib/auth"
+import { useVisiblePolling } from "@/hooks/useVisiblePolling"
 
 export interface BgAgent {
   agentId: string
@@ -11,39 +12,24 @@ export interface BgAgent {
   preview: string
 }
 
+const NO_AGENTS: BgAgent[] = []
+
 export function useBackgroundAgents(cwd: string | null): BgAgent[] {
-  const [agents, setAgents] = useState<BgAgent[]>([])
-
-  useEffect(() => {
-    if (!cwd) {
-      setAgents([])
-      return
-    }
-
-    let cancelled = false
-
-    async function fetchAgents() {
-      try {
-        const res = await authFetch(
-          `/api/background-agents?cwd=${encodeURIComponent(cwd!)}`
-        )
-        if (cancelled) return
-        if (res.ok) {
-          const data: BgAgent[] = await res.json()
-          setAgents(data)
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    fetchAgents()
-    const interval = setInterval(fetchAgents, 5_000)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
+  const [result, setResult] = useState<{ cwd: string; agents: BgAgent[] } | null>(null)
+  const poll = useCallback(async (isActive: () => boolean) => {
+    if (!cwd) return
+    try {
+      const res = await authFetch(`/api/background-agents?cwd=${encodeURIComponent(cwd)}`)
+      if (!res.ok) return
+      const agents = await res.json() as BgAgent[]
+      if (!isActive()) return
+      setResult((current) => current?.cwd === cwd && JSON.stringify(current.agents) === JSON.stringify(agents)
+        ? current
+        : { cwd, agents })
+    } catch {
+      // The next visible poll retries.
     }
   }, [cwd])
-
-  return agents
+  useVisiblePolling(cwd ? poll : null, 5_000)
+  return result && result.cwd === cwd ? result.agents : NO_AGENTS
 }

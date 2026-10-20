@@ -1,6 +1,7 @@
 // SHARED SESSION CORE: edit shared/session only; cogpit-memory copies are generated.
 import { computeStats, createEmptySessionStats, mergeTokenUsage } from "./sessionStats"
 import { appendAssistantText } from "./turnContent"
+import { awaitingAgentsStatus, type AgentLaunch } from "./backgroundAgents"
 import {
   findFailedNestedPatchCallIds,
   parseCodexToolPatches,
@@ -1284,21 +1285,33 @@ function parseJsonObject(value: unknown): Record<string, unknown> | null {
   }
 }
 
-function collectCodexPendingAgents(rawMessages: readonly RawRecord[]): string[] {
-  const alive = new Map<string, string>() // agentId → description
-  const done = new Set<string>()
+function collectCodexBackgroundAgents(rawMessages: readonly RawRecord[]): AgentLaunch[] {
+  // agentId → launch, kept after the agent finishes so the batch can count it
+  const launched = new Map<string, { launchedAt: number; description: string; startedAt?: string }>()
+  const alive = new Set<string>()
+  const endedAt = new Map<string, number>() // agentId → index of the record that ended it
   const agentIdByPath = new Map<string, string>()
   const spawnCalls = new Map<string, string>() // call_id → task name
   const waitCalls = new Set<string>()
   const interruptCalls = new Map<string, string[]>() // call_id → target agent ids
 
-  function markAlive(agentId: string, description: string) {
-    if (!done.has(agentId)) alive.set(agentId, alive.get(agentId) || description)
+  function markAlive(agentId: string, description: string, index: number, startedAt: string | undefined) {
+    if (endedAt.has(agentId)) return
+    alive.add(agentId)
+    const launch = launched.get(agentId)
+    if (!launch) launched.set(agentId, { launchedAt: index, description, startedAt })
+    else if (!launch.description) launch.description = description
   }
 
-  for (const msg of rawMessages) {
+  function markEnded(agentId: string, index: number) {
+    if (!endedAt.has(agentId)) endedAt.set(agentId, index)
+    alive.delete(agentId)
+  }
+
+  for (const [index, msg] of rawMessages.entries()) {
     const payload = isObject(msg.payload) ? msg.payload : null
     if (!payload) continue
+    const timestamp = typeof msg.timestamp === "string" ? msg.timestamp : undefined
 
     if (msg.type === "event_msg" && payload.type === "sub_agent_activity"
       && typeof payload.agent_thread_id === "string" && typeof payload.agent_path === "string") {
@@ -1306,27 +1319,26 @@ function collectCodexPendingAgents(rawMessages: readonly RawRecord[]): string[] 
       const kind = typeof payload.kind === "string" ? payload.kind : "started"
       const eventId = typeof payload.event_id === "string" ? payload.event_id : ""
       const existingId = agentIdByPath.get(payload.agent_path)
-      const known = alive.has(agentId) || done.has(agentId) || existingId !== undefined || spawnCalls.has(eventId)
+      const known = alive.has(agentId) || endedAt.has(agentId) || existingId !== undefined || spawnCalls.has(eventId)
       // Only a `started` event (or a previously known agent) establishes a child.
       if (kind !== "started" && !known) continue
 
       // Agent-id renumbering: a provisional id from the spawn output is
       // superseded by the thread id once activity events arrive.
       if (existingId && existingId !== agentId) {
-        if (alive.has(existingId)) {
-          markAlive(agentId, alive.get(existingId) ?? "")
-          alive.delete(existingId)
-        }
-        if (done.has(existingId)) done.add(agentId)
+        const prior = launched.get(existingId)
+        launched.delete(existingId)
+        const current = launched.get(agentId)
+        if (prior && !current) launched.set(agentId, prior)
+        else if (prior && current && !current.description) current.description = prior.description
+        if (alive.delete(existingId)) markAlive(agentId, "", index, timestamp)
+        const priorEnd = endedAt.get(existingId)
+        if (priorEnd !== undefined) markEnded(agentId, priorEnd)
       }
       agentIdByPath.set(payload.agent_path, agentId)
 
-      if (kind === "interrupted") {
-        done.add(agentId)
-        alive.delete(agentId)
-      } else {
-        markAlive(agentId, spawnCalls.get(eventId) ?? "")
-      }
+      if (kind === "interrupted") markEnded(agentId, index)
+      else markAlive(agentId, spawnCalls.get(eventId) ?? "", index, timestamp)
       continue
     }
 
@@ -1354,7 +1366,7 @@ function collectCodexPendingAgents(rawMessages: readonly RawRecord[]): string[] 
         const output = parseJsonObject(payload.output)
         const agentId = typeof output?.agent_id === "string" ? output.agent_id : ""
         if (agentId) {
-          markAlive(agentId, spawnCalls.get(callId) ?? "")
+          markAlive(agentId, spawnCalls.get(callId) ?? "", index, timestamp)
           const agentPath = typeof output?.task_name === "string" ? output.task_name : ""
           if (agentPath && !agentIdByPath.has(agentPath)) agentIdByPath.set(agentPath, agentId)
         }
@@ -1369,16 +1381,10 @@ function collectCodexPendingAgents(rawMessages: readonly RawRecord[]): string[] 
             || typeof statusValue.error === "string"
             || typeof statusValue.interrupted === "string"
             || lifecycle === "completed" || lifecycle === "failed" || lifecycle === "interrupted"
-          if (isTerminal) {
-            done.add(agentId)
-            alive.delete(agentId)
-          }
+          if (isTerminal) markEnded(agentId, index)
         }
       } else if (interruptCalls.has(callId)) {
-        for (const agentId of interruptCalls.get(callId) ?? []) {
-          done.add(agentId)
-          alive.delete(agentId)
-        }
+        for (const agentId of interruptCalls.get(callId) ?? []) markEnded(agentId, index)
       }
       continue
     }
@@ -1387,15 +1393,15 @@ function collectCodexPendingAgents(rawMessages: readonly RawRecord[]): string[] 
       const text = codexPayloadText(payload)
       const messageType = text.match(/^Message Type:\s*([^\r\n]+)/)?.[1]?.trim().toUpperCase() ?? ""
       if (!TERMINAL_INTER_AGENT_TYPES.has(messageType)) continue
-      const agentId = agentIdByPath.get(payload.author) ?? payload.author
-      done.add(agentId)
-      alive.delete(agentId)
+      markEnded(agentIdByPath.get(payload.author) ?? payload.author, index)
     }
   }
 
-  return [...alive.entries()]
-    .filter(([agentId]) => !done.has(agentId))
-    .map(([, description]) => description)
+  return [...launched.entries()].map(([agentId, { description, startedAt, launchedAt }]) => ({
+    agent: { description, startedAt },
+    launchedAt,
+    endedAt: alive.has(agentId) ? undefined : endedAt.get(agentId) ?? launchedAt,
+  }))
 }
 
 /** Derive status by walking backward through a rollout's records. */
@@ -1408,16 +1414,7 @@ export function deriveCodexSessionStatus(rawMessages: readonly RawRecord[]): Ses
       switch (payload?.type) {
         case "task_complete": {
           // The turn ended, but spawned collab agents may still be running.
-          const pending = collectCodexPendingAgents(rawMessages)
-          if (pending.length > 0) {
-            return {
-              status: "awaiting_agents",
-              pendingQueue: 0,
-              pendingAgents: pending.length,
-              pendingAgentDescriptions: pending.filter((description) => description.length > 0),
-            }
-          }
-          return { status: "completed" }
+          return awaitingAgentsStatus(collectCodexBackgroundAgents(rawMessages)) ?? { status: "completed" }
         }
         case "task_started":
           return { status: "processing" }

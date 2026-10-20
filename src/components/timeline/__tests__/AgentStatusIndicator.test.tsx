@@ -1,10 +1,12 @@
-import { act, cleanup, render, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   SessionProvider,
   type SessionChatContextValue,
   type SessionContextValue,
 } from "@/contexts/SessionContext"
+import { StreamingOverlayProvider } from "@/contexts/StreamingOverlayContext"
+import { EMPTY_OVERLAY } from "@/lib/streamingOverlay"
 import type { ParsedSession } from "../../../../shared/session/types"
 import { AgentStatusIndicator, LiveElapsed } from "../AgentStatusIndicator"
 
@@ -39,6 +41,29 @@ function awaitingAgentsSession(): MockSession {
   }
 }
 
+function agentLaunch(toolUseId: string, agentId: string, description: string) {
+  return {
+    type: "user",
+    timestamp: "2026-10-14T10:00:00.000Z",
+    message: { role: "user", content: [{ type: "tool_result", tool_use_id: toolUseId, content: "Async agent launched successfully." }] },
+    toolUseResult: { status: "async_launched", agentId, description },
+  }
+}
+
+function agentBatchSession(): MockSession {
+  return {
+    rawMessages: [
+      { type: "user", message: { role: "user", content: "go" } },
+      agentLaunch("tu1", "ag1", "Read the parser"),
+      agentLaunch("tu2", "ag2", "Read the renderer"),
+      { type: "assistant", message: { stop_reason: "end_turn" } },
+      { type: "user", message: { role: "user", content: "<task-notification>\n<task-id>ag1</task-id>\n</task-notification>" } },
+      { type: "assistant", message: { stop_reason: "end_turn" } },
+    ],
+    turns: [],
+  }
+}
+
 function thinkingSession(): MockSession {
   return {
     rawMessages: [
@@ -55,11 +80,13 @@ function indicatorWithContext({
   isLive = true,
   isCompacting = false,
   pendingInteraction = null,
+  agentProgress,
 }: {
   session?: MockSession
   isLive?: boolean
   isCompacting?: boolean
   pendingInteraction?: SessionContextValue["pendingInteraction"]
+  agentProgress?: Record<string, string>
 } = {}) {
   const value = {
     session: session as unknown as ParsedSession,
@@ -71,7 +98,9 @@ function indicatorWithContext({
 
   return (
     <SessionProvider value={value} chatValue={unusedChatContext}>
-      <AgentStatusIndicator />
+      <StreamingOverlayProvider value={EMPTY_OVERLAY} agentProgress={agentProgress}>
+        <AgentStatusIndicator />
+      </StreamingOverlayProvider>
     </SessionProvider>
   )
 }
@@ -175,10 +204,45 @@ describe("AgentStatusIndicator lifecycle", () => {
   it("shows waiting-on-agents instead of Done while background agents run", () => {
     render(indicatorWithContext({ session: awaitingAgentsSession() }))
 
-    expect(screen.getByText("Waiting on 1 agent...")).toBeInTheDocument()
+    expect(screen.getByText("Waiting on 1 agent")).toBeInTheDocument()
     expect(screen.getByText("Explore the parser")).toBeInTheDocument()
     expect(screen.queryByText("Done")).not.toBeInTheDocument()
     expect(screen.queryByText("Waiting for your input")).not.toBeInTheDocument()
+  })
+
+  it("lists every agent in the batch with how many have finished", () => {
+    render(indicatorWithContext({ session: agentBatchSession() }))
+
+    expect(screen.getByText("Waiting on 1 of 2 agents")).toBeInTheDocument()
+    expect(screen.getByText("Read the parser").closest("li")).toHaveAttribute("data-agent-done", "true")
+    expect(screen.getByText("Read the renderer").closest("li")).not.toHaveAttribute("data-agent-done")
+  })
+
+  it("shows a running agent's live progress line", () => {
+    render(indicatorWithContext({
+      session: agentBatchSession(),
+      agentProgress: { tu1: "Stale line for a finished agent", tu2: "Tracing the virtualized list" },
+    }))
+
+    expect(screen.getByText("Tracing the virtualized list")).toBeInTheDocument()
+    expect(screen.queryByText("Stale line for a finished agent")).not.toBeInTheDocument()
+  })
+
+  it("times the wait from the batch's first launch", () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-10-14T10:01:30.000Z"))
+    render(indicatorWithContext({ session: agentBatchSession() }))
+
+    expect(within(screen.getByRole("button", { name: /Waiting on 1 of 2 agents/ })).getByText("1m 30s")).toBeInTheDocument()
+  })
+
+  it("collapses the agent list from its header", () => {
+    render(indicatorWithContext({ session: agentBatchSession() }))
+
+    fireEvent.click(screen.getByRole("button", { name: /Waiting on 1 of 2 agents/ }))
+
+    expect(screen.queryByText("Read the renderer")).not.toBeInTheDocument()
+    expect(screen.getByText("Waiting on 1 of 2 agents")).toBeInTheDocument()
   })
 
   it("continues to surface compaction while ordinary live output is paused", () => {

@@ -10,11 +10,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-const { mockStat, mockOpen, mockWatch, mockIsCopilotTurnActive } = vi.hoisted(() => ({
+const { mockStat, mockOpen, mockWatch, mockIsCopilotTurnActive, mockAgentsRunning } = vi.hoisted(() => ({
   mockStat: vi.fn(),
   mockOpen: vi.fn(),
   mockWatch: vi.fn(),
   mockIsCopilotTurnActive: vi.fn(),
+  mockAgentsRunning: vi.fn(async (_dirName: string, _sessionId: string) => false),
 }))
 
 vi.mock("../../helpers", () => ({
@@ -41,6 +42,8 @@ vi.mock("../../agents", async () => {
     }),
   }
 })
+
+vi.mock("../../agents/agentsRunning", () => ({ sessionAgentsRunning: mockAgentsRunning }))
 
 vi.mock("../../agents/runtimes", () => ({
   runtimeForDirName: () => ({
@@ -134,6 +137,7 @@ beforeEach(() => {
   })
   mockWatch.mockReturnValue({ on: vi.fn(), close: vi.fn() })
   mockIsCopilotTurnActive.mockReturnValue(false)
+  mockAgentsRunning.mockResolvedValue(false)
 })
 
 afterEach(() => {
@@ -270,6 +274,41 @@ describe("/api/watch stream-bus forwarding", () => {
     const initialCount = activityCount()
     await vi.advanceTimersByTimeAsync(15_000)
     expect(activityCount()).toBeGreaterThan(initialCount)
+
+    harness.closeConnection()
+  })
+
+  it("keeps a session live while its agents run, then lets it lapse", async () => {
+    vi.useFakeTimers()
+    mockAgentsRunning.mockResolvedValue(true)
+    const handler = getHandler("/api/watch/")
+    const harness = makeReqRes(`/proj-a/${SESSION}.jsonl`)
+    const announcements = () => parseFrames(harness.frames)
+      .filter((event) => event.type === "subagent_activity").length
+
+    await handler(harness.req as never, harness.res as never, harness.next)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockAgentsRunning).toHaveBeenCalledWith("proj-a", SESSION)
+    expect(announcements()).toBe(1)
+
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(announcements()).toBe(2)
+
+    mockAgentsRunning.mockResolvedValue(false)
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(announcements()).toBe(2)
+
+    harness.closeConnection()
+  })
+
+  it("says nothing about agents for a session that has none running", async () => {
+    vi.useFakeTimers()
+    const handler = getHandler("/api/watch/")
+    const harness = makeReqRes(`/proj-a/${SESSION}.jsonl`)
+
+    await handler(harness.req as never, harness.res as never, harness.next)
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(parseFrames(harness.frames).some((event) => event.type === "subagent_activity")).toBe(false)
 
     harness.closeConnection()
   })

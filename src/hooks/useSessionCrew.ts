@@ -105,7 +105,7 @@ export function useSessionCrew(sessionId: string | null): SessionCrewState {
     member.sessionId,
     () => (member.result?.state === "running" && member.parentId
       ? jsonFetch("/api/delegated-tasks", { sessionId: member.parentId, taskId: member.result.taskId, action: "cancel" })
-      : jsonFetch("/api/stop-session", { sessionId: member.sessionId })),
+      : jsonFetch("/api/stop-session", { sessionId: member.sessionId, cancelQueued: true })),
     "Couldn't stop the session.",
   ), [act])
 

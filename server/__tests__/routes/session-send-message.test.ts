@@ -52,6 +52,7 @@ const {
     steerTurn: vi.fn(),
     interruptTurn: vi.fn(),
     getActiveTurnId: vi.fn(),
+    hasActiveDescendantTurn: vi.fn(() => false),
     listApprovalThreadIds: vi.fn(() => []),
     call: vi.fn(),
     shutdown: vi.fn(async () => {}),
@@ -59,6 +60,7 @@ const {
   mockCopilotRuntime: {
     isSessionActive: vi.fn(),
     isTurnActive: vi.fn(),
+    hasRunningSubagents: vi.fn(() => false),
     getPendingPermissions: vi.fn(() => []),
     getPendingUserInputs: vi.fn(() => []),
     getPendingExitPlans: vi.fn(() => []),
@@ -504,7 +506,7 @@ describe("/api/send-message SDK resume cwd", () => {
     ["keeps an explicit queue intent during a running turn", true, "queue", "queue"],
   ] as const)("durable send %s", async (_name, running, intent, expected) => {
     mockFindJsonlPath.mockResolvedValue("/Users/me/.claude/projects/-Users-me-proj/sess-1.jsonl")
-    mockSdkSessions.set("sess-1", { sessionId: "sess-1", running, activeQuery: {}, messageStream: {} })
+    mockSdkSessions.set("sess-1", { sessionId: "sess-1", running, backgroundAgents: new Set(), activeQuery: {}, messageStream: {} })
 
     const handler = getHandler("/api/send-message")
     const { req, res, next, sendBody } = createMockReqRes("POST", JSON.stringify({ sessionId: "sess-1", message: "also check the logs", commandId: "command-0001", intent }))

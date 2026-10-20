@@ -8,7 +8,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -127,6 +127,23 @@ describe("claude store", () => {
     ])
     await expect(store.listSubagentFiles("proj-x", "no-such-session")).resolves.toEqual([])
     await expect(store.listSubagentFiles("..", "etc")).resolves.toBeNull()
+  })
+
+  it("sees an agent write anywhere under the session's sub-agents, workflow agents included", async () => {
+    const store = agents.storeFor("claude")
+    const subagents = join(sessionPaths.dirs.PROJECTS_DIR, "proj-x", CLAUDE_SESSION, "subagents")
+    const workflowAgent = join(subagents, "workflows", "wf_1", "agent-wf1.jsonl")
+    await write(workflowAgent, "{}\n")
+    const now = Date.now()
+    const hourAgo = new Date(now - 3_600_000)
+    await utimes(join(subagents, "agent-abc123.jsonl"), hourAgo, hourAgo)
+
+    await expect(store.agentsWroteSince("proj-x", CLAUDE_SESSION, now - 60_000)).resolves.toBe(true)
+
+    await utimes(workflowAgent, hourAgo, hourAgo)
+    await expect(store.agentsWroteSince("proj-x", CLAUDE_SESSION, now - 60_000)).resolves.toBe(false)
+    await expect(store.agentsWroteSince("proj-x", "no-such-session", 0)).resolves.toBe(false)
+    await expect(store.agentsWroteSince("..", "etc", 0)).resolves.toBe(false)
   })
 
   it("addresses a transcript by its directory and file name", async () => {
