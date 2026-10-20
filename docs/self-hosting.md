@@ -31,7 +31,7 @@ isn't one.
 |---|---|---|
 | Desktop app | Electron, macOS / Linux / Windows | You are at the machine |
 | `bun run dev` | Vite dev server | You are hacking on Cogpit itself |
-| `cogpit-server` | Headless, no Electron | The machine has no display, or you want it always on |
+| `./CC-Copilot` or `bun server/standalone.ts` | Headless, no Electron | The machine has no display, or you want it always on |
 
 Only the third one needs this page.
 
@@ -43,6 +43,11 @@ Your choice is saved in that browser and restored on reload. Existing saved them
 are kept. On desktop, **Appearance** in the command palette also offers the full
 theme list and chat width settings.
 
+Terminals keep a dark gray background and contrasting text in light mode. See
+[the usage guide](usage.md#sessions-and-conversation-history) for automatic project
+focus, and [message controls](usage.md#messages-models-and-permissions) for Enter,
+new lines, and input-method candidate confirmation.
+
 ---
 
 ## Headless server
@@ -50,8 +55,8 @@ theme list and chat width settings.
 ```bash
 git clone https://github.com/gentritbiba/cogpit.git
 cd cogpit
-bun install
-bun run build
+bun install --ignore-scripts
+bun run build:web
 
 # Loopback only. Safe default, not reachable from the network.
 CC_COPILOT_UI_HOST=127.0.0.1 bun server/standalone.ts
@@ -80,7 +85,7 @@ export PATH="$HOME/.bun/bin:$PATH"
 
 # On an x86_64 Linux machine:
 cd release/cc-copilot-linux-x64
-CC_COPILOT_UI_PASSWORD='replace-with-your-own-long-password' ./CC-Copilot
+CC_COPILOT_UI_PASSWORD='replace-with-your-own-password' CC_COPILOT_UI_PORT=19384 ./CC-Copilot
 ```
 
 Open `http://<server-ip>:19384` from Windows over the VPN. The default bind address
@@ -98,8 +103,22 @@ directory and forwards arguments and shutdown signals to the server. Builds on
 macOS produce a macOS package for local verification, not a Linux package.
 The portable package includes the personal edition.
 
-Configuration and session data stay in `~/.config/cogpit`, separate from the
-release directory. Override this with `CC_COPILOT_UI_DATA_DIR=/your/data/path`. Existing
+For example, on a second RHEL 9 x86_64 machine:
+
+```bash
+tar -xzf cc-copilot-linux-x64.tar.gz
+cd cc-copilot-linux-x64
+CC_COPILOT_UI_PASSWORD='replace-with-your-own-password' ./CC-Copilot
+```
+
+To deploy an update, run `./build-server.sh` again from the updated checkout,
+stop the running server with `Ctrl+C` or your service manager, and replace the
+package directory with the new build. Preserve your data directory and password
+settings. Restart the server and reload the browser to load the new web assets.
+
+Server-owned configuration and data stay in `~/.config/cogpit`, separate from the
+release directory. Agent transcripts remain in the CLIs' own directories.
+Override the server data directory with `CC_COPILOT_UI_DATA_DIR=/your/data/path`. Existing
 `CC_COPILOT_UI_PASSWORD_FILE` settings also work. Runtime plugins and background
 workers are included; browser automation additionally needs its usual browser and
 agent-browser installation on the host.
@@ -125,8 +144,9 @@ CC_COPILOT_UI_PASSWORD='a genuinely long passphrase' \
 bun server/standalone.ts
 ```
 
-The password is read from the environment and never written to disk. Minimum 6 characters,
-enforced. It is stored as a versioned scrypt hash using the OWASP profile.
+The password is read from the environment and never written to disk. The minimum
+is 6 characters. The server keeps its versioned scrypt hash in memory for
+environment-supplied credentials.
 
 If you would rather not put a secret in the environment directly, use a file. This works with
 systemd `LoadCredential`:
@@ -134,6 +154,10 @@ systemd `LoadCredential`:
 ```bash
 CC_COPILOT_UI_PASSWORD_FILE=/run/credentials/cogpit/password bun server/standalone.ts
 ```
+
+The password file takes precedence over the inline password. A single trailing
+newline is trimmed. An unreadable password file stops startup; it does not fall
+back to an unprotected listener.
 
 ### Starting a session in a folder
 
@@ -205,7 +229,7 @@ bun server/standalone.ts
 ```
 
 Open `http://<linux-server-ip>:19384` in the Windows browser. No reverse proxy or
-certificate installation is needed. Build the frontend with `bun run build` when
+certificate installation is needed. Build the frontend with `bun run build:web` when
 updating the server so its HTTP-compatible browser code is included.
 
 HTTP is the standalone default. Set `CC_COPILOT_UI_ALLOW_HTTP=0` or pass `--https` to
@@ -213,6 +237,14 @@ require HTTPS sessions. `--https` overrides `CC_COPILOT_UI_ALLOW_HTTP=1`; the le
 `--http-only` flag explicitly enables HTTP and overrides `CC_COPILOT_UI_ALLOW_HTTP=0`.
 Passing both flags is an error. `./CC-Copilot --help` lists the options. Other
 entry points retain their HTTPS policy unless explicitly configured for HTTP.
+
+| Startup setting | Browser session policy |
+| --- | --- |
+| No flag and no transport variable | HTTP allowed |
+| `CC_COPILOT_UI_ALLOW_HTTP=0` | HTTPS required |
+| `--https` | HTTPS required, even when the environment allows HTTP |
+| `--http-only` | HTTP allowed, even when the environment requires HTTPS |
+| Both flags | Startup error |
 
 HTTP mode retains password verification, login rate limits, session expiry,
 same-origin checks, and API/WebSocket authorization. Browser sessions use separate
@@ -253,9 +285,10 @@ network password: a guest cannot log in at `/` with it, and someone holding two 
 reaches two sessions and no more.
 
 Network access has to be on before a session can be shared, and the guest needs the same
-origin you do. By default, share login sets a `Secure` cookie, so a plain `http://192.168.x.x:19384` link
-answers `426 Upgrade Required` and says to use the tunnel. Send guests the HTTPS URL from your
-reverse proxy or tunnel unless HTTP mode is enabled. Login attempts are rate limited,
+origin you do. Shares follow the host's browser transport policy. In the standalone
+server's default HTTP mode, guests can use its HTTP URL. With `--https`, share login
+uses a `Secure` cookie and a plaintext remote link returns `426 Upgrade Required`;
+send the HTTPS URL from the reverse proxy instead. Login attempts are rate limited,
 and a wrong passphrase and a session that was never shared return the same 401, so the endpoint
 cannot be used to discover which sessions are shared.
 
@@ -310,26 +343,32 @@ internal session CLI continues to receive `COGPIT_PORT` with the actual bound po
 
 ```ini
 [Unit]
-Description=Cogpit
+Description=CC Copilot self-hosted server
 Wants=network-online.target
 After=network-online.target
 
 [Service]
 Type=simple
 User=you
-WorkingDirectory=/opt/cogpit
-Environment=CC_COPILOT_UI_HOST=127.0.0.1
+WorkingDirectory=/opt/cc-copilot
+Environment=CC_COPILOT_UI_HOST=0.0.0.0
+Environment=CC_COPILOT_UI_PORT=19384
 Environment=CC_COPILOT_UI_DEVICE_NAME=build-box
 LoadCredential=password:/etc/cogpit/password
 Environment=CC_COPILOT_UI_PASSWORD_FILE=%d/password
-ExecStart=/usr/local/bin/bun server/standalone.ts
+ExecStart=/opt/cc-copilot/CC-Copilot
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Binding loopback and letting Caddy terminate TLS in front is the arrangement I would pick.
+Extract the portable package into `/opt/cc-copilot` and replace `User=you` with
+the account whose agent CLI logins the server will use. The example serves HTTP
+to your private network or VPN. For a TLS proxy on the same host, set
+`CC_COPILOT_UI_HOST=127.0.0.1` and change `ExecStart` to
+`/opt/cc-copilot/CC-Copilot --https`. When running from source instead, use your
+installed Bun's absolute path and the absolute `server/standalone.ts` path.
 
 ---
 
@@ -358,7 +397,7 @@ Register other machines and drive them from one window. Your browser only ever t
 hub, which reverse-proxies to each device, so there is nothing to configure per origin.
 
 A device is addable if it runs either the desktop app with Network Access enabled, or
-`cogpit-server`. Add one under **Devices → Add device** with its `host:port`, or
+`./CC-Copilot`. Add one under **Devices → Add device** with its `host:port`, or
 `https://host:port` if it sits behind a TLS proxy. A live probe tells you whether it is
 reachable, needs a password, has network access disabled, or is running an older version.
 
@@ -372,8 +411,9 @@ the hub proxy.
 
 ## Ports and discovery
 
-The packaged app binds an ephemeral port unless Network Access pins one. It writes the bound
-port to `~/.cogpit/port` on start and removes it on exit.
+The Electron app binds an ephemeral port unless Network Access pins one. The
+standalone server defaults to `19384`, configurable with `CC_COPILOT_UI_PORT`.
+Both publish the bound port to `~/.cogpit/port` on start and remove it on exit.
 
 Anything integrating with a running Cogpit should resolve the port in this order:
 
@@ -388,7 +428,7 @@ Anything integrating with a running Cogpit should resolve the port in this order
 What is actually there:
 
 - Refuses to bind a non-loopback address without a password.
-- Minimum 16 character password, versioned scrypt hash on the OWASP profile.
+- Minimum 6-character password, with a versioned scrypt hash.
 - Auth rate limited to 5 attempts per minute per client.
 - Browser sessions expire after 30 minutes idle or 8 hours absolute, whichever comes first.
 - Changing the password or disabling network access revokes every existing session.

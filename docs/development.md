@@ -25,13 +25,32 @@ bun run electron:dev
 bun run build
 
 # Build and serve the web app
-bun run serve
+CC_COPILOT_UI_PASSWORD='replace-with-your-password' bun run serve
+
+# Build a portable headless server with its own runtime
+./build-server.sh
+# Equivalent: bun run build:server
 
 # Build a local unsigned macOS arm64 desktop package
 bun run electron:package
 ```
 
 `bun run electron:package:signed` uses a local Developer ID and builds the host targets. It requires a paid Apple Developer account and signing credentials. The [release workflow](../.github/workflows/release.yml) builds the distribution artifacts for each supported platform.
+
+### Portable self-hosted server
+
+`./build-server.sh` requires Bun 1.3.5 or newer with `Bun.Terminal`, plus `tar` and gzip support. It installs frozen dependencies with lifecycle scripts disabled, builds the web app and runtime plugins, then installs production dependencies into a separate package. No Electron packaging or native Node PTY build is needed for this Bun server.
+
+The output is `release/cc-copilot-<os>-<arch>/` and a matching `.tar.gz`, with `CC-Copilot`, `runtime/bun`, and `app/`. Keep the whole directory together. The launcher uses its bundled runtime, keeps the caller's working directory, forwards arguments, and receives shutdown signals through `exec`.
+
+Build on the destination OS and architecture: RHEL 9 x86_64 produces `cc-copilot-linux-x64`, aarch64 produces `cc-copilot-linux-arm64`, and macOS produces a macOS package. This script does not cross-compile. The portable package includes the personal edition, and runtime data stays outside the release directory.
+
+```bash
+cd release/cc-copilot-linux-x64
+CC_COPILOT_UI_PASSWORD='replace-with-your-password' CC_COPILOT_UI_PORT=19384 ./CC-Copilot
+```
+
+HTTP browser login is enabled by default; remote access still requires a password of at least 6 characters. `--https` requires HTTPS browser sessions behind a separately configured TLS proxy. See [self-hosting](self-hosting.md) for RHEL 9 prerequisites, environment aliases, and service deployment.
 
 ### Update your installed Mac app
 
@@ -56,6 +75,7 @@ bun run lint
 bun run typecheck
 bun run check:agents
 bun run test
+bun run test:public
 
 cd packages/cogpit-memory
 bun test

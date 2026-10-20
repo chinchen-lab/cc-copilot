@@ -1,10 +1,19 @@
 # Runtime plugin browser support
 
-Verified 2026-09-15. Runtime plugins require a secure browser context and the APIs listed below. The core application can continue when the plugin gate rejects a browser, provided the browser can load the application bundle itself.
+The baseline checks below were verified 2026-09-15; HTTP-mode behavior was added in commits `5d0d00f` and `a8015ec`. Runtime plugins require a secure browser context or the server's explicit HTTP-mode handshake, plus the APIs listed below. The core application can continue when the plugin gate rejects a browser, provided the browser can load the application bundle itself.
 
-`src/plugins/browserSupport.ts` checks native API availability before the client starts polling, creates a plugin session, or sends a mutation. It checks secure context, MessageChannel/MessagePort, Blob URLs, Web Crypto digest/random values, AbortController, AbortSignal.any/timeout/throwIfAborted, structuredClone, Object.hasOwn, fetch, Headers, readable response streams, and text encoding/decoding. It does not allocate a channel, invoke crypto, make a request, inspect the user agent, or install global polyfills.
+`src/plugins/browserSupport.ts` checks API availability before the client starts polling, creates a plugin session, or sends a mutation. It checks secure context or server-enabled HTTP mode, MessageChannel/MessagePort, Blob URLs, SHA-256 support and native random values, AbortController, AbortSignal.any/timeout/throwIfAborted, structuredClone, Object.hasOwn, fetch, Headers, readable response streams, and text encoding/decoding. It does not allocate a channel, invoke crypto, make a request, inspect the user agent, or install global polyfills.
 
-An unsupported browser receives a Plugins error naming the missing APIs. The client advertises no executable runtime or client capabilities. Its three manifest browser features remain truthful: a partial MessagePort API cannot advertise `message-channel`, missing Blob URL creation/revocation cannot advertise `blob-script`, and an insecure context cannot advertise `web-crypto`. Those three feature names remain the public manifest vocabulary; the complete client gate also checks the implementation's other prerequisites.
+An unsupported browser receives a Plugins error naming the missing APIs. The client advertises no executable runtime or client capabilities. A partial MessagePort API cannot advertise `message-channel`, and missing Blob URL creation/revocation cannot advertise `blob-script`. The existing `web-crypto` feature name covers native SHA-256 or the HTTP-mode SHA-256 fallback, with native `getRandomValues` still required. Those three feature names remain the public manifest vocabulary; the complete client gate also checks the implementation's other prerequisites.
+
+The browser learns HTTP mode only from its own `/api/hello` response with
+`httpOnly: true`. The standalone entry point enables that mode by default;
+`--https` disables it. URLs and browser storage cannot enable the fallback.
+When `crypto.subtle.digest` is unavailable, `src/lib/browserCrypto.ts` uses
+`@noble/hashes` for SHA-256 verification. Core UUID generation uses native
+`crypto.randomUUID` when available and falls back to `getRandomValues` otherwise.
+Package integrity checks remain enabled, and other missing browser APIs still
+fail the plugin gate.
 
 An active client that loses prerequisites aborts its work and clears its plugin state on refresh. It skips session-release requests if the required APIs are no longer usable; the host's expiring session and activation leases provide bounded cleanup. Normal stop/host-switch cleanup still sends DELETE to the captured host.
 
@@ -26,7 +35,12 @@ MDN records Chrome 103–123's timeout implementation as partial because it abor
 
 The standalone package builder targets ES2022 syntax. A syntax target does not supply missing Web APIs or JavaScript built-ins, so Object.hasOwn and structuredClone remain explicit prerequisites. The practical Firefox floor is 128 because the shared UI uses Tailwind 4, whose documented browser baseline is Chrome 111, Safari 16.4, and Firefox 128. See [Tailwind's compatibility policy](https://tailwindcss.com/docs/compatibility). The API gate is not a complete CSS compatibility test.
 
-Use HTTPS for remote hosts. Browser-recognized trustworthy loopback origins such as localhost also qualify. An HTTP LAN address normally does not; the gate uses the browser's `isSecureContext` result rather than guessing from the hostname. See [MDN's secure context rules](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts).
+Without the server's HTTP-mode handshake, use HTTPS for remote hosts or a
+browser-recognized trustworthy loopback origin such as localhost. An HTTP LAN
+address normally is not a secure context; HTTP mode permits that deployment
+without changing the browser's `isSecureContext` value. Browser features such as
+the Clipboard API retain their own secure-context restrictions. See
+[self-hosting transport modes](self-hosting.md#remote-browser-access).
 
 ## Executed checks and platform limits
 

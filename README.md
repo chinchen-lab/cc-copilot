@@ -66,6 +66,23 @@ npx cogpit@latest preview <session-id>
 
 See [launcher options](packages/cogpit-cli/README.md) or the [self-hosting guide](docs/self-hosting.md) for a headless server and remote access.
 
+### Build a portable self-hosted server
+
+With Bun 1.3.5 or newer installed, run this from the repository root on the Linux machine you will deploy to:
+
+```bash
+./build-server.sh
+# Equivalent: bun run build:server
+
+# Linux x86_64 output; use linux-arm64 on aarch64:
+cd release/cc-copilot-linux-x64
+CC_COPILOT_UI_PASSWORD='replace-with-your-password' CC_COPILOT_UI_PORT=19384 ./CC-Copilot
+```
+
+Open `http://<server-ip>:19384` from your browser. The standalone server defaults to HTTP and binds `0.0.0.0`; remote access requires a password of at least 6 characters. For HTTPS browser sessions behind a TLS reverse proxy, add `--https`.
+
+The build produces a directory and a `.tar.gz` archive containing Bun, the web app, and server dependencies. Transfer the whole package to a matching OS and architecture; the destination does not need Bun or Node installed. Agent CLIs and their logins are still needed on the server. For RHEL 9, build on RHEL 9. See [portable server setup](docs/self-hosting.md#build-a-portable-server-on-rhel-9) for prerequisites, deployment settings, and systemd.
+
 ## Claude Code, Codex, and Copilot support
 
 Cogpit connects to the installed agent CLIs. The controls in a session reflect what that CLI supports.
@@ -128,7 +145,7 @@ Cogpit reads session history from the CLI directories on your machine. It does n
 
 ### Can I use Cogpit from my phone or self-host it?
 
-Yes. Run the desktop app with Network Access enabled or run a headless Cogpit server, then connect through your phone's browser. Remote browser access requires HTTPS and authentication. The multi-device hub lets you switch between registered machines. See [self-hosting and remote access](docs/self-hosting.md).
+Yes. Run the desktop app with Network Access enabled or run a headless server, then connect through your phone's browser. The standalone server defaults to authenticated HTTP for a trusted private network or VPN. Add `--https` to require secure browser sessions behind a TLS reverse proxy; the desktop app retains its HTTPS requirement. The multi-device hub lets you switch between registered machines. See [self-hosting and remote access](docs/self-hosting.md).
 
 ## Build from source
 
@@ -139,7 +156,7 @@ bun install
 bun run dev
 ```
 
-Use `bun run electron:dev` for the desktop app, `bun run build:web` for the web build, or `bun run electron:package` for a local desktop package. See the [development guide](docs/development.md) for checks and packaging details.
+Use `bun run electron:dev` for the desktop app, `bun run build:web` for the web build, `bun run build:server` for a portable self-hosted server, or `bun run electron:package` for a local desktop package. See the [development guide](docs/development.md) for checks and packaging details.
 
 React, TypeScript, Vite, Electron, Tailwind CSS, and Express. [Architecture](ARCHITECTURE.md) explains how Cogpit connects to each agent.
 
@@ -147,7 +164,7 @@ React, TypeScript, Vite, Electron, Tailwind CSS, and Express. [Architecture](ARC
 
 - [Using Cogpit](docs/usage.md): session controls, history, file changes, goals, and notifications.
 - [Browser panel](docs/browser.md): shared browsing, persistent logins, and setup.
-- [Self-hosting](docs/self-hosting.md): headless servers, HTTPS, and authentication.
+- [Self-hosting](docs/self-hosting.md): portable Linux builds, HTTP/HTTPS modes, deployment settings, and authentication.
 - [Integrations and plugins](docs/plugins.md): GitHub, ClickUp, Vercel, Cloudflare, and custom panels.
 - [Remote workspaces](docs/remote-workspaces.md): isolated cross-device tasks with target or explicitly transferred env files.
 - [cogpit-memory](packages/cogpit-memory/README.md): search and inspect agent sessions from the command line.

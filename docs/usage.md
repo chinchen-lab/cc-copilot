@@ -25,15 +25,19 @@ Copilot discovery reads events from `~/.copilot/session-state`. It does not impo
 
 The sidebar and mobile Sessions tab show live and recent sessions, with status and attention cues. Search by project, prompt, title, branch, or pull request. Enter `#157`, a project name plus `#157`, or a GitHub pull request URL to find sessions that created or worked on that PR. Sessions are one list of cards, newest first, shelved under "Today", "Yesterday", "Last 7 days", "Last 30 days" and "Older". Each card shows its project, title, last prompt, status, branch and turns; hover a card for the full first and latest prompts. The scope picker below the search box narrows the list to one project, where cards drop the project line and the picker shows how many sessions in other projects are waiting for you. "Load older sessions" at the end fetches beyond the newest ones.
 
+Opening, switching, or starting a chat automatically focuses the sidebar on that chat's project. Worktree sessions use their parent project's group. You can still choose **All projects** or another project in the scope picker: background refreshes preserve that choice until you navigate to another chat. With no chat open, the sidebar keeps its remembered scope for that device.
+
 Archive a finished session to keep the sidebar short: hover a row and use the archive button, or right-click it. Focus the sidebar on a project and right-click its name at the top to archive every idle session in that project at once. Archiving only hides the session from the list; the transcript is untouched, and the toast offers Undo. The archive toggle next to the search box lists archived sessions again, dimmed with an archive mark, and a search always looks through them. Archived sessions come back on their own when they get new activity, including a message sent from Cogpit. Sessions with no activity for two weeks are archived automatically; restoring one keeps it listed until you archive it again. The archive is stored on the server, so every device sees the same list.
 
 The timeline contains messages, expandable thinking blocks, tool calls, diffs, and compaction markers. Images and videos that an agent references with markdown image syntax render inline: images open in a zoomable viewer, and `mp4`, `m4v`, `webm` and `mov` files play with controls. Local files are served by the Cogpit server, so they show up on remote devices too. Expand a command to inspect its output. Adjacent shell calls share a card, and failures stay attached to the command that produced them.
 
 Work stays expanded while a turn is live. Completed turns fold behind a duration row. Each turn has a separate file summary. Cogpit virtualizes long transcripts so you can scroll through large sessions.
 
-Claude token streaming is on by default. Set `COGPIT_STREAM_PARTIAL=0`, `false`, `off`, or `no` before launching Cogpit to disable partial messages while keeping completed session updates.
+Claude token streaming is on by default. For standalone deployments, set `CC_COPILOT_UI_STREAM_PARTIAL=0`, `false`, `off`, or `no` before launching to disable partial messages while keeping completed session updates. The existing `COGPIT_STREAM_PARTIAL` name remains supported, including in the desktop app.
 
 ## Messages, models, and permissions
+
+Press **Enter** to send a message or **Shift+Enter** for a new line. When using a Chinese, Japanese, or Korean input method, Enter confirms the candidate without sending; a subsequent ordinary Enter sends the committed text. This also applies to the first-message composer on the home screen and queued-message editing. Crew chat uses **Cmd+Enter** or **Ctrl+Enter** to send and ignores those shortcuts while composing text.
 
 The model chip beside Send opens the provider, model, reasoning effort, and available speed controls. You can change several settings before clicking outside to close it. Image drag-and-drop and paste appear for models that accept images. Slash command suggestions include supported built-in commands and project skills and commands. Claude sessions offer `/output-style` to list output styles or switch to one.
 
@@ -63,7 +67,7 @@ The Worktrees panel in the right rail lists active git worktrees, whether they h
 
 The [Browser panel](browser.md) shows the browser your agent is using. Select the same browser and tab to watch it work or interact with the page yourself. The shared default browser retains logins. Named browsers keep separate profiles, and subagents use private temporary browsers.
 
-On desktop, terminals and discovered project scripts share the bottom process panel. Select terminal output to add it to the chat composer.
+On desktop, terminals and discovered project scripts share the bottom process panel. Select terminal output to add it to the chat composer. In light mode, terminals keep a dark gray background with contrasting text and selection colors; switching the surrounding interface to light mode does not turn the terminal white.
 
 The project file editor reads and writes files within the project, checks modification times to avoid overwriting concurrent edits, and previews supported content. Use `@` in the composer to mention a file.
 
@@ -93,18 +97,18 @@ Create `~/.cogpit/push.json` with permissions `0600`. Keep the topic private bec
 { "topic": "your-private-topic", "publicUrl": "https://cogpit.example.com" }
 ```
 
-| Key | Environment override | Default | Purpose |
+| Key | Standalone environment override | Default | Purpose |
 | --- | --- | --- | --- |
-| `topic` | `COGPIT_NTFY_TOPIC` | Unset | Enables push. Topic must use `[-_A-Za-z0-9]` and be at most 64 characters. |
-| `ntfyUrl` | `COGPIT_NTFY_URL` | `https://ntfy.sh` | ntfy server URL. Self-hosted servers work too. |
-| `token` | `COGPIT_NTFY_TOKEN` | Unset | Bearer token for a protected topic. |
-| `publicUrl` | `COGPIT_PUBLIC_URL` | Unset | Reachable Cogpit URL for notification links. Without it, pushes have no click target. |
+| `topic` | `CC_COPILOT_UI_NTFY_TOPIC` | Unset | Enables push. Topic must use `[-_A-Za-z0-9]` and be at most 64 characters. |
+| `ntfyUrl` | `CC_COPILOT_UI_NTFY_URL` | `https://ntfy.sh` | ntfy server URL. Self-hosted servers work too. |
+| `token` | `CC_COPILOT_UI_NTFY_TOKEN` | Unset | Bearer token for a protected topic. |
+| `publicUrl` | `CC_COPILOT_UI_PUBLIC_URL` | Unset | Reachable Cogpit URL for notification links. Without it, pushes have no click target. |
 
-Changes take effect without restarting. Headless services can use the environment variables instead of a config file. No agent notification hooks are required.
+Changes to `push.json` take effect without restarting. Restart a standalone service after changing its environment. Legacy `COGPIT_NTFY_*` and `COGPIT_PUBLIC_URL` names remain supported; standalone startup gives the corresponding `CC_COPILOT_UI_*` value precedence. The desktop app uses the legacy names or the config file. No agent notification hooks are required.
 
 ## Remote access and multiple devices
 
-Enable Network Access to connect from another device. Remote browser access requires HTTPS. A non-loopback bind requires a network password of at least 16 characters. The [self-hosting guide](self-hosting.md) covers TLS proxies, forwarding headers, password policy, and session expiry.
+Enable Network Access in the desktop app or run a standalone server to connect from another device. The standalone server defaults to HTTP for a trusted private network or VPN. A non-loopback bind requires a network password of at least 6 characters. Use `--https` to require HTTPS browser sessions behind a TLS reverse proxy; the desktop app retains its HTTPS requirement. The [self-hosting guide](self-hosting.md) covers portable builds, forwarding headers, password policy, and session expiry.
 
 The device switcher shows one machine at a time and restores the view you left on each device. Use `Cmd+Shift+1–9` or `Ctrl+Shift+1–9` to select a machine, and `Cmd+Shift+0` or `Ctrl+Shift+0` to cycle.
 
@@ -113,10 +117,10 @@ Under **Devices → Add device**, enter the address of a Cogpit app with Network
 To run a headless box from source:
 
 ```bash
-COGPIT_HOST=0.0.0.0 COGPIT_NETWORK_PASSWORD='your-long-passphrase' bun server/standalone.ts
+CC_COPILOT_UI_PASSWORD='replace-with-your-password' CC_COPILOT_UI_PORT=19384 bun server/standalone.ts
 ```
 
-Put HTTPS in front of it for remote browser access. Local-only actions such as revealing a folder or opening an external terminal are hidden when viewing a remote machine.
+Build the web app first with `bun run build:web`, or use [`./build-server.sh`](self-hosting.md#build-a-portable-server-on-rhel-9) to package the runtime and application together. Open `http://<server-ip>:19384`. For HTTPS, add `--https` and configure the TLS proxy separately. Local-only actions such as revealing a folder or opening an external terminal are hidden when viewing a remote machine.
 
 Claude Code sessions can be shared with a guest through a passphrase-protected link. The guest gets access to that session. Manage active shares in **Configuration → Network**.
 
@@ -127,3 +131,5 @@ Browse and edit the installed CLIs' instruction files, settings, and skills at g
 GitHub, ClickUp, Vercel, and Cloudflare panels are read-only integrations. GitHub uses your authenticated `gh` CLI for Actions, pull requests, and issues. ClickUp uses a personal API token and supports a linked list per project. Vercel uses CLI 50.5.1 or newer and the project linked at the exact session root. Cloudflare uses Wrangler 4.65.0 or newer and the nearest Wrangler configuration in the workspace. The [plugin guide](plugins.md) covers setup, installation from signed `.cogpit-plugin` files, and the SDK for building custom panels. Runtime plugins can be installed through Plugins → Install from file without rebuilding Cogpit.
 
 Press `Cmd+K` to open the command palette. Customize shortcuts in settings, with conflict detection. Cogpit includes Dark, Deep OLED, and Light themes.
+
+Browser sessions without a saved preference default to the white light theme. The moon/sun button in the top-right toolbar switches light and dark mode on desktop browsers and phones. The choice is saved in that browser and restored on reload; existing saved preferences are preserved. The Electron desktop app keeps its dark default. Use **Appearance** in the command palette for the full theme list and chat width settings.
