@@ -165,7 +165,7 @@ export function SessionCard({
           data-crew-lineage
           onClick={lineage.onOpenParent}
           aria-label={`Open ${lineage.parentTitle}, which started this session`}
-          className="flex min-w-0 items-center gap-1.5 rounded-t-lg px-3 pl-[26px] pt-2.5 text-left text-[11px] leading-tight outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex min-w-0 items-center gap-1.5 rounded-t-lg px-3 pl-[26px] pt-2.5 text-left text-[0.6875rem] leading-tight outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ArrowUp className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span className="truncate text-foreground/90">{lineage.parentTitle}</span>
@@ -197,7 +197,7 @@ export function SessionCard({
         {projectEyebrow && (
           <span
             data-session-project
-            className="flex items-center gap-1.5 pl-3.5 text-[11px] leading-tight text-muted-foreground"
+            className="flex items-center gap-1.5 pl-3.5 text-[0.6875rem] leading-tight text-muted-foreground"
           >
             <ProjectFavicon
               projectPath={projectPath}
@@ -230,7 +230,7 @@ export function SessionCard({
             {lastPrompt}
           </span>
         )}
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 pl-3.5 text-[11px] text-muted-foreground">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 pl-3.5 text-[0.6875rem] text-muted-foreground">
           {isLive && !isDeferred && statusLabel && (
             <Badge
               variant="secondary"

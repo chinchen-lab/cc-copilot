@@ -41,7 +41,7 @@ export function AgentCaption({ activity }: { activity: BrowserAgentActivity | nu
     >
       <div className="flex min-w-0 items-center gap-2 rounded-full bg-popover px-3 py-1 text-xs shadow-xs">
         <Bot aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-        <code className="min-w-0 truncate font-mono text-[11px]">{activity.command}</code>
+        <code className="min-w-0 truncate font-mono text-[0.6875rem]">{activity.command}</code>
         <span className="shrink-0 text-muted-foreground">{activity.done ? "ran" : "running"}</span>
       </div>
     </div>

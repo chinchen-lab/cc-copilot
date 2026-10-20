@@ -651,7 +651,7 @@ function CrewMapItem({
         >
           <span className="flex min-w-0 items-start gap-1.5">
             <Icon aria-hidden="true" className="mt-[3px] size-3.5 shrink-0 text-muted-foreground" />
-            <span className="line-clamp-2 min-w-0 flex-1 text-[13px]/[18px] font-medium">{name}</span>
+            <span className="line-clamp-2 min-w-0 flex-1 text-[0.8125rem]/[1.125rem] font-medium">{name}</span>
           </span>
           <span className="flex min-w-0 items-center gap-1.5 text-xs">
             <span className={cn("size-1.5 shrink-0 rounded-full", CREW_DOT[state])} aria-hidden="true" />
@@ -660,7 +660,7 @@ function CrewMapItem({
             </span>
           </span>
           {(meta || here) && (
-            <span className="flex min-w-0 items-center gap-1.5 text-[11.5px] tabular-nums text-muted-foreground/75">
+            <span className="flex min-w-0 items-center gap-1.5 text-[0.71875rem] tabular-nums text-muted-foreground/75">
               <span className="min-w-0 flex-1 truncate">{meta}</span>
               {here && <span className="shrink-0 font-medium text-foreground/70">You are here</span>}
             </span>
@@ -695,7 +695,7 @@ function FoldToggle({ node, name, left, onToggle }: { node: CrewMapNode; name: s
       title={collapsed ? undefined : "Fold"}
       onClick={() => onToggle(node.member.sessionId)}
       className={cn(
-        "absolute z-10 flex h-5 min-w-5 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-full border bg-card px-1.5 text-[11px] font-medium tabular-nums text-muted-foreground shadow-xs outline-none",
+        "absolute z-10 flex h-5 min-w-5 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-full border bg-card px-1.5 text-[0.6875rem] font-medium tabular-nums text-muted-foreground shadow-xs outline-none",
         "transition-opacity hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
         !collapsed && "opacity-0 group-hover/node:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
       )}

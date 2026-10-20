@@ -391,8 +391,8 @@ export function CommandPalette(props: CommandPaletteProps) {
     action("settings", "Open Cogpit settings", "preferences network", Settings, props.onOpenSettings),
     action(
       "theme",
-      "Change theme & chat width",
-      "appearance light dark oled width narrow wide",
+      "Appearance preferences",
+      "theme font text size scale light dark oled width narrow wide",
       Palette,
       props.onOpenTheme,
       shortcutLabel("themeSelector"),

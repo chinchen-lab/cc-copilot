@@ -136,7 +136,7 @@ function CrewIndicator({ context }: WorkspacePanelIndicatorProps) {
       <span
         role="status"
         aria-label={`${crew.needsYou} ${crew.needsYou === 1 ? "session needs" : "sessions need"} you`}
-        className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-warning px-1 text-[9px] font-semibold text-warning-foreground"
+        className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-warning px-1 text-[0.5625rem] font-semibold text-warning-foreground"
       >
         {crew.needsYou}
       </span>

@@ -115,7 +115,7 @@ export function WorkspaceActivityBar({
             {Indicator ? (
               <Indicator {...panel.indicatorProps} context={context} active={active} />
             ) : badge !== null && badge !== undefined && (
-              <Badge className="absolute -right-1 -top-1 min-w-4 px-1 text-[9px]" variant="secondary">
+              <Badge className="absolute -right-1 -top-1 min-w-4 px-1 text-[0.5625rem]" variant="secondary">
                 {badge}
               </Badge>
             )}

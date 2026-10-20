@@ -71,7 +71,7 @@ export function CrewFold({
         onClick={onToggle}
         aria-expanded={open}
         aria-label={open ? `Hide crew: ${summary}` : `Show crew: ${summary}`}
-        className="flex w-full items-center gap-1.5 rounded-sm py-0.5 text-left text-[11px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex w-full items-center gap-1.5 rounded-sm py-0.5 text-left text-[0.6875rem] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
         <ChevronRight className={cn("size-3 shrink-0 transition-transform duration-150", open && "rotate-90")} aria-hidden="true" />
         <span className="font-medium text-foreground">Crew</span>
@@ -110,7 +110,7 @@ export function CrewFold({
                     {name}
                     {reportsLabel && <span className="text-muted-foreground/70">{reportsLabel}</span>}
                   </span>
-                  <span className={cn("shrink-0 text-[11px] tabular-nums", status.state === "needs-you" ? "text-warning" : "text-muted-foreground/80")}>
+                  <span className={cn("shrink-0 text-[0.6875rem] tabular-nums", status.state === "needs-you" ? "text-warning" : "text-muted-foreground/80")}>
                     {activity}
                   </span>
                 </button>
@@ -122,7 +122,7 @@ export function CrewFold({
               <button
                 type="button"
                 onClick={() => setShowAllDone(true)}
-                className="rounded-sm px-1.5 py-1 text-[11px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded-sm px-1.5 py-1 text-[0.6875rem] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
                 Show {hiddenDone.length} more done
               </button>

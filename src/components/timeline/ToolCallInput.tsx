@@ -70,7 +70,7 @@ function PlanInput({ steps }: { steps: PlanStep[] }): React.ReactElement {
             <li key={index} className="flex min-w-0 items-start gap-2 text-xs">
               <Icon role="img" aria-label={label} className={cn("mt-0.5 size-3 shrink-0 text-muted-foreground", active && "text-info")} />
               <div className="min-w-0 flex-1"><InputText value={step.text} /></div>
-              <span className="shrink-0 text-[10px] text-muted-foreground">{label}</span>
+              <span className="shrink-0 text-[0.625rem] text-muted-foreground">{label}</span>
             </li>
           )
         })}

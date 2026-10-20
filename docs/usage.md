@@ -133,3 +133,11 @@ GitHub, ClickUp, Vercel, and Cloudflare panels are read-only integrations. GitHu
 Press `Cmd+K` to open the command palette. Customize shortcuts in settings, with conflict detection. Cogpit includes Dark, Deep OLED, and Light themes.
 
 Browser sessions without a saved preference default to the white light theme. The moon/sun button in the top-right toolbar switches light and dark mode on desktop browsers and phones. The choice is saved in that browser and restored on reload; existing saved preferences are preserved. The Electron desktop app keeps its dark default. Use **Appearance** in the command palette for the full theme list and chat width settings.
+
+Open **Appearance preferences** from the command palette, or open the general
+settings, to adjust **Text size** from 75% to 150% in 5% steps. The default is
+100%; at a standard browser font setting, chat text is 14px, secondary labels
+are generally 12px, and terminals use 12px. The setting scales interface text,
+code and terminals together, applies immediately, and is saved automatically in
+this browser. Use the reset button to return to 100%. The preference stays the
+same when switching projects or devices, and does not change other browsers.

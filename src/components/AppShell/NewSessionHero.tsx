@@ -96,7 +96,7 @@ function ProjectNameSwitcher({
             onNewFolder(cwd)
           }}
         >
-          <div className="flex items-center justify-between border-t px-3 py-2 text-[11px] text-muted-foreground">
+          <div className="flex items-center justify-between border-t px-3 py-2 text-[0.6875rem] text-muted-foreground">
             <span>Switch where this session starts</span>
             <kbd className="font-mono">{shortcutLabel("newSession")}</kbd>
           </div>

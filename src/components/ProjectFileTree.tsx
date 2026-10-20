@@ -320,7 +320,7 @@ function FileRow({ path, name, depth, selected, status, onSelect }: FileRowProps
       <FileIcon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
       <span className={cn("min-w-0 flex-1 truncate text-xs", status && status.className)}>{name}</span>
       {status && (
-        <span className={cn("shrink-0 font-mono text-[10px]", status.className)} title={status.label}>
+        <span className={cn("shrink-0 font-mono text-[0.625rem]", status.className)} title={status.label}>
           {status.code}
         </span>
       )}

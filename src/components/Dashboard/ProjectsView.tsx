@@ -178,7 +178,7 @@ export function ProjectsView({
                                 {customName || projectName(project.path)}
                               </span>
                               {providerLabel && (
-                                <Badge variant="outline" className="h-5 shrink-0 px-1.5 text-[10px]">
+                                <Badge variant="outline" className="h-5 shrink-0 px-1.5 text-[0.625rem]">
                                   {providerLabel}
                                 </Badge>
                               )}

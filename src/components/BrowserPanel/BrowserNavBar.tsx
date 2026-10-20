@@ -85,7 +85,7 @@ function FrameStatus({ status }: { status: BrowserStreamStatus }) {
         render={
           <span
             className={cn(
-              "ml-1 flex shrink-0 cursor-default items-center gap-1 text-[10px] font-medium tracking-wide",
+              "ml-1 flex shrink-0 cursor-default items-center gap-1 text-[0.625rem] font-medium tracking-wide",
               report.tone,
             )}
           />

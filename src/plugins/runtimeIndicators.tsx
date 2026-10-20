@@ -15,8 +15,8 @@ export interface RuntimePluginIndicatorProps {
   enabled?: boolean
 }
 interface Indicator { label: string; text: string; variant: "default" | "secondary" | "destructive"; compact?: boolean }
-const COUNT_CLASS = "absolute -right-1 -top-1 min-w-4 px-1 text-[9px]"
-const FAILURE_CLASS = "absolute -right-0.5 -top-0.5 size-3 p-0 text-[8px]"
+const COUNT_CLASS = "absolute -right-1 -top-1 min-w-4 px-1 text-[0.5625rem]"
+const FAILURE_CLASS = "absolute -right-0.5 -top-0.5 size-3 p-0 text-[0.5rem]"
 const BUNDLED = new Set(["cogpit.github", "cogpit.vercel", "cogpit.clickup"])
 const failedRun = new Set(["action_required", "failure", "startup_failure", "timed_out"])
 const activeDeployment = new Set(["BUILDING", "INITIALIZING", "QUEUED"])

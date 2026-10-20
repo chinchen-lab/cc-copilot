@@ -141,7 +141,7 @@ export function ModelPicker({
               ))}
             </PickerList>
             {providerLocked && !isNewSession && (
-              <p className="mt-auto px-2 pb-1 pt-3 text-[11px] leading-4 text-muted-foreground">
+              <p className="mt-auto px-2 pb-1 pt-3 text-[0.6875rem] leading-4 text-muted-foreground">
                 Fixed for this session. Start a new one to switch.
               </p>
             )}
@@ -218,7 +218,7 @@ export function ModelPicker({
                 )}
               </PickerSectionLabel>
               {effortCaption && (
-                <span className="truncate text-[11px] leading-4 text-muted-foreground">{effortCaption}</span>
+                <span className="truncate text-[0.6875rem] leading-4 text-muted-foreground">{effortCaption}</span>
               )}
             </div>
             {effortOptions.length > 0

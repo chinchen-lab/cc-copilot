@@ -89,7 +89,7 @@ export const CollapsibleToolCalls = memo(function CollapsibleToolCalls({
       >
         <ListTree className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-[13px] font-medium text-foreground">{title}</span>
+          <span className="text-[0.8125rem] font-medium text-foreground">{title}</span>
           {description && <span className="text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">{description}</span>}
         </span>
         <span id={statusId} className="flex shrink-0 flex-col items-end gap-1 text-xs">

@@ -1,6 +1,8 @@
 import { applyTheme, readSavedTheme } from "./lib/themes"
+import { applyFontScale, readSavedFontScale } from "./lib/fontScale"
 
 applyTheme(readSavedTheme())
+applyFontScale(readSavedFontScale())
 
 if (navigator.userAgent.includes("Electron")) {
   document.documentElement.classList.add("electron")

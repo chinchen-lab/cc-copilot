@@ -43,6 +43,10 @@ Your choice is saved in that browser and restored on reload. Existing saved them
 are kept. On desktop, **Appearance** in the command palette also offers the full
 theme list and chat width settings.
 
+**Text size** in Appearance preferences or general settings scales the interface,
+code and terminals from 75% to 150%. It defaults to 100%, applies immediately, and
+is saved in the browser rather than the server configuration.
+
 Terminals keep a dark gray background and contrasting text in light mode. See
 [the usage guide](usage.md#sessions-and-conversation-history) for automatic project
 focus, and [message controls](usage.md#messages-models-and-permissions) for Enter,

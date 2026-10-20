@@ -247,7 +247,7 @@ function NeedsYouQueue({
         )}
       </SectionHeading>
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2 px-0.5 text-[13px]">
+        <div className="flex items-center gap-2 px-0.5 text-[0.8125rem]">
           <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden="true" />
           <button type="button" onClick={() => onOpen(request.sessionId)} className="min-w-0 truncate rounded-sm font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
             {nameOf(request.sessionId) ?? "A session"}
@@ -267,9 +267,9 @@ function NeedsYouQueue({
               <button
                 type="button"
                 onClick={() => setIndex(position)}
-                className="grid w-full grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[12.5px] outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                className="grid w-full grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[0.78125rem] outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span className="text-right text-[11px] tabular-nums text-muted-foreground/80">{position + 1}</span>
+                <span className="text-right text-[0.6875rem] tabular-nums text-muted-foreground/80">{position + 1}</span>
                 <span className="flex min-w-0 flex-col">
                   <span className="truncate font-medium">
                     {nameOf(other.sessionId) ?? "A session"}
@@ -277,15 +277,15 @@ function NeedsYouQueue({
                       <span className="font-normal text-muted-foreground"> · {lineageLabel(byId.get(other.sessionId), nameOf)}</span>
                     )}
                   </span>
-                  <span className="truncate text-[11.5px] text-muted-foreground">{KIND_LABEL[other.kind]}</span>
+                  <span className="truncate text-[0.71875rem] text-muted-foreground">{KIND_LABEL[other.kind]}</span>
                 </span>
-                <span className="text-[11px] tabular-nums text-warning">{formatRelativeTime(new Date(other.since).toISOString())}</span>
+                <span className="text-[0.6875rem] tabular-nums text-warning">{formatRelativeTime(new Date(other.since).toISOString())}</span>
               </button>
             </li>
           ))}
         </ol>
       )}
-      <p className="mt-2 px-0.5 text-[11px] text-muted-foreground/80">J / K move · Enter answers · D denies · O opens</p>
+      <p className="mt-2 px-0.5 text-[0.6875rem] text-muted-foreground/80">J / K move · Enter answers · D denies · O opens</p>
     </section>
   )
 }
@@ -345,7 +345,7 @@ function YourSessions({
               <X className="size-3" />
             </button>
           ) : (
-            <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[10px] text-muted-foreground/70" aria-hidden="true">/</kbd>
+            <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[0.625rem] text-muted-foreground/70" aria-hidden="true">/</kbd>
           )}
         </div>
         {onBrowseProjects && (
@@ -421,7 +421,7 @@ function SessionRow({
           {entry.landed ? `${entry.landed.title ?? "Pull request"} · ${nameOf(entry.landed.by.sessionId) ?? ""}` : session.lastUserMessage ?? ""}
         </span>
       </span>
-      <span className="text-[11px] tabular-nums text-muted-foreground/80">
+      <span className="text-[0.6875rem] tabular-nums text-muted-foreground/80">
         {entry.counts ? `crew active ${formatRelativeTime(entry.activityAt)}` : formatRelativeTime(entry.activityAt)}
       </span>
     </>
@@ -454,7 +454,7 @@ function SessionRow({
         >
           <span className="flex min-w-0 items-center gap-2.5">
             {dot && <span className={cn("size-1.5 shrink-0 rounded-full", dot)} aria-hidden="true" />}
-            <span className="truncate text-[13.5px] font-medium">{title}</span>
+            <span className="truncate text-[0.84375rem] font-medium">{title}</span>
             <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">{projectLabel(session)}</span>
           </span>
           {details}
@@ -475,7 +475,7 @@ function SessionRow({
                 if (event.key === "Enter") { event.preventDefault(); commit() }
                 if (event.key === "Escape") { event.preventDefault(); setDraft(null) }
               }}
-              className="h-7 max-w-md text-[13.5px] font-medium"
+              className="h-7 max-w-md text-[0.84375rem] font-medium"
             />
             <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">{projectLabel(session)}</span>
           </span>

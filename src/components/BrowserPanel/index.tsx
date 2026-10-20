@@ -268,7 +268,7 @@ function ReconnectingBanner() {
     <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center p-2">
       <span
         role="status"
-        className="rounded-full bg-popover px-2.5 py-0.5 text-[11px] text-muted-foreground shadow-xs"
+        className="rounded-full bg-popover px-2.5 py-0.5 text-[0.6875rem] text-muted-foreground shadow-xs"
       >
         Reconnecting…
       </span>

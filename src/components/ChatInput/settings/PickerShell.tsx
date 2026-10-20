@@ -55,7 +55,7 @@ export function PickerPanel({ side, align = "start", className, ...props }: Pick
 export function PickerSectionLabel({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
-      className={cn("px-2 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground", className)}
+      className={cn("px-2 pb-1 pt-1.5 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground", className)}
       {...props}
     />
   )

@@ -67,7 +67,7 @@ export function SessionPreview({
       )}
       {firstPrompt && (
         <div className="flex flex-col gap-0.5">
-          {lastPrompt && <span className="text-[10px] text-muted-foreground/70">Started with</span>}
+          {lastPrompt && <span className="text-[0.625rem] text-muted-foreground/70">Started with</span>}
           <div className="border-l-2 pl-2 text-muted-foreground">
             <span data-first-prompt className="line-clamp-8 leading-relaxed">{firstPrompt}</span>
           </div>
@@ -75,7 +75,7 @@ export function SessionPreview({
       )}
       {lastPrompt && (
         <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] text-muted-foreground/70">Latest</span>
+          <span className="text-[0.625rem] text-muted-foreground/70">Latest</span>
           <div className="border-l-2 pl-2 text-muted-foreground">
             <span data-last-prompt className="line-clamp-4 leading-relaxed">{lastPrompt}</span>
           </div>

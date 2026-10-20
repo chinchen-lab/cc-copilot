@@ -121,7 +121,7 @@ export function ProjectScopePicker({
         <span className="truncate text-sm font-medium leading-tight text-foreground">
           {value === null ? "All projects" : focusedLabel}
         </span>
-        <span className="truncate text-[11px] leading-tight text-muted-foreground">
+        <span className="truncate text-[0.6875rem] leading-tight text-muted-foreground">
           {summary}
         </span>
       </span>
@@ -131,7 +131,7 @@ export function ProjectScopePicker({
           label={elsewhere === 1
             ? "1 session in another project is waiting for you"
             : `${elsewhere} sessions in other projects are waiting for you`}
-          className="rounded-full border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[11px]"
+          className="rounded-full border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[0.6875rem]"
         />
       )}
       <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -188,7 +188,7 @@ export function ProjectScopePicker({
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate">{option.customName ?? option.key}</span>
                       {option.customName && (
-                        <span className="truncate text-[11px] text-muted-foreground">{option.key}</span>
+                        <span className="truncate text-[0.6875rem] text-muted-foreground">{option.key}</span>
                       )}
                     </span>
                     {option.needsYou > 0 && (

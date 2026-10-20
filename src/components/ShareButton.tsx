@@ -100,7 +100,7 @@ export function ShareButton({ sessionId }: ShareButtonProps) {
         {share ? (
           <div className="flex flex-col gap-2.5">
             <div className="flex items-center gap-1.5">
-              <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-[11px]">
+              <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-[0.6875rem]">
                 {url}
               </code>
               <Button
@@ -114,7 +114,7 @@ export function ShareButton({ sessionId }: ShareButtonProps) {
             </div>
 
             <div className="flex items-center gap-1.5">
-              <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-[11px]">
+              <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-[0.6875rem]">
                 {passphrase ?? MASKED}
               </code>
               <Button

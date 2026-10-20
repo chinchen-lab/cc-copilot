@@ -188,7 +188,7 @@ export const AgentMessageCard = memo(function AgentMessageCard({
           {needsYou && (
             <Badge
               variant="outline"
-              className="h-4 border-warning/30 bg-warning/10 px-1.5 text-[10px] tracking-wide text-warning uppercase"
+              className="h-4 border-warning/30 bg-warning/10 px-1.5 text-[0.625rem] tracking-wide text-warning uppercase"
             >
               Needs you
             </Badge>

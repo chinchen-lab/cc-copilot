@@ -263,7 +263,7 @@ function CommandRow({
   const content = (
     <>
       <KindIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <span className="min-w-0 flex-1 break-words text-[13px] font-medium text-foreground">
+      <span className="min-w-0 flex-1 break-words text-[0.8125rem] font-medium text-foreground">
         {row.section.label || kindLabel}
       </span>
       <span className={cn("shrink-0 text-xs tabular-nums text-muted-foreground", row.failed && "text-destructive")}>

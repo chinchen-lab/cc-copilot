@@ -229,7 +229,7 @@ function DailyChart({ days, metric }: { days: DayTotals[]; metric: Metric }) {
               x={i * step + step / 2}
               y={CHART_H - 4}
               textAnchor="middle"
-              className="fill-muted-foreground text-[10px]"
+              className="fill-muted-foreground text-[0.625rem]"
             >
               {formatDayShort(d.day)}
             </text>

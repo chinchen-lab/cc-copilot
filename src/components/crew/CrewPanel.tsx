@@ -291,7 +291,7 @@ function CrewSessions({
               aria-checked={filter === id}
               onClick={() => setFilter(id)}
               className={cn(
-                "rounded-full px-2 py-0.5 text-[11px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+                "rounded-full px-2 py-0.5 text-[0.6875rem] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
                 filter === id && "bg-accent text-foreground",
               )}
             >
@@ -359,14 +359,14 @@ function CrewRow({
         className="grid w-full grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 rounded-md px-2 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span className={cn("size-1.5 justify-self-center rounded-full", CREW_DOT[state])} aria-hidden="true" />
-        <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium">
+        <span className="flex min-w-0 items-center gap-1.5 text-[0.78125rem] font-medium">
           <span className="truncate">{name}</span>
-          {here && <span className="shrink-0 rounded-full border px-1.5 text-[10.5px] font-normal text-muted-foreground">you are here</span>}
+          {here && <span className="shrink-0 rounded-full border px-1.5 text-[0.65625rem] font-normal text-muted-foreground">you are here</span>}
         </span>
-        <span className="text-[11px] tabular-nums text-muted-foreground/80">
+        <span className="text-[0.6875rem] tabular-nums text-muted-foreground/80">
           {member.lastActivityAt ? formatRelativeTime(member.lastActivityAt) : ""}
         </span>
-        <span className="col-start-2 col-end-4 flex min-w-0 items-center gap-2 text-[11.5px] text-muted-foreground">
+        <span className="col-start-2 col-end-4 flex min-w-0 items-center gap-2 text-[0.71875rem] text-muted-foreground">
           <span className={cn(
             "min-w-0 flex-1 truncate",
             (state === "needs-you" || unread) && "text-warning",
@@ -375,7 +375,7 @@ function CrewRow({
           >
             {activity}
           </span>
-          {pullRequest && <span className="shrink-0 rounded-full border px-1.5 text-[11px]">#{pullRequest.number}</span>}
+          {pullRequest && <span className="shrink-0 rounded-full border px-1.5 text-[0.6875rem]">#{pullRequest.number}</span>}
           {member.device && <span className="shrink-0">{member.device.name}</span>}
           {children > 0 && <span className="shrink-0">{children} {children === 1 ? "session" : "sessions"}</span>}
           {member.model && <span className="shrink-0 text-muted-foreground/70">{shortenModel(member.model)}</span>}

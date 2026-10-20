@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { usePty } from "@/contexts/PtyContext"
 import { matchesKeybinding } from "@/lib/keybindings"
 import { readTerminalTheme } from "@/lib/terminalTheme"
+import { useFontScale } from "@/hooks/useFontScale"
 
 export function TerminalOutput({ processId, autoFocus = false, onRequestNew, onRequestClose, onAddContext }: {
   processId: string
@@ -16,6 +17,7 @@ export function TerminalOutput({ processId, autoFocus = false, onRequestNew, onR
   onAddContext?: (text: string) => void
 }) {
   const pty = usePty()
+  const [fontScale] = useFontScale()
 
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
@@ -70,7 +72,7 @@ export function TerminalOutput({ processId, autoFocus = false, onRequestNew, onR
     const terminal = new Terminal({
       theme: readTerminalTheme(container),
       fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, monospace',
-      fontSize: 12,
+      fontSize: 12 * fontScale / 100,
       lineHeight: 1.4,
       cursorBlink: true,
       cursorStyle: "block",
@@ -142,6 +144,14 @@ export function TerminalOutput({ processId, autoFocus = false, onRequestNew, onR
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processId])
+
+  useEffect(() => {
+    const terminal = termRef.current
+    const fontSize = 12 * fontScale / 100
+    if (!terminal || terminal.options.fontSize === fontSize) return
+    terminal.options.fontSize = fontSize
+    scheduleFit()
+  }, [fontScale, scheduleFit])
 
   const handleClick = useCallback(() => {
     termRef.current?.focus()

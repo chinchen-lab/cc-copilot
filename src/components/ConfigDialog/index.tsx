@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react"
+import { FontScaleSettings } from "@/components/FontScaleSettings"
 import { FolderOpen, CheckCircle, XCircle, Loader2, TerminalSquare, Code2, PanelsTopLeft } from "lucide-react"
 import {
   Dialog,
@@ -225,11 +226,12 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
         <DialogHeader>
           <DialogTitle className="text-foreground">Configuration</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Manage local paths, preferred apps, and remote access.
+            Adjust display preferences, local paths, preferred apps, and remote access.
           </DialogDescription>
         </DialogHeader>
 
         <FieldGroup>
+          <FontScaleSettings />
           <Field>
             <FieldLabel htmlFor="claude-directory">Claude directory</FieldLabel>
             <FieldDescription>The directory containing your Claude configuration.</FieldDescription>

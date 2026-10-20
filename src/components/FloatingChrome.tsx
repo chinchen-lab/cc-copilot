@@ -204,13 +204,13 @@ export const FloatingChrome = memo(function FloatingChrome({
               size="xs"
               className={cn(
                 FLOATING_PILL,
-                "h-8 shrink-0 gap-1 px-2.5 text-[11px] text-muted-foreground hover:text-foreground",
+                "h-8 shrink-0 gap-1 px-2.5 text-[0.6875rem] text-muted-foreground hover:text-foreground",
               )}
               onClick={onShowWorkflows}
             >
               <WorkflowIcon className="size-3" />
               Workflows
-              <Badge variant="outline" className="h-4 min-w-4 justify-center px-1 text-[9px] font-semibold">
+              <Badge variant="outline" className="h-4 min-w-4 justify-center px-1 text-[0.5625rem] font-semibold">
                 {workflowCount}
               </Badge>
             </Button>
@@ -284,7 +284,7 @@ export const FloatingChrome = memo(function FloatingChrome({
                     <DropdownMenuItem onClick={handleCopyNetworkUrl}>
                       <Globe className="text-success" />
                       Copy network URL
-                      <span className="ml-auto truncate pl-2 font-mono text-[11px] text-muted-foreground">
+                      <span className="ml-auto truncate pl-2 font-mono text-[0.6875rem] text-muted-foreground">
                         {networkUrl}
                       </span>
                     </DropdownMenuItem>

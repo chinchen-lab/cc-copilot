@@ -163,7 +163,7 @@ function HeaderAction({ label, disabled, onClick, children }: HeaderActionProps)
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="h-6 px-1.5 text-[11px] text-muted-foreground"
+      className="h-6 px-1.5 text-[0.6875rem] text-muted-foreground"
     >
       {children}
     </Button>
@@ -202,7 +202,7 @@ function ServerTile({ server, on, onClick }: ServerTileProps) {
       <span
         aria-hidden
         className={cn(
-          "flex size-6 shrink-0 items-center justify-center rounded-md text-[10px] font-semibold tracking-wide transition-colors duration-100",
+          "flex size-6 shrink-0 items-center justify-center rounded-md text-[0.625rem] font-semibold tracking-wide transition-colors duration-100",
           needsAuth && "bg-warning/15 text-warning",
           on === true && "bg-primary text-primary-foreground",
           on === false && "bg-muted text-muted-foreground",
@@ -212,7 +212,7 @@ function ServerTile({ server, on, onClick }: ServerTileProps) {
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate leading-4">{short}</span>
-        {namespace && <span className="truncate text-[10px] leading-3 text-muted-foreground">{namespace}</span>}
+        {namespace && <span className="truncate text-[0.625rem] leading-3 text-muted-foreground">{namespace}</span>}
       </span>
       {needsAuth && <LogIn className="size-3.5 shrink-0 text-warning" aria-hidden />}
     </button>

@@ -45,7 +45,7 @@ function StatusView({ block }: { block: StatusBlock }) {
   const percent = progress ? Math.round((progress.done / progress.total) * 100) : null
   return (
     <Frame label={block.title ?? "Status"}>
-      {block.title && <h4 className="mb-2 text-[13.5px] font-medium">{block.title}</h4>}
+      {block.title && <h4 className="mb-2 text-[0.84375rem] font-medium">{block.title}</h4>}
       {progress && (
         <div className="mb-2.5">
           <div
@@ -67,7 +67,7 @@ function StatusView({ block }: { block: StatusBlock }) {
       {block.values.length > 0 && (
         <dl className="grid grid-cols-1 gap-x-5 sm:grid-cols-2">
           {block.values.map((entry) => (
-            <div key={entry.label} className="flex justify-between gap-3 border-t border-border/70 py-1.5 text-[12.5px]">
+            <div key={entry.label} className="flex justify-between gap-3 border-t border-border/70 py-1.5 text-[0.78125rem]">
               <dt className={cn("text-muted-foreground", entry.tone && TONE[entry.tone])}>{entry.label}</dt>
               <dd className={cn("text-right tabular-nums", entry.tone && TONE[entry.tone])}>{entry.value}</dd>
             </div>
@@ -91,19 +91,19 @@ function ChecklistView({ block }: { block: ChecklistBlock }) {
   return (
     <Frame label={block.title ?? "Checklist"}>
       <div className="mb-1.5 flex items-baseline gap-2">
-        {block.title && <h4 className="text-[13.5px] font-medium">{block.title}</h4>}
+        {block.title && <h4 className="text-[0.84375rem] font-medium">{block.title}</h4>}
         <span className="text-xs tabular-nums text-muted-foreground">{done} of {block.items.length}</span>
       </div>
       <ul className="flex flex-col">
         {block.items.map((item, index) => {
           const look = CHECK[item.state]
           return (
-            <li key={`${index}:${item.text}`} className="flex items-center gap-2.5 py-1 text-[13px]">
+            <li key={`${index}:${item.text}`} className="flex items-center gap-2.5 py-1 text-[0.8125rem]">
               <span className={cn("grid size-3.5 shrink-0 place-items-center rounded-full border-[1.5px]", look.ring)} aria-label={look.label} role="img">
                 {look.mark}
               </span>
               <span className={cn("min-w-0 flex-1", look.text)}>{item.text}</span>
-              {item.note && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{item.note}</span>}
+              {item.note && <span className="shrink-0 text-[0.6875rem] tabular-nums text-muted-foreground">{item.note}</span>}
             </li>
           )
         })}
@@ -201,7 +201,7 @@ function DecisionsView({ block, source, occurrence }: { block: DecisionsBlock; s
       className="my-3 rounded-lg border border-border bg-card p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div className="mb-1 flex flex-wrap items-baseline gap-x-2.5">
-        <h4 className="text-[13.5px] font-medium">{heading}</h4>
+        <h4 className="text-[0.84375rem] font-medium">{heading}</h4>
         <span className="text-xs text-muted-foreground">
           {state.sentAt ? "Sent" : "Answer in any order; your answers go back as one message."}
         </span>
@@ -220,8 +220,8 @@ function DecisionsView({ block, source, occurrence }: { block: DecisionsBlock; s
                 index === current && canSend && "rounded-md bg-accent/40",
               )}
             >
-              <span className="pt-px text-right text-[11px] tabular-nums text-muted-foreground/80">{index + 1}</span>
-              <span className={cn("text-[13px]", open ? "font-medium" : "text-muted-foreground")}>{decision.question}</span>
+              <span className="pt-px text-right text-[0.6875rem] tabular-nums text-muted-foreground/80">{index + 1}</span>
+              <span className={cn("text-[0.8125rem]", open ? "font-medium" : "text-muted-foreground")}>{decision.question}</span>
               {decision.detail && open && <span className="col-start-2 text-xs text-muted-foreground">{decision.detail}</span>}
               {open ? (
                 <span className="col-start-2 mt-1 flex flex-wrap items-center gap-1.5">
@@ -242,7 +242,7 @@ function DecisionsView({ block, source, occurrence }: { block: DecisionsBlock; s
                   ))}
                 </span>
               ) : (
-                <span className="col-start-2 flex items-center gap-2 text-[12.5px] text-success">
+                <span className="col-start-2 flex items-center gap-2 text-[0.78125rem] text-success">
                   <Check className="size-3.5" aria-hidden="true" />
                   {answer}
                   {canSend && (

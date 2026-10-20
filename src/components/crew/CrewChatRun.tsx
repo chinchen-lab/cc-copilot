@@ -42,7 +42,7 @@ function dayLabel(day: number): string {
 export function CrewChatDay({ day }: { day: number }) {
   const label = dayLabel(day)
   return (
-    <div role="separator" aria-label={label} className="flex items-center gap-3 text-[11px] text-muted-foreground">
+    <div role="separator" aria-label={label} className="flex items-center gap-3 text-[0.6875rem] text-muted-foreground">
       <span className="h-px flex-1 bg-border" />
       {label}
       <span className="h-px flex-1 bg-border" />
@@ -65,7 +65,7 @@ export function CrewChatRunView({ run, members, handles, kinds, tints, rootId }:
             <>
               <CrewAvatar role={run.role} sessionId={author.sessionId} kinds={kinds} tints={tints} className="row-span-2 mt-px" />
               <header className="flex min-w-0 items-baseline gap-1.5 leading-6">
-                <span className="truncate text-[13px] font-medium">{author.name}</span>
+                <span className="truncate text-[0.8125rem] font-medium">{author.name}</span>
                 {recipients.length > 0 && (
                   <span className="flex min-w-0 items-baseline gap-1 text-xs text-muted-foreground" title={`To ${recipients.join(", ")}`}>
                     <ArrowRight aria-hidden="true" className="size-3 shrink-0 translate-y-0.5" />
@@ -73,11 +73,11 @@ export function CrewChatRunView({ run, members, handles, kinds, tints, rootId }:
                     <span className="truncate">{recipients.join(", ")}</span>
                   </span>
                 )}
-                <Time at={message.createdAt} className="ml-auto pl-2 text-[11px]" />
+                <Time at={message.createdAt} className="ml-auto pl-2 text-[0.6875rem]" />
               </header>
             </>
           ) : (
-            <Time at={message.createdAt} short className="pt-[3px] text-center text-[10px] opacity-0 group-hover/message:opacity-100 group-focus-within/message:opacity-100" />
+            <Time at={message.createdAt} short className="pt-[3px] text-center text-[0.625rem] opacity-0 group-hover/message:opacity-100 group-focus-within/message:opacity-100" />
           )}
           <div className="col-start-2 min-w-0">
             <CrewChatBody message={message} handles={handles} tints={tints} rootId={rootId} />
@@ -102,7 +102,7 @@ const CrewChatBody = memo(function CrewChatBody({ message, handles, tints, rootI
   const components = useMemo(() => chatComponents(rootId, tints), [rootId, tints])
   return (
     <Clamp>
-      <div className="text-[13px] leading-relaxed text-foreground/90 [overflow-wrap:anywhere]">
+      <div className="text-[0.8125rem] leading-relaxed text-foreground/90 [overflow-wrap:anywhere]">
         <ReactMarkdown remarkPlugins={plugins} components={components}>{text}</ReactMarkdown>
       </div>
     </Clamp>

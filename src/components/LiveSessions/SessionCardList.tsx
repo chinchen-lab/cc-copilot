@@ -238,7 +238,7 @@ function RecencyDivider({ label }: { label: string }) {
   return (
     <div
       data-recency-divider
-      className="px-1 pb-0.5 pt-2 text-[11px] font-medium text-muted-foreground/80 first:pt-0"
+      className="px-1 pb-0.5 pt-2 text-[0.6875rem] font-medium text-muted-foreground/80 first:pt-0"
     >
       {label}
     </div>

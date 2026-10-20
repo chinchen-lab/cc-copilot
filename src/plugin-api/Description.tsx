@@ -22,7 +22,7 @@ export function Description({ body }: { body: string }) {
       {long && (
         <button
           type="button"
-          className="mt-1 text-[11px] text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:underline"
+          className="mt-1 text-[0.6875rem] text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:underline"
           onClick={() => setExpanded((value) => !value)}
           aria-expanded={expanded}
         >

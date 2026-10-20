@@ -212,16 +212,16 @@ export const ToolCallCard = memo(function ToolCallCard({
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           {crewCall ? (
-            <CrewCallHeadline call={crewCall} className={cn("text-[13px] font-medium", nameClass)} />
+            <CrewCallHeadline call={crewCall} className={cn("text-[0.8125rem] font-medium", nameClass)} />
           ) : summary && (
             <ToolSummary
               summary={summary}
               filePath={[toolCall.input.file_path, toolCall.input.path, toolCall.input.notebook_path].includes(summary)}
               monospace={!crewCall && (!hasCommand || !toolCall.input.description)}
-              className={cn("text-[13px] font-medium", nameClass)}
+              className={cn("text-[0.8125rem] font-medium", nameClass)}
             />
           )}
-          <span className={cn(summary ? "text-xs text-muted-foreground" : cn("text-[13px] font-medium", nameClass), "leading-5")} title={nameTitle}>{displayName}</span>
+          <span className={cn(summary ? "text-xs text-muted-foreground" : cn("text-[0.8125rem] font-medium", nameClass), "leading-5")} title={nameTitle}>{displayName}</span>
         </span>
         <span id={statusId} className="flex shrink-0 flex-col items-end gap-1">
           <ToolCallStatus toolCall={toolCall} failed={failed} isAgentActive={isAgentActive} />
