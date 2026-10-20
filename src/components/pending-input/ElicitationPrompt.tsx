@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 /**
  * The inline answer block for a session parked on an MCP elicitation.
  *
@@ -81,6 +82,7 @@ export function ElicitationPrompt({
   responding,
   onAnswer,
 }: ElicitationPromptProps) {
+  const { t } = useTranslation()
   const [values, setValues] = useState<FieldValues>(() => initialValues(request.fields))
   const complete = useMemo(() => isComplete(request.fields, values), [request.fields, values])
   const server = request.displayName || request.title || request.serverName
@@ -109,11 +111,10 @@ export function ElicitationPrompt({
                 onAnswer(request.requestId, { action: "accept" })
               }}
             >
-              Open link
-              <ExternalLink data-icon="inline-end" />
+              {t("Open link")}<ExternalLink data-icon="inline-end" />
             </Button>
             <Button variant="ghost" size="sm" disabled={responding} onClick={decline}>
-              Decline
+              {t("Decline")}
             </Button>
           </div>
         )}
@@ -148,10 +149,10 @@ export function ElicitationPrompt({
               content: toContent(request.fields, values),
             })}
           >
-            Send
+            {t("Send")}
           </Button>
           <Button variant="ghost" size="sm" disabled={responding} onClick={decline}>
-            Decline
+            {t("Decline")}
           </Button>
         </div>
       )}
@@ -247,10 +248,11 @@ function FieldText({ field }: { field: MissionControlElicitationField }) {
 }
 
 function Shell({ server, children }: { server: string; children: React.ReactNode }) {
+  const { t } = useTranslation()
   return (
     <Alert className="border-info/40 bg-info/5">
       <Plug className="text-info" />
-      <AlertTitle>{server} needs input</AlertTitle>
+      <AlertTitle>{server} {t(" needs input")}</AlertTitle>
       <div className="col-start-2 mt-1 min-w-0">{children}</div>
     </Alert>
   )

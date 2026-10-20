@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useState, type ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -38,6 +39,7 @@ function ActivityBarButton({
   onClick: () => void
   children?: ReactNode
 }) {
+  const { t } = useTranslation()
   return (
     <Tooltip>
       <TooltipTrigger
@@ -46,7 +48,7 @@ function ActivityBarButton({
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label={title}
+            aria-label={t(title)}
             aria-pressed={active}
             onClick={onClick}
             className={cn(
@@ -59,7 +61,7 @@ function ActivityBarButton({
         <Icon data-icon="inline-start" />
         {children}
       </TooltipTrigger>
-      <TooltipContent side="left">{title}</TooltipContent>
+      <TooltipContent side="left">{t(title)}</TooltipContent>
     </Tooltip>
   )
 }
@@ -78,12 +80,13 @@ export function WorkspaceActivityBar({
   onTogglePanel,
   actions = [],
 }: WorkspaceActivityBarProps) {
+  const { t } = useTranslation()
   const available = availableWorkspacePanels(panels, context)
   if (available.length === 0 && actions.length === 0) return null
 
   return (
     <aside
-      aria-label="Workspace panels"
+      aria-label={t("Workspace panels")}
       className="electron-no-drag flex w-11 shrink-0 flex-col items-center gap-1 border-l bg-sidebar py-2 text-sidebar-foreground"
     >
       {actions.map((action) => (

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Fragment, useMemo, useState, type MouseEvent } from "react"
 import { History, Loader2 } from "lucide-react"
 
@@ -82,6 +83,7 @@ export function SessionCardList({
   onPrefetchSession,
   onResumeSession,
 }: SessionCardListProps) {
+  const { t } = useTranslation()
   const permissionsOf = useListedPermissions()
   // Shelf labels come out of the same memo as the ordering they describe. A
   // session carrying a crew is placed by the crew's latest activity.
@@ -204,7 +206,7 @@ export function SessionCardList({
           {older.loading
             ? <Loader2 data-icon="inline-start" className="animate-spin" />
             : <History data-icon="inline-start" />}
-          Load older sessions
+          {t("Load older sessions")}
         </Button>
       )}
     </div>
@@ -235,22 +237,24 @@ function lineageOf(
 }
 
 function RecencyDivider({ label }: { label: string }) {
+  const { t } = useTranslation()
   return (
     <div
       data-recency-divider
       className="px-1 pb-0.5 pt-2 text-[0.6875rem] font-medium text-muted-foreground/80 first:pt-0"
     >
-      {label}
+      {t(label)}
     </div>
   )
 }
 
 function PendingSessionRow({ firstMessage }: { firstMessage?: string }) {
+  const { t } = useTranslation()
   return (
     <div className="motion-enter relative flex w-full items-center gap-1.5 rounded-lg border border-border/70 bg-accent px-3 py-2.5 text-left">
       <Loader2 className="size-3 shrink-0 animate-spin text-info" />
       <span className="flex-1 truncate text-sm leading-tight text-foreground">
-        {firstMessage || "New session"}
+        {firstMessage || t("New session")}
       </span>
     </div>
   )

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Unlink } from "lucide-react"
 import { allDescriptors } from "@/lib/agents"
 import { agentConfigBadge } from "@/lib/agents/presentation"
@@ -23,16 +24,17 @@ interface CliBadgeProps {
  * directory is loaded by neither, which is worth flagging rather than hiding.
  */
 export function CliBadge({ cli, variant = "compact" }: CliBadgeProps) {
+  const { t } = useTranslation()
   if (!cli) return null
 
   if (cli.length === 0) {
     return (
       <span
         className="flex shrink-0 items-center gap-1 text-xs text-warning"
-        title="Present in the shared source directory but not linked into any CLI"
+        title={t("Present in the shared source directory but not linked into any CLI")}
       >
         <Unlink data-icon="inline-start" className="size-3" />
-        {variant === "full" && "unlinked"}
+        {variant === "full" && t("unlinked")}
       </span>
     )
   }

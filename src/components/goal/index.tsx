@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Flag } from "lucide-react"
 import type { ReactNode } from "react"
 import { capabilitiesFor, type AgentKind } from "@/lib/agents"
@@ -45,6 +46,7 @@ export function GoalSection() {
 
 /** Compact "Set goal" chip for the composer settings row. */
 export function GoalTrigger() {
+  const { t } = useTranslation()
   const { canCreate, beginEditing } = useGoalControls()
   if (!canCreate) return null
   return (
@@ -53,10 +55,10 @@ export function GoalTrigger() {
       variant="ghost"
       size="xs"
       onClick={beginEditing}
-      title="Set a long-running goal for this session"
+      title={t("Set a long-running goal for this session")}
     >
       <Flag data-icon="inline-start" />
-      Set goal
+      {t("Set goal")}
     </Button>
   )
 }

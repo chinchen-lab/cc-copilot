@@ -344,18 +344,23 @@ mark.find-in-session-active {
   background: var(--terminal-background, var(--background));
 }
 
-/* Shells often print bright ANSI text, even when the application uses a light theme. */
-:root:not(.dark) .terminal-surface {
-  --terminal-background: #202020;
-  --terminal-foreground: #f5f5f5;
-  --terminal-selection: #525252;
-  --terminal-bright-black: #a3a3a3;
-  --terminal-red: #f87171;
-  --terminal-green: #86efac;
-  --terminal-yellow: #facc15;
-  --terminal-blue: #93c5fd;
-  --terminal-magenta: #e879f9;
-  --terminal-cyan: #67e8f9;
+/* Both normal and bright ANSI colors need contrast on the light terminal surface. */
+:root:not(.dark) :is(.terminal-panel, .terminal-surface) {
+  --terminal-background: #E8EDF3;
+  --terminal-foreground: #263445;
+  --terminal-cursor: #334155;
+  --terminal-selection: #CBD5E1;
+  --terminal-border: #D7DEE7;
+  --terminal-black: #263445;
+  --terminal-bright-black: #64748B;
+  --terminal-white: #263445;
+  --terminal-red: #B42318;
+  --terminal-green: #22764E;
+  --terminal-yellow: #8B620C;
+  --terminal-blue: #245EA8;
+  --terminal-magenta: #8B3E85;
+  --terminal-cyan: #146C8B;
+  --border: var(--terminal-border);
 }
 
 .xterm .xterm-viewport {

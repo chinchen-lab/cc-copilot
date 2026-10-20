@@ -7,7 +7,7 @@ export function readTerminalTheme(element: HTMLElement): ITheme {
   return {
     background: color("terminal-background") || "#00000000",
     foreground: terminalColor("foreground", "foreground"),
-    cursor: terminalColor("foreground", "foreground"),
+    cursor: color("terminal-cursor") || terminalColor("foreground", "foreground"),
     cursorAccent: terminalColor("background", "canvas"),
     selectionBackground: color("terminal-selection"),
     black: color("terminal-black"), brightBlack: terminalColor("bright-black", "muted-foreground"),

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useRef, useLayoutEffect, useMemo, useState } from "react"
 import { useNearViewport } from "@/hooks/useNearViewport"
 import { Clock, RotateCcw } from "lucide-react"
@@ -180,13 +181,13 @@ function TurnWorkLabel({
   isTurnDone: boolean
   hiddenToolCalls: number
 }) {
+  const { t } = useTranslation()
   if (isTurnDone) return turnFoldLabel(getTurnDuration(turn), hiddenToolCalls)
   if (!turn.timestamp) return "Working"
 
   return (
     <span className="inline-flex items-baseline gap-1">
-      Working for
-      <LiveElapsed
+      {t("Working for")}<LiveElapsed
         startTimestamp={turn.timestamp}
         className="text-xs text-inherit"
       />
@@ -380,6 +381,7 @@ function TurnHeader({
   onRestoreToHere?: (turnIndex: number) => void
   onOpenBranches?: (turnIndex: number) => void
 }) {
+  const { t } = useTranslation()
   const showLiveTimer = !isTurnDone && !!turn.timestamp
   const durationMs = isTurnDone ? getTurnDuration(turn) : null
 
@@ -401,10 +403,10 @@ function TurnHeader({
             "ml-auto text-muted-foreground transition-opacity hover:text-foreground",
             isMobile ? "opacity-70" : "opacity-0 group-hover:opacity-100",
           )}
-          title="Undo this turn and all after it"
+          title={t("Undo this turn and all after it")}
         >
           <RotateCcw data-icon="inline-start" />
-          <span className="hidden sm:inline">Restore</span>
+          <span className="hidden sm:inline">{t("Restore")}</span>
         </Button>
       )}
       {branchCount > 0 && onOpenBranches && (
@@ -496,6 +498,7 @@ function ContentBlocks({
   isMobile: boolean
   skillMetadata?: Map<string, SkillMeta>
 }) {
+  const { t } = useTranslation()
   const elements: React.ReactNode[] = []
   // Indent for every nested block, so the rails all line up.
   const nestIndent = isMobile ? "ml-0 pl-2" : "ml-1 pl-3"
@@ -589,7 +592,7 @@ function ContentBlocks({
             PROMPT_CARD,
           )}
         >
-          <Badge variant="outline" className="mb-2">Queued while working</Badge>
+          <Badge variant="outline" className="mb-2">{t("Queued while working")}</Badge>
           <UserMessage content={block.content} timestamp={block.timestamp ?? ""} />
         </div>
       )
@@ -615,7 +618,7 @@ function ContentBlocks({
     if (block.kind === "sub_agent") {
       elements.push(
         <div key={keyFor(block, i)} className={cn(AGENT_RAIL, nestIndent)}>
-          <AgentPanel messages={block.messages} expandAll={expandAll} label="Sub-agent activity" countLabel="subagents active" />
+          <AgentPanel messages={block.messages} expandAll={expandAll} label={t("Sub-agent activity")} countLabel="subagents active" />
         </div>
       )
       i++
@@ -625,7 +628,7 @@ function ContentBlocks({
     if (block.kind === "background_agent") {
       elements.push(
         <div key={keyFor(block, i)} className={cn(AGENT_RAIL, nestIndent)}>
-          <AgentPanel messages={block.messages} expandAll={expandAll} label="Background agent activity" countLabel="agents active" />
+          <AgentPanel messages={block.messages} expandAll={expandAll} label={t("Background agent activity")} countLabel="agents active" />
         </div>
       )
       i++

@@ -1,9 +1,11 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Moon, Sun } from "lucide-react"
 import { HeaderIconButton } from "@/components/header-shared"
 import { useAppContext } from "@/contexts/AppContext"
 import { themeMode, type ThemeId } from "@/lib/themes"
 
 export function ThemeToggleButton({ className }: { className?: string }) {
+  const { t } = useTranslation()
   const { theme: { activeTheme, setTheme } } = useAppContext()
   const isDark = themeMode(activeTheme) === "dark"
   const nextTheme: ThemeId = activeTheme === "layered" ? "layered-light"
@@ -13,7 +15,7 @@ export function ThemeToggleButton({ className }: { className?: string }) {
   return (
     <HeaderIconButton
       icon={isDark ? Sun : Moon}
-      label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      label={isDark ? t("Switch to light mode") : t("Switch to dark mode")}
       onClick={() => setTheme(nextTheme)}
       size="default"
       className={className}

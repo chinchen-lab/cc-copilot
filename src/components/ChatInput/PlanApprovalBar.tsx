@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { CheckCircle, ChevronDown, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -51,12 +52,13 @@ export function PlanApprovalBar({
   onApprove,
   onReject,
 }: PlanApprovalBarProps) {
+  const { t } = useTranslation()
   const primaryAction = recommendedAction ?? actions[0]
   const alternatives = actions.filter((action) => action !== primaryAction)
   return (
     <Alert className={cn("mb-3", onApprove && "pr-44")}>
       <CheckCircle />
-      <AlertTitle>Plan ready for review</AlertTitle>
+      <AlertTitle>{t("Plan ready for review")}</AlertTitle>
       <AlertDescription>
         {summary || (onApprove ? "Approve the plan or ask the agent to revise it." : "The agent is waiting for this plan to be reviewed.")}
       </AlertDescription>
@@ -68,12 +70,12 @@ export function PlanApprovalBar({
             onClick={() => onApprove(primaryAction)}
           >
             {responding && <Loader2 className="animate-spin" data-icon="inline-start" />}
-            {responding ? "Sending..." : primaryAction ? actionLabel(primaryAction) : "Approve"}
+            {responding ? t("Sending...") : primaryAction ? actionLabel(primaryAction) : t("Approve")}
           </Button>
           {alternatives.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger
-                render={<Button type="button" variant="outline" size="icon-sm" aria-label="Other plan actions" disabled={responding} />}
+                render={<Button type="button" variant="outline" size="icon-sm" aria-label={t("Other plan actions")} disabled={responding} />}
               >
                 <ChevronDown data-icon="icon" />
               </DropdownMenuTrigger>
@@ -94,7 +96,7 @@ export function PlanApprovalBar({
             disabled={responding}
             onClick={onReject}
           >
-            Reject
+            {t("Reject")}
           </Button>
         </AlertAction>
       )}
@@ -108,7 +110,7 @@ export function PlanApprovalBar({
           <CollapsibleTrigger
             render={<Button type="button" variant="ghost" size="xs" />}
           >
-            Review full plan
+            {t("Review full plan")}
           </CollapsibleTrigger>
           <CollapsibleContent>
             <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs text-foreground">
@@ -119,7 +121,7 @@ export function PlanApprovalBar({
       )}
       {allowedPrompts && allowedPrompts.length > 0 && (
         <div className="col-span-full mt-2 flex flex-wrap gap-1">
-          <span className="mr-1 self-center text-xs text-muted-foreground">Permissions requested:</span>
+          <span className="mr-1 self-center text-xs text-muted-foreground">{t("Permissions requested:")}</span>
           {allowedPrompts.map((p, i) => (
             <Badge key={i} variant="outline">
               {p.prompt}

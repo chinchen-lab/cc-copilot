@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo } from "react"
 import type { LucideIcon } from "lucide-react"
 import { MessageSquare, FolderOpen, PanelsTopLeft } from "lucide-react"
@@ -29,12 +30,13 @@ export const MobileNav = memo(function MobileNav({
   activeTab,
   onTabChange,
 }: MobileNavProps) {
+  const { t } = useTranslation()
   const { isLive } = useSessionContext()
 
   return (
     <nav
       className="flex shrink-0 items-stretch border-t bg-background pb-[env(safe-area-inset-bottom)]"
-      aria-label="Navigation"
+      aria-label={t("Navigation")}
     >
       {TAB_DEFINITIONS.map((tab) => {
         const Icon = tab.icon
@@ -44,8 +46,8 @@ export const MobileNav = memo(function MobileNav({
             key={tab.id}
             type="button"
             aria-current={isActive ? "page" : undefined}
-            aria-label={tab.label}
-            title={tab.label}
+            aria-label={t(tab.label)}
+            title={t(tab.label)}
             onClick={() => { hapticLight(); onTabChange(tab.id) }}
             className={cn(
               "flex min-h-14 flex-1 items-center justify-center outline-none transition-[color,transform] duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset motion-reduce:transition-none",
@@ -65,7 +67,7 @@ export const MobileNav = memo(function MobileNav({
               />
               {/* On the chat tab the session header shows it. */}
               {tab.id === "chat" && isLive && !isActive && (
-                <LiveIndicator aria-label="Session is live" className="absolute right-0.5 top-0.5 size-1.5 ring-2 ring-background" />
+                <LiveIndicator aria-label={t("Session is live")} className="absolute right-0.5 top-0.5 size-1.5 ring-2 ring-background" />
               )}
             </div>
           </button>

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useCallback, useEffect, useRef } from "react"
 import { Terminal, Sparkles, Loader2, Pencil } from "lucide-react"
 import type { SlashSuggestion } from "../../shared/contracts/projectTools"
@@ -38,6 +39,7 @@ export const SlashSuggestions = memo(function SlashSuggestions({
   onHover,
   onEdit,
 }: SlashSuggestionsProps) {
+  const { t } = useTranslation()
   const itemRefs = useRef<Map<number, HTMLElement>>(new Map())
 
   // Scroll selected item into view
@@ -53,7 +55,7 @@ export const SlashSuggestions = memo(function SlashSuggestions({
       <div className="motion-popover-in absolute bottom-full left-0 right-0 z-50 mx-auto mb-2 max-w-[var(--chat-width)]">
         <div className="flex items-center gap-2 rounded-lg border bg-popover p-3 text-popover-foreground shadow-sm">
           <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Loading suggestions...</span>
+          <span className="text-xs text-muted-foreground">{t("Loading suggestions...")}</span>
         </div>
       </div>
     )
@@ -64,7 +66,7 @@ export const SlashSuggestions = memo(function SlashSuggestions({
       <div className="motion-popover-in absolute bottom-full left-0 right-0 z-50 mx-auto mb-2 max-w-[var(--chat-width)]">
         <div className="rounded-lg border bg-popover p-3 text-popover-foreground shadow-sm">
           <span className="text-xs text-muted-foreground">
-            {filter ? `No commands or skills matching "${filter}"` : "No commands or skills found"}
+            {filter ? t("No commands or skills matching \"{0}\"", { "0": filter }) : t("No commands or skills found")}
           </span>
         </div>
       </div>
@@ -136,6 +138,7 @@ function SuggestionItem({
   onEdit?: (filePath: string) => void
   itemRefs: React.MutableRefObject<Map<number, HTMLElement>>
 }) {
+  const { t } = useTranslation()
   const setRef = useCallback(
     (el: HTMLElement | null) => {
       if (el) {
@@ -182,7 +185,7 @@ function SuggestionItem({
         </div>
         {isSelected && (
           <CommandShortcut className={onEdit && suggestion.filePath ? "mr-6" : undefined}>
-            Enter
+            {t("Enter")}
           </CommandShortcut>
         )}
       </CommandItem>
@@ -201,7 +204,7 @@ function SuggestionItem({
             e.stopPropagation()
             onEdit(suggestion.filePath)
           }}
-          aria-label={`Edit ${suggestion.name}`}
+          aria-label={t("Edit {0}", { "0": suggestion.name })}
         >
           <Pencil data-icon="inline-start" />
         </Button>

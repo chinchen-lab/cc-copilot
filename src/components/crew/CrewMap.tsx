@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
 import { Bot, Maximize2, Minus, Network, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -101,6 +102,7 @@ interface CrewMapProps {
  * when the panel is too narrow for it.
  */
 export function CrewMap({ crew, hereId, controls, kinds, nameOf, onOpen }: CrewMapProps) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const { filter, collapsed, toggle } = controls
   const root = crew.members.find((member) => member.sessionId === crew.rootId)
@@ -124,7 +126,7 @@ export function CrewMap({ crew, hereId, controls, kinds, nameOf, onOpen }: CrewM
       <div className="flex shrink-0 items-center gap-2 px-3 pb-2">
         <FilterToggle crew={crew} controls={controls} />
         <span className="flex-1" />
-        <Button variant="ghost" size="icon-xs" aria-label="Expand the map" title="Expand the map" onClick={() => setExpanded(true)}>
+        <Button variant="ghost" size="icon-xs" aria-label={t("Expand the map")} title={t("Expand the map")} onClick={() => setExpanded(true)}>
           <Maximize2 data-icon="inline-start" />
         </Button>
       </div>
@@ -134,11 +136,11 @@ export function CrewMap({ crew, hereId, controls, kinds, nameOf, onOpen }: CrewM
           showCloseButton
           className="flex h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:h-[calc(100dvh-4rem)] sm:w-[calc(100vw-4rem)] sm:max-w-none"
         >
-          <DialogTitle className="sr-only">Crew map</DialogTitle>
-          <DialogDescription className="sr-only">Every session in this crew, from the one that started it.</DialogDescription>
+          <DialogTitle className="sr-only">{t("Crew map")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("Every session in this crew, from the one that started it.")}</DialogDescription>
           <header className="flex h-12 shrink-0 items-center gap-3 pl-4 pr-14">
             <Network aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 truncate text-sm font-medium">{root ? nameOf(root) : "Crew"}</span>
+            <span className="min-w-0 truncate text-sm font-medium">{root ? nameOf(root) : t("Crew")}</span>
             <span className="flex-1" />
             <FilterToggle crew={crew} controls={controls} />
           </header>
@@ -153,13 +155,14 @@ export function CrewMap({ crew, hereId, controls, kinds, nameOf, onOpen }: CrewM
 }
 
 function FilterToggle({ crew, controls }: { crew: SessionCrew; controls: CrewMapControls }) {
+  const { t } = useTranslation()
   const counts = crewMapCounts(crew)
   const options: Array<{ id: CrewMapFilter; label: string; count: number; hint: string }> = [
     { id: "all", label: "All", count: counts.all, hint: "Every session in the crew" },
     { id: "active", label: "Active", count: counts.active, hint: "Sessions working or waiting on you, and the sessions that started them" },
   ]
   return (
-    <div role="radiogroup" aria-label="Show on the map" className="flex shrink-0 gap-0.5 rounded-full border bg-background p-0.5">
+    <div role="radiogroup" aria-label={t("Show on the map")} className="flex shrink-0 gap-0.5 rounded-full border bg-background p-0.5">
       {options.map(({ id, label, count, hint }) => (
         <button
           key={id}
@@ -310,6 +313,7 @@ interface CanvasProps {
 }
 
 function CrewMapCanvas({ crew, collapsed, groups, filter, hereId, kinds, nameOf, memory, onOpen, onToggle, onShowAll }: CanvasProps) {
+  const { t } = useTranslation()
   const scroller = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<Size>({ width: 0, height: 0 })
   const group = groups && size.width >= GROUP_VIEW_WIDTH
@@ -477,7 +481,7 @@ function CrewMapCanvas({ crew, collapsed, groups, filter, hereId, kinds, nameOf,
       <div
         ref={scroller}
         role="region"
-        aria-label="Crew map"
+        aria-label={t("Crew map")}
         data-crew-map-layout={layout.orientation}
         onScroll={(event) => {
           scrolled.current = { left: event.currentTarget.scrollLeft, top: event.currentTarget.scrollTop }
@@ -502,10 +506,10 @@ function CrewMapCanvas({ crew, collapsed, groups, filter, hereId, kinds, nameOf,
         {empty ? (
           <Empty className="h-full">
             <EmptyHeader>
-              <EmptyTitle>Nothing is active</EmptyTitle>
-              <EmptyDescription className="text-xs">No session in this crew is working or waiting on you.</EmptyDescription>
+              <EmptyTitle>{t("Nothing is active")}</EmptyTitle>
+              <EmptyDescription className="text-xs">{t("No session in this crew is working or waiting on you.")}</EmptyDescription>
             </EmptyHeader>
-            <Button variant="outline" size="xs" onClick={onShowAll}>Show all sessions</Button>
+            <Button variant="outline" size="xs" onClick={onShowAll}>{t("Show all sessions")}</Button>
           </Empty>
         ) : (
           <div className="relative" style={{ width: area.width, height: area.height }}>
@@ -527,7 +531,7 @@ function CrewMapCanvas({ crew, collapsed, groups, filter, hereId, kinds, nameOf,
                 ))}
                 {trail && <path d={trail} className="stroke-foreground/55" strokeWidth={1.5} />}
               </svg>
-              <ul aria-label="Sessions" className="absolute inset-0">
+              <ul aria-label={t("Sessions")} className="absolute inset-0">
                 {layout.nodes.map((node) => (
                   <CrewMapItem
                     key={node.member.sessionId}
@@ -551,24 +555,24 @@ function CrewMapCanvas({ crew, collapsed, groups, filter, hereId, kinds, nameOf,
       </div>
       {!empty && (
         <div className="absolute bottom-2.5 right-2.5 flex items-center gap-0.5 rounded-lg border bg-popover p-0.5 shadow-sm">
-          <Button variant="ghost" size="icon-xs" aria-label="Zoom out" title="Zoom out" disabled={scale <= MIN_SCALE} onClick={() => zoomBy(1 / ZOOM_STEP)}>
+          <Button variant="ghost" size="icon-xs" aria-label={t("Zoom out")} title={t("Zoom out")} disabled={scale <= MIN_SCALE} onClick={() => zoomBy(1 / ZOOM_STEP)}>
             <Minus data-icon="inline-start" />
           </Button>
-          <Button variant="ghost" size="xs" aria-label="Actual size" title="Actual size" className="min-w-11 px-1 tabular-nums text-muted-foreground" onClick={() => zoomBy(1 / scale)}>
+          <Button variant="ghost" size="xs" aria-label={t("Actual size")} title={t("Actual size")} className="min-w-11 px-1 tabular-nums text-muted-foreground" onClick={() => zoomBy(1 / scale)}>
             {Math.round(scale * 100)}%
           </Button>
-          <Button variant="ghost" size="icon-xs" aria-label="Zoom in" title="Zoom in" disabled={scale >= MAX_SCALE} onClick={() => zoomBy(ZOOM_STEP)}>
+          <Button variant="ghost" size="icon-xs" aria-label={t("Zoom in")} title={t("Zoom in")} disabled={scale >= MAX_SCALE} onClick={() => zoomBy(ZOOM_STEP)}>
             <Plus data-icon="inline-start" />
           </Button>
           <span className="mx-0.5 h-4 w-px bg-border" aria-hidden="true" />
           <Button
             variant="ghost"
             size="xs"
-            title="Fit the whole crew on screen"
+            title={t("Fit the whole crew on screen")}
             className="px-1.5 text-muted-foreground"
             onClick={() => drawThenScroll(frameFor(layout, fitScale(layout, size), size), () => ({ left: 0, top: 0 }))}
           >
-            Fit
+            {t("Fit")}
           </Button>
         </div>
       )}
@@ -617,6 +621,7 @@ function CrewMapItem({
   onOpen: (member: CrewMember) => void
   onToggle: (sessionId: string) => void
 }) {
+  const { t } = useTranslation()
   const { member } = node
   const state = memberCellState(member)
   const activity = memberActivity(member)
@@ -662,7 +667,7 @@ function CrewMapItem({
           {(meta || here) && (
             <span className="flex min-w-0 items-center gap-1.5 text-[0.71875rem] tabular-nums text-muted-foreground/75">
               <span className="min-w-0 flex-1 truncate">{meta}</span>
-              {here && <span className="shrink-0 font-medium text-foreground/70">You are here</span>}
+              {here && <span className="shrink-0 font-medium text-foreground/70">{t("You are here")}</span>}
             </span>
           )}
         </TooltipTrigger>
@@ -676,6 +681,7 @@ function CrewMapItem({
 }
 
 function FoldToggle({ node, name, left, onToggle }: { node: CrewMapNode; name: string; left: number; onToggle: (sessionId: string) => void }) {
+  const { t } = useTranslation()
   const { collapsed, hidden } = node
   let busy: "needs-you" | "working" | null = null
   if (hidden.needsYou > 0) busy = "needs-you"
@@ -692,7 +698,7 @@ function FoldToggle({ node, name, left, onToggle }: { node: CrewMapNode; name: s
       type="button"
       aria-expanded={!collapsed}
       aria-label={label}
-      title={collapsed ? undefined : "Fold"}
+      title={collapsed ? undefined : t("Fold")}
       onClick={() => onToggle(node.member.sessionId)}
       className={cn(
         "absolute z-10 flex h-5 min-w-5 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center gap-1 rounded-full border bg-card px-1.5 text-[0.6875rem] font-medium tabular-nums text-muted-foreground shadow-xs outline-none",

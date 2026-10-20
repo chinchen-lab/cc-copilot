@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { AlertTriangle, LoaderCircle, RefreshCw, Search, X } from "lucide-react"
 import {
   Alert,
@@ -21,11 +22,12 @@ export function SearchInput({ value, onChange, placeholder, loading = false }: {
   placeholder: string
   loading?: boolean
 }) {
+  const { t } = useTranslation()
   return (
     <InputGroup className="w-full sm:max-w-sm">
       <InputGroupAddon>
         {loading
-          ? <LoaderCircle className="animate-spin" aria-label="Searching session history" />
+          ? <LoaderCircle className="animate-spin" aria-label={t("Searching session history")} />
           : <Search aria-hidden="true" />}
       </InputGroupAddon>
       <InputGroupInput
@@ -39,7 +41,7 @@ export function SearchInput({ value, onChange, placeholder, loading = false }: {
       {value && (
         <InputGroupAddon align="inline-end">
           <InputGroupButton
-            aria-label="Clear search"
+            aria-label={t("Clear search")}
             onClick={() => onChange("")}
             size="icon-xs"
           >
@@ -52,15 +54,16 @@ export function SearchInput({ value, onChange, placeholder, loading = false }: {
 }
 
 export function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const { t } = useTranslation()
   return (
     <Alert variant="destructive">
       <AlertTriangle aria-hidden="true" />
-      <AlertTitle>Could not load this data</AlertTitle>
+      <AlertTitle>{t("Could not load this data")}</AlertTitle>
       <AlertDescription>{message}</AlertDescription>
       <AlertAction>
         <Button variant="ghost" size="xs" onClick={onRetry}>
           <RefreshCw data-icon="inline-start" />
-          Retry
+          {t("Retry")}
         </Button>
       </AlertAction>
     </Alert>

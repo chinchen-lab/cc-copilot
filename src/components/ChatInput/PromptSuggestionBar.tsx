@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import { Sparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -17,6 +18,7 @@ export function PromptSuggestionBar({
   suggestion: string | null
   onAccept: (suggestion: string) => void
 }) {
+  const { t } = useTranslation()
   // Keyed by text, not a boolean: the next turn's suggestion is a different
   // offer and must reappear even though the previous one was waved away.
   const [dismissed, setDismissed] = useState<string | null>(null)
@@ -29,7 +31,7 @@ export function PromptSuggestionBar({
         type="button"
         variant="ghost"
         size="sm"
-        title="Put this in the composer"
+        title={t("Put this in the composer")}
         onClick={() => {
           setDismissed(suggestion)
           onAccept(suggestion)
@@ -43,7 +45,7 @@ export function PromptSuggestionBar({
         type="button"
         variant="ghost"
         size="icon"
-        aria-label="Dismiss suggestion"
+        aria-label={t("Dismiss suggestion")}
         onClick={() => setDismissed(suggestion)}
         className="shrink-0 text-muted-foreground"
       >

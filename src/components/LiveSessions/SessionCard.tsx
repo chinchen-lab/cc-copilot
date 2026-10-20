@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import {
   Archive,
@@ -105,6 +106,7 @@ export function SessionCard({
   sessionNames = EMPTY_NAMES,
   activeSessionKey = null,
 }: SessionCardProps) {
+  const { t } = useTranslation()
   const {
     isLive,
     isRunning,
@@ -164,7 +166,7 @@ export function SessionCard({
           type="button"
           data-crew-lineage
           onClick={lineage.onOpenParent}
-          aria-label={`Open ${lineage.parentTitle}, which started this session`}
+          aria-label={t("Open {0}, which started this session", { "0": lineage.parentTitle })}
           className="flex min-w-0 items-center gap-1.5 rounded-t-lg px-3 pl-[26px] pt-2.5 text-left text-[0.6875rem] leading-tight outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ArrowUp className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -242,13 +244,13 @@ export function SessionCard({
           )}
           {isDeferred && (
             <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
-              deferred
+              {t("deferred")}
             </Badge>
           )}
           {isTeammate && (
             <Badge variant="outline">
               <Bot data-icon="inline-start" />
-              {headline !== s.agentName ? s.agentName : "Agent"}
+              {headline !== s.agentName ? s.agentName : t("Agent")}
             </Badge>
           )}
           <SessionBadges access={s.access} />
@@ -267,13 +269,13 @@ export function SessionCard({
           {turnCount > 0 && (
             <span className="flex items-center gap-1">
               <MessageSquare className="size-3 shrink-0" aria-hidden="true" />
-              {turnCount} {turnCount === 1 ? "turn" : "turns"}
+              {turnCount} {turnCount === 1 ? t("turn") : t("turns")}
             </span>
           )}
           {isArchived && (
             <span className="flex items-center gap-1">
               <Archive className="size-3 shrink-0" aria-label={archivedLabel} role="img" />
-              Archived
+              {t("Archived")}
             </span>
           )}
           {crewIsAhead ? (
@@ -281,7 +283,7 @@ export function SessionCard({
               data-crew-activity
               className={cn("ml-auto tabular-nums", isRecentlyActive({ ...s, lastActivityAt: crew.activityAt }) && "text-success")}
             >
-              crew active {formatRelativeTime(crew.activityAt)}
+              {t("crew active ")}{formatRelativeTime(crew.activityAt)}
             </span>
           ) : (
             <span className="ml-auto tabular-nums">
@@ -306,7 +308,7 @@ export function SessionCard({
         <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2.5 pl-[26px]">
           {s.matchedPullRequestNumber ? (
             <Badge variant="outline" className="px-1">
-              Matched #{s.matchedPullRequestNumber}
+              {t("Matched #")}{s.matchedPullRequestNumber}
             </Badge>
           ) : (
             <PullRequestChips pullRequests={s.pullRequests} max={2} compact />
@@ -318,7 +320,7 @@ export function SessionCard({
               size="xs"
               onClick={onToggleTeammates}
               aria-expanded={!teammatesCollapsed}
-              aria-label={teammatesCollapsed ? `Show ${teammateCount} team agents` : `Hide ${teammateCount} team agents`}
+              aria-label={teammatesCollapsed ? t("Show {0} team agents", { "0": teammateCount }) : t("Hide {0} team agents", { "0": teammateCount })}
             >
               <Users data-icon="inline-start" />
               {teammateCount}
@@ -336,11 +338,11 @@ export function SessionCard({
               onClick={handleResume}
               disabled={resuming}
               className="text-warning"
-              title="Resume to evaluate deferred permission"
-              aria-label="Resume to evaluate"
+              title={t("Resume to evaluate deferred permission")}
+              aria-label={t("Resume to evaluate")}
             >
               <Play data-icon="inline-start" />
-              Resume
+              {t("Resume")}
             </Button>
           )}
         </div>
@@ -388,8 +390,8 @@ export function SessionCard({
             "absolute right-1.5 bg-popover text-destructive opacity-0 group-focus-within:opacity-100 group-hover:opacity-100",
             crew ? "top-1.5" : "bottom-1.5",
           )}
-          title={`Kill PID ${proc.pid}`}
-          aria-label={`Kill process ${proc.pid}`}
+          title={t("Kill PID {0}", { "0": proc.pid })}
+          aria-label={t("Kill process {0}", { "0": proc.pid })}
         >
           <X data-icon="inline-start" />
         </Button>

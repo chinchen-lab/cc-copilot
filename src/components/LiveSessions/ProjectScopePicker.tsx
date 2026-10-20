@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import { ChevronsUpDown, Folder, FolderSearch, Layers, Loader2, Plus } from "lucide-react"
 
@@ -92,6 +93,7 @@ export function ProjectScopePicker({
   archivableCount,
   onArchiveIdle,
 }: ProjectScopePickerProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const focusedLabel = focused?.customName ?? value
   const summary = value === null
@@ -105,7 +107,7 @@ export function ProjectScopePicker({
 
   const trigger = (
     <PopoverTrigger
-      aria-label={value === null ? "Choose a project to focus on" : `Focused on ${focusedLabel}. Change project`}
+      aria-label={value === null ? t("Choose a project to focus on") : t("Focused on {0}. Change project", { "0": focusedLabel })}
       className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-popup-open:bg-accent"
     >
       {value === null ? (
@@ -119,7 +121,7 @@ export function ProjectScopePicker({
       )}
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-sm font-medium leading-tight text-foreground">
-          {value === null ? "All projects" : focusedLabel}
+          {value === null ? t("All projects") : focusedLabel}
         </span>
         <span className="truncate text-[0.6875rem] leading-tight text-muted-foreground">
           {summary}
@@ -129,8 +131,8 @@ export function ProjectScopePicker({
         <WaitingCount
           count={elsewhere}
           label={elsewhere === 1
-            ? "1 session in another project is waiting for you"
-            : `${elsewhere} sessions in other projects are waiting for you`}
+            ? t("1 session in another project is waiting for you")
+            : t("{0} sessions in other projects are waiting for you", { "0": elsewhere })}
           className="rounded-full border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[0.6875rem]"
         />
       )}
@@ -155,9 +157,9 @@ export function ProjectScopePicker({
         ) : trigger}
         <PopoverContent className="w-(--anchor-width) min-w-72 p-0">
           <Command>
-            <CommandInput placeholder="Find a project" autoFocus />
+            <CommandInput placeholder={t("Find a project")} autoFocus />
             <CommandList>
-              <CommandEmpty>No project matches.</CommandEmpty>
+              <CommandEmpty>{t("No project matches.")}</CommandEmpty>
               <CommandGroup>
                 <CommandItem
                   value="all-projects"
@@ -166,7 +168,7 @@ export function ProjectScopePicker({
                   className="gap-2.5"
                 >
                   <Layers className="text-muted-foreground" aria-hidden="true" />
-                  <span className="flex-1 truncate">All projects</span>
+                  <span className="flex-1 truncate">{t("All projects")}</span>
                   <span className="text-xs tabular-nums text-muted-foreground">{totalSessions}</span>
                 </CommandItem>
               </CommandGroup>
@@ -194,7 +196,7 @@ export function ProjectScopePicker({
                     {option.needsYou > 0 && (
                       <WaitingCount
                         count={option.needsYou}
-                        label={`${plural(option.needsYou, "session")} waiting for you`}
+                        label={t("{0} waiting for you", { "0": plural(option.needsYou, "session") })}
                         className="text-xs"
                       />
                     )}
@@ -223,7 +225,7 @@ export function ProjectScopePicker({
           className="shrink-0"
           disabled={creatingSession}
           onClick={() => onNewSession(focused.dirName, focused.cwd)}
-          aria-label={`New session in ${focusedLabel}`}
+          aria-label={t("New session in {0}", { "0": focusedLabel })}
         >
           {creatingSession ? (
             <Loader2 data-icon="inline-start" className="animate-spin" />
@@ -240,8 +242,8 @@ export function ProjectScopePicker({
           className="shrink-0"
           disabled={creatingSession}
           onClick={() => openFolderBrowser()}
-          aria-label="Start a session in a folder"
-          title="Start a session in a folder"
+          aria-label={t("Start a session in a folder")}
+          title={t("Start a session in a folder")}
         >
           <FolderSearch data-icon="inline-start" />
         </Button>

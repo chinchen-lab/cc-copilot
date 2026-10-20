@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 /**
  * Shared indicator components used by both GroupedFileCard and TurnChangedFiles.
 */
@@ -17,14 +18,15 @@ export function OpIndicator({ hasEdit, hasWrite }: { hasEdit: boolean; hasWrite:
 }
 
 export function SubAgentIndicator({ agentId }: { agentId: string }) {
+  const { t } = useTranslation()
   return (
     <Button
       type="button"
       variant="ghost"
       size="icon-xs"
       className="size-5 shrink-0 font-mono text-xs font-bold text-muted-foreground"
-      aria-label="Open sub-agent view"
-      title="Open sub-agent view"
+      aria-label={t("Open sub-agent view")}
+      title={t("Open sub-agent view")}
       onClick={(e) => {
         e.stopPropagation()
         window.dispatchEvent(new CustomEvent(OPEN_SUBAGENT_EVENT, { detail: { agentId } }))

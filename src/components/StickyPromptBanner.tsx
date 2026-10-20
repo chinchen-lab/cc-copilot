@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useEffect, useMemo, useState } from "react"
 import { ChevronUp, MessageSquareText } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -95,6 +96,7 @@ export const StickyPromptBanner = memo(function StickyPromptBanner({
   session,
   scrollContainerRef,
 }: StickyPromptBannerProps) {
+  const { t } = useTranslation()
   const [stickyTurn, setStickyTurn] = useState<StickyTurn | null>(null)
 
   useEffect(() => {
@@ -162,14 +164,14 @@ export const StickyPromptBanner = memo(function StickyPromptBanner({
       type="button"
       variant="outline"
       size="sm"
-      aria-label={`Scroll to turn ${prompt.index + 1} prompt`}
+      aria-label={t("Scroll to turn {0} prompt", { "0": prompt.index + 1 })}
       title={prompt.text}
       className="motion-slide-down-in absolute left-1/2 top-12 z-20 h-9 max-w-[calc(100%-5rem)] -translate-x-1/2 justify-start gap-2 rounded-full bg-popover px-3 text-left shadow-sm"
       onClick={scrollToPrompt}
     >
       <MessageSquareText data-icon="inline-start" />
       <span className="shrink-0 font-mono text-xs text-muted-foreground">
-        Turn {prompt.index + 1}
+        {t("Turn ")}{prompt.index + 1}
       </span>
       <span className="min-w-0 flex-1 truncate text-sm font-normal text-foreground/80">
         {prompt.text}

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { randomUUID } from "@/lib/uuid"
 import { useMemo, useState, useSyncExternalStore } from "react"
 import { X } from "lucide-react"
@@ -25,6 +26,7 @@ export function ConversationQueue({ sessionId, readOnly = false }: { sessionId: 
 }
 
 function DeliveryProblems({ storageKey, commands: receipts, readOnly, onAction }: { storageKey: string; commands: CommandReceipt[]; readOnly: boolean; onAction: (body: Record<string, unknown>) => Promise<void> }) {
+  const { t } = useTranslation()
   const [storedDismissals, setDismissals] = useLocalStorage<string[]>(storageKey, [])
   const dismissed = new Set(Array.isArray(storedDismissals) ? storedDismissals : [])
   const [busy, setBusy] = useState(false)
@@ -40,21 +42,21 @@ function DeliveryProblems({ storageKey, commands: receipts, readOnly, onAction }
     finally { setBusy(false) }
   }
   if (!commands.length && !error) return null
-  return <section className="flex max-h-72 flex-col gap-2 overflow-y-auto p-3" aria-label="Message delivery problems">
-    {error && <Alert variant="destructive"><AlertTitle className="flex items-center justify-between gap-2">Queue update failed<Button size="icon-xs" variant="ghost" aria-label="Dismiss queue error" onClick={() => setError(null)}><X /></Button></AlertTitle><AlertDescription>{presentTurnError(error)}</AlertDescription></Alert>}
+  return <section className="flex max-h-72 flex-col gap-2 overflow-y-auto p-3" aria-label={t("Message delivery problems")}>
+    {error && <Alert variant="destructive"><AlertTitle className="flex items-center justify-between gap-2">{t("Queue update failed")}<Button size="icon-xs" variant="ghost" aria-label={t("Dismiss queue error")} onClick={() => setError(null)}><X /></Button></AlertTitle><AlertDescription>{presentTurnError(error)}</AlertDescription></Alert>}
     {commands.map((command) => <div className="flex flex-col gap-2" key={command.id}>
       <div className="flex items-center gap-2">
         <Badge variant="destructive">{command.state}</Badge>
-        <span className="min-w-0 flex-1 truncate" title={command.message}>{(command.message && taskWakeupSummary(command.message, nameOf)) || command.message || "Image attachment"}</span>
-        {command.state === "failed" && <Button size="icon-xs" variant="ghost" aria-label="Dismiss failed message" title="Dismiss failed message" onClick={() => setDismissals((previous) => [...(Array.isArray(previous) ? previous : []), command.id])}><X /></Button>}
+        <span className="min-w-0 flex-1 truncate" title={command.message}>{(command.message && taskWakeupSummary(command.message, nameOf)) || command.message || t("Image attachment")}</span>
+        {command.state === "failed" && <Button size="icon-xs" variant="ghost" aria-label={t("Dismiss failed message")} title={t("Dismiss failed message")} onClick={() => setDismissals((previous) => [...(Array.isArray(previous) ? previous : []), command.id])}><X /></Button>}
       </div>
       {command.error && <p className="text-sm text-muted-foreground">{presentTurnError(command.error)}</p>}
       {command.state === "unknown" && !readOnly && <div className="flex flex-wrap gap-2">
-        <Button size="xs" variant="outline" disabled={busy} onClick={() => void action({ action: "resolve", commandId: command.id, disposition: "completed" })}>History confirms completion</Button>
-        <Button size="xs" variant="outline" disabled={busy} onClick={() => void action({ action: "resolve", commandId: command.id, disposition: "failed" })}>History confirms failure</Button>
-        <Button size="xs" variant="outline" disabled={busy} onClick={() => setResending(command.id)}>Resend…</Button>
+        <Button size="xs" variant="outline" disabled={busy} onClick={() => void action({ action: "resolve", commandId: command.id, disposition: "completed" })}>{t("History confirms completion")}</Button>
+        <Button size="xs" variant="outline" disabled={busy} onClick={() => void action({ action: "resolve", commandId: command.id, disposition: "failed" })}>{t("History confirms failure")}</Button>
+        <Button size="xs" variant="outline" disabled={busy} onClick={() => setResending(command.id)}>{t("Resend…")}</Button>
       </div>}
-      {resending === command.id && <Alert><AlertTitle>This may send a duplicate</AlertTitle><AlertDescription>Review the conversation first. Cogpit could not confirm the original delivery.<Button size="xs" variant="destructive" disabled={busy} onClick={() => void action({ action: "resend", commandId: command.id, newCommandId: randomUUID(), confirmDuplicateRisk: true })}>Confirm resend</Button><Button size="xs" variant="ghost" onClick={() => setResending(null)}>Keep waiting</Button></AlertDescription></Alert>}
+      {resending === command.id && <Alert><AlertTitle>{t("This may send a duplicate")}</AlertTitle><AlertDescription>{t("Review the conversation first. Cogpit could not confirm the original delivery.")}<Button size="xs" variant="destructive" disabled={busy} onClick={() => void action({ action: "resend", commandId: command.id, newCommandId: randomUUID(), confirmDuplicateRisk: true })}>{t("Confirm resend")}</Button><Button size="xs" variant="ghost" onClick={() => setResending(null)}>{t("Keep waiting")}</Button></AlertDescription></Alert>}
     </div>)}
   </section>
 }

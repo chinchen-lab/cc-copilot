@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import type { LucideIcon } from "lucide-react"
 import { Bot, Eye, ShieldEllipsis, ShieldX } from "lucide-react"
 import { PermissionRequestBar } from "@/components/ChatInput/PermissionRequestBar"
@@ -25,15 +26,16 @@ export function accessReadOnlyReason({ level }: SessionAccess): ReadOnlyReason |
 
 /** Stands in for the composer when the session can be read but not driven. */
 export function SessionReadOnlyNotice({ reason }: { reason: ReadOnlyReason }) {
+  const { t } = useTranslation()
   switch (reason.kind) {
     case "subagent":
-      return <Banner icon={Bot}>Viewing sub-agent session (read-only)</Banner>
+      return <Banner icon={Bot}>{t("Viewing sub-agent session (read-only)")}</Banner>
     case "external":
       return <Banner icon={Bot} status>{readOnlySessionNotice(reason.agentKind)}</Banner>
     case "no-access":
-      return <Banner icon={ShieldX} status>You don't have access to this session</Banner>
+      return <Banner icon={ShieldX} status>{t("You don't have access to this session")}</Banner>
     case "checking":
-      return <ReaderBanner icon={ShieldEllipsis}>Checking access…</ReaderBanner>
+      return <ReaderBanner icon={ShieldEllipsis}>{t("Checking access…")}</ReaderBanner>
     case "view-only":
       return <ReaderBanner icon={Eye}><ViewOnlyNote /></ReaderBanner>
   }

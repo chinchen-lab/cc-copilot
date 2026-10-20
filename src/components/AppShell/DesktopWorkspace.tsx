@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { resolvePluginPanelPreference } from "@/plugins/panelAliases"
 import { useOpenSessionCrew } from "@/hooks/useOpenSessionCrew"
 import { lazy, Suspense, useCallback, useState } from "react"
@@ -94,6 +95,7 @@ function DesktopMainView({
   extensionView,
   floatingChrome,
 }: DesktopViewProps & { view: DesktopMainView; extensionView: EditionMainView | null; floatingChrome: ReactNode }) {
+  const { t } = useTranslation()
   const { state, config } = useAppContext()
   const { session, sessionSource } = useSessionContext()
   const pendingPath = state.pendingCwd
@@ -101,7 +103,7 @@ function DesktopMainView({
 
   if (view === "config") {
     return (
-      <Suspense fallback={<LazyViewFallback label="Loading configuration…" />}>
+      <Suspense fallback={<LazyViewFallback label={t("Loading configuration…")} />}>
         <div className="motion-session-enter flex min-h-0 flex-1 pt-10">
           <ConfigBrowser
             projectPath={resolveDesktopProjectPath({
@@ -189,7 +191,7 @@ function DesktopMainView({
                   onClick={project.onOpenTerminal}
                 >
                   <TerminalSquare data-icon="inline-start" />
-                  Terminal
+                  {t("Terminal")}
                 </Button>
               </DisabledHint>
             )}
@@ -203,7 +205,7 @@ function DesktopMainView({
                     onClick={() => openProject(project.pendingProject)}
                   >
                     <Code2 data-icon="inline-start" />
-                    Open in editor
+                    {t("Open in editor")}
                   </Button>
                 </DisabledHint>
                 <DisabledHint reason={hostActionReason}>
@@ -214,7 +216,7 @@ function DesktopMainView({
                     onClick={() => revealInFolder(project.pendingProject)}
                   >
                     <FolderSearch data-icon="inline-start" />
-                    Reveal in files
+                    {t("Reveal in files")}
                   </Button>
                 </DisabledHint>
               </>

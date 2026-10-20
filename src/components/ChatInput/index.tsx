@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useRef, useCallback, useEffect, useMemo, memo, useImperativeHandle, forwardRef, type ReactNode } from "react"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -117,6 +118,7 @@ function getActionRowClass(stacked: boolean, isMultiline: boolean): string {
 }
 
 export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput({ allowImages = true, agentKind, projectCwd, leadingAccessory, footer, compact = false }, ref) {
+  const { t } = useTranslation()
   const canAccessHostFiles = useCapability("hostFiles")
   const {
     session,
@@ -423,7 +425,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
     >
       {isDragOver && (
         <div className="motion-enter pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-info/40 bg-info/10">
-          <span className="text-sm font-medium text-info">Drop images here</span>
+          <span className="text-sm font-medium text-info">{t("Drop images here")}</span>
         </div>
       )}
 
@@ -466,7 +468,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
             {images.map((img, i) => (
               <div key={img.id} className="motion-list-item relative group/thumb">
                 <img src={img.preview} alt={`Upload ${i + 1}`} className="h-16 w-auto rounded-md border bg-muted object-contain" />
-                <Button type="button" variant="ghost" size="icon-xs" onClick={() => removeImage(i)} className="absolute -right-1.5 -top-1.5 size-5 rounded-full border bg-popover p-0 text-muted-foreground opacity-100 hover:bg-destructive hover:text-destructive-foreground sm:opacity-0 sm:group-hover/thumb:opacity-100 sm:focus-visible:opacity-100" aria-label={`Remove image ${i + 1}`}>
+                <Button type="button" variant="ghost" size="icon-xs" onClick={() => removeImage(i)} className="absolute -right-1.5 -top-1.5 size-5 rounded-full border bg-popover p-0 text-muted-foreground opacity-100 hover:bg-destructive hover:text-destructive-foreground sm:opacity-0 sm:group-hover/thumb:opacity-100 sm:focus-visible:opacity-100" aria-label={t("Remove image {0}", { "0": i + 1 })}>
                   <X className="size-3" data-icon="icon" />
                 </Button>
               </div>
@@ -478,7 +480,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
           <div role="status" aria-live="polite" className="motion-enter mb-2 flex items-center gap-2 text-xs text-warning">
             <span className="flex-1">{imageError}</span>
             {!hasUnsupportedAttachments && (
-              <Button type="button" variant="ghost" size="icon-xs" onClick={dismissImageError} className="text-muted-foreground" aria-label="Dismiss image notice">
+              <Button type="button" variant="ghost" size="icon-xs" onClick={dismissImageError} className="text-muted-foreground" aria-label={t("Dismiss image notice")}>
                 <X data-icon="icon" />
               </Button>
             )}
@@ -535,8 +537,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
                 // On mobile, scroll textarea into view after virtual keyboard opens
                 setTimeout(() => textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 300)
               }}
-              placeholder={getPlaceholder(isPlanApproval, isUserQuestion, isConnected, hasPermissions, isSteering, compact)}
-              aria-label="Message"
+              placeholder={t(getPlaceholder(isPlanApproval, isUserQuestion, isConnected, hasPermissions, isSteering, compact))}
+              aria-label={t("Message")}
               role="combobox"
               aria-autocomplete="list"
               aria-expanded={Boolean(suggestionListId)}
@@ -554,7 +556,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
               getActionRowClass(stacked, isMultiline),
             )}>
               {footer}
-              <ActionButtons hasContent={hasContent} onSubmit={handleSubmit} submitLabel={isSteering ? "Steer active turn" : "Send message"} />
+              <ActionButtons hasContent={hasContent} onSubmit={handleSubmit} submitLabel={isSteering ? t("Steer active turn") : t("Send message")} />
             </div>
           </div>
         </div>

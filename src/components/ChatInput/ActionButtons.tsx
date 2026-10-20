@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Send, Square, Power } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
@@ -17,11 +18,12 @@ export function ActionButtons({
   onSubmit,
   submitLabel = "Send message",
 }: ActionButtonsProps) {
+  const { t } = useTranslation()
   const { isLive, sessionSource, actions: { handleStopSession: onStopSession } } = useSessionContext()
   const { chat: { isConnected, interrupt: onInterrupt } } = useSessionChatContext()
   const showAgentControls = isConnected || isLive
   const agentKind = sessionSource?.agentKind ?? agentKindForDirName(sessionSource?.dirName ?? null)
-  const interruptLabel = agentInterruptLabel(agentKind)
+  const interruptLabel = t(agentInterruptLabel(agentKind))
 
   return (
     <div className="flex items-center gap-1">
@@ -50,12 +52,12 @@ export function ActionButtons({
               size="icon-sm"
               className="motion-enter shrink-0 rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive"
               onClick={onStopSession}
-              aria-label="Stop session"
-              title="Stop session"
+              aria-label={t("Stop session")}
+              title={t("Stop session")}
             />}>
               <Power data-icon="inline-start" />
           </TooltipTrigger>
-          <TooltipContent>Stop session</TooltipContent>
+          <TooltipContent>{t("Stop session")}</TooltipContent>
         </Tooltip>
       )}
 
@@ -65,8 +67,8 @@ export function ActionButtons({
         className={cn("shrink-0 rounded-full", !hasContent && "text-muted-foreground")}
         disabled={!hasContent}
         onClick={onSubmit}
-        aria-label={submitLabel}
-        title={submitLabel}
+        aria-label={t(submitLabel)}
+        title={t(submitLabel)}
       >
         <Send data-icon="inline-start" />
       </Button>

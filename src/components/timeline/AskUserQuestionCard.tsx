@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useMemo, useState } from "react"
 import {
   AlertCircle,
@@ -101,6 +102,7 @@ function QuestionHistoryItem({
   index: number
   completed: boolean
 }): React.ReactElement {
+  const { t } = useTranslation()
   const options = question.options ?? []
   const selectedOptionCount = options.filter((option) => (
     isSelectedOption(question, answer, option.label)
@@ -152,7 +154,7 @@ function QuestionHistoryItem({
 
       {showWrittenAnswer && (
         <div className="mt-2 border-l-2 border-border pl-3">
-          <div className="mb-0.5 text-xs font-medium text-muted-foreground">Answer</div>
+          <div className="mb-0.5 text-xs font-medium text-muted-foreground">{t("Answer")}</div>
           <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
             {answer.trim() || "No answer provided"}
           </p>
@@ -177,6 +179,7 @@ export function AskUserQuestionCard({
   /** False for a viewer, who sees the open question without the form to answer it. */
   canAnswer: boolean
 }): React.ReactElement {
+  const { t } = useTranslation()
   const [detailsOpen, setDetailsOpen] = useState(false)
   const questions = useMemo(() => getQuestions(toolCall), [toolCall])
   const answers = useMemo(() => getAnswers(toolCall, questions), [toolCall, questions])
@@ -209,13 +212,13 @@ export function AskUserQuestionCard({
         "my-1 overflow-hidden rounded-lg border bg-card",
         toolCall.isError && "border-destructive/30",
       )}
-      aria-label="Question history"
+      aria-label={t("Question history")}
     >
       <header className="flex items-start gap-2.5 border-b px-3 py-2.5">
         <CircleHelp className="mt-0.5 size-4 shrink-0 text-muted-foreground" data-icon="inline-start" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h3 className="text-sm font-medium text-foreground">Decision requested</h3>
+            <h3 className="text-sm font-medium text-foreground">{t("Decision requested")}</h3>
             <span className="text-xs text-muted-foreground">
               {questions.length} {questions.length === 1 ? "question" : "questions"}
             </span>
@@ -251,7 +254,7 @@ export function AskUserQuestionCard({
           ))
         ) : (
           <p className="py-3 text-sm text-muted-foreground">
-            Question details are unavailable.
+            {t("Question details are unavailable.")}
           </p>
         )}
 
@@ -263,7 +266,7 @@ export function AskUserQuestionCard({
               : "text-muted-foreground",
           )}>
             <div className="mb-0.5 text-xs font-semibold uppercase tracking-wide opacity-70">
-              Recorded response
+              {t("Recorded response")}
             </div>
             <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
               {toolCall.result}
@@ -286,14 +289,14 @@ export function AskUserQuestionCard({
           {showRawDetails
             ? <ChevronDown data-icon="inline-start" />
             : <ChevronRight data-icon="inline-start" />}
-          Raw details
+          {t("Raw details")}
         </Button>
 
         {showRawDetails && (
           <div className="mt-1.5 grid gap-2 pb-1.5 lg:grid-cols-2">
             <div className="min-w-0">
               <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Input
+                {t("Input")}
               </div>
               <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border bg-muted/30 p-2 font-mono text-xs leading-relaxed text-muted-foreground">
                 {JSON.stringify(toolCall.input, null, 2)}
@@ -302,7 +305,7 @@ export function AskUserQuestionCard({
             {toolCall.result !== null && (
               <div className="min-w-0">
                 <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Result
+                  {t("Result")}
                 </div>
                 <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border bg-muted/30 p-2 font-mono text-xs leading-relaxed text-muted-foreground">
                   {toolCall.result}

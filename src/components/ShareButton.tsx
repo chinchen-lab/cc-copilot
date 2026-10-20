@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useState } from "react"
 import { Check, Copy, RefreshCw, Share2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -35,6 +36,7 @@ function guestLabel(guests: number): string {
  * nowhere else — the server hands it over exactly once, at mint or rotate.
  */
 export function ShareButton({ sessionId }: ShareButtonProps) {
+  const { t } = useTranslation()
   const { config: { networkAccessDisabled } } = useAppContext()
   const { shares, error, refresh, create, regenerate, revoke } = useShares()
   const [open, setOpen] = useState(false)
@@ -68,7 +70,7 @@ export function ShareButton({ sessionId }: ShareButtonProps) {
 
   const localOnlyNote = networkAccessDisabled && (
     <p className="text-xs text-muted-foreground">
-      Network access is off, so this link only works on this machine.
+      {t("Network access is off, so this link only works on this machine.")}
     </p>
   )
 
@@ -88,7 +90,7 @@ export function ShareButton({ sessionId }: ShareButtonProps) {
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label={share ? "Session is shared" : "Share session"}
+            aria-label={share ? t("Session is shared") : t("Share session")}
             className={cn(share && "bg-primary/15 text-primary hover:bg-primary/25")}
           />
         }
@@ -106,7 +108,7 @@ export function ShareButton({ sessionId }: ShareButtonProps) {
               <Button
                 variant="ghost"
                 size="icon-xs"
-                aria-label="Copy link"
+                aria-label={t("Copy link")}
                 onClick={() => copyLink(url)}
               >
                 {linkCopied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
@@ -120,7 +122,7 @@ export function ShareButton({ sessionId }: ShareButtonProps) {
               <Button
                 variant="ghost"
                 size="icon-xs"
-                aria-label="Regenerate passphrase"
+                aria-label={t("Regenerate passphrase")}
                 disabled={busy}
                 onClick={() => run(async () => {
                   setPassphrase(await regenerate(sessionId))
@@ -136,11 +138,11 @@ export function ShareButton({ sessionId }: ShareButtonProps) {
                 size="xs"
                 onClick={() => copyBoth(`${url}\nPassphrase: ${passphrase}`)}
               >
-                {bothCopied ? "Copied" : "Copy link & passphrase"}
+                {bothCopied ? t("Copied") : t("Copy link & passphrase")}
               </Button>
             ) : (
               <p className="text-xs text-muted-foreground">
-                The passphrase is only shown once. Regenerate to get a new one.
+                {t("The passphrase is only shown once. Regenerate to get a new one.")}
               </p>
             )}
 
@@ -159,14 +161,14 @@ export function ShareButton({ sessionId }: ShareButtonProps) {
                   setPassphrase(null)
                 })}
               >
-                Stop sharing
+                {t("Stop sharing")}
               </Button>
             </div>
           </div>
         ) : (
           <div className="flex flex-col gap-2.5">
             <p className="text-xs text-muted-foreground">
-              Anyone with the link and passphrase can read and join this session.
+              {t("Anyone with the link and passphrase can read and join this session.")}
             </p>
             {localOnlyNote}
             {error && <p className="text-xs text-destructive">{error}</p>}
@@ -177,7 +179,7 @@ export function ShareButton({ sessionId }: ShareButtonProps) {
                 setPassphrase(await create(sessionId))
               })}
             >
-              Enable sharing
+              {t("Enable sharing")}
             </Button>
           </div>
         )}

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Slider } from "@base-ui/react/slider"
 import { cn } from "@/lib/utils"
 import type { SettingOption } from "./types"
@@ -10,6 +11,7 @@ interface SettingsSliderProps {
 }
 
 export function SettingsSlider({ options, value, onChange, labelId }: SettingsSliderProps) {
+  const { t } = useTranslation()
   const last = options.length - 1
   const index = Math.max(0, options.findIndex((option) => option.value === value))
 
@@ -41,7 +43,7 @@ export function SettingsSlider({ options, value, onChange, labelId }: SettingsSl
           ))}
           <Slider.Thumb
             aria-labelledby={labelId}
-            getAriaValueText={(_, next) => options[next]?.label ?? ""}
+            getAriaValueText={(_, next) => t(options[next]?.label ?? "")}
             className="size-3.5 rounded-full bg-primary shadow-[0_0_0_3px_var(--popover)] outline-none transition-transform duration-100 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50 has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-popover data-dragging:scale-125 motion-reduce:transition-none"
           />
         </Slider.Track>

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useRef, useState, type ReactNode } from "react"
 import { Archive, ArchiveRestore, ArrowLeft, Check, ChevronDown, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -37,6 +38,7 @@ function StatusDot({ running }: { running: boolean }) {
 export function BrowserSessionPicker({
   sessions, selected, home, currentSessionId, busy, onSelect, onSetArchived, children,
 }: BrowserSessionPickerProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [showArchived, setShowArchived] = useState(false)
@@ -77,32 +79,32 @@ export function BrowserSessionPicker({
       setOpen(next)
       if (next) { setQuery(""); setShowArchived(false) }
     }}>
-      <PopoverTrigger render={<Button variant="ghost" size="xs" aria-label="Switch browser" className="max-w-40" />}>
+      <PopoverTrigger render={<Button variant="ghost" size="xs" aria-label={t("Switch browser")} className="max-w-40" />}>
         <StatusDot running={selectedInfo?.running ?? false} />
         <span className="truncate">{browserLabel(selectedInfo, selected)}</span>
         <ChevronDown data-icon="inline-end" className="opacity-60" />
       </PopoverTrigger>
       <PopoverContent
-        aria-label="Browsers"
+        aria-label={t("Browsers")}
         initialFocus={searchRef}
         className="flex max-h-[min(32rem,var(--available-height))] w-80 max-w-[calc(100vw-1rem)] flex-col overflow-hidden"
       >
         <div className="flex shrink-0 flex-col gap-2 p-2">
           <div className="flex items-center justify-between pl-1">
-            <span className="text-sm font-medium">{showArchived && !search ? "Archived browsers" : "Browsers"}</span>
-            <Button variant="ghost" size="icon-xs" aria-label="Close browser picker" onClick={close}><X data-icon="inline-start" /></Button>
+            <span className="text-sm font-medium">{showArchived && !search ? t("Archived browsers") : t("Browsers")}</span>
+            <Button variant="ghost" size="icon-xs" aria-label={t("Close browser picker")} onClick={close}><X data-icon="inline-start" /></Button>
           </div>
-          <Input ref={searchRef} aria-label="Search browsers" placeholder="Search browsers…" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <Input ref={searchRef} aria-label={t("Search browsers")} placeholder={t("Search browsers…")} value={query} onChange={(event) => setQuery(event.target.value)} />
         </div>
         <Separator />
-        <div className="min-h-0 max-h-72 overflow-y-auto overscroll-contain p-1" aria-label="Browser list">
+        <div className="min-h-0 max-h-72 overflow-y-auto overscroll-contain p-1" aria-label={t("Browser list")}>
           {[
             { label: "Recent browsers", sessions: visibleRecent, archived: false },
             { label: "Archived browsers", sessions: visibleArchived, archived: true },
           ].filter((group) => group.sessions.length > 0).map((group) => (
             <div key={group.label}>
-              {group.archived && !!search && <p className="px-2 py-1 text-xs text-muted-foreground">Archived</p>}
-              <ul aria-label={group.label}>
+              {group.archived && !!search && <p className="px-2 py-1 text-xs text-muted-foreground">{t("Archived")}</p>}
+              <ul aria-label={t(group.label)}>
                 {group.sessions.map((session) => (
                   <BrowserSessionRow
                     key={session.name}
@@ -119,18 +121,18 @@ export function BrowserSessionPicker({
               </ul>
             </div>
           ))}
-          {visibleRecent.length === 0 && visibleArchived.length === 0 && <p role="status" className="px-3 py-6 text-center text-sm text-muted-foreground">No browsers found.</p>}
+          {visibleRecent.length === 0 && visibleArchived.length === 0 && <p role="status" className="px-3 py-6 text-center text-sm text-muted-foreground">{t("No browsers found.")}</p>}
         </div>
         <Separator />
         <div className="flex shrink-0 flex-col gap-1 p-2">
           {(allArchived.length > 0 || showArchived) && (
             <Button variant="ghost" size="sm" className="w-full justify-start" aria-expanded={showArchived} onClick={() => { setShowArchived(!showArchived); setQuery("") }}>
               {showArchived ? <ArrowLeft data-icon="inline-start" /> : <Archive data-icon="inline-start" />}
-              {showArchived ? "Back to recent" : "Archived"}
+              {showArchived ? t("Back to recent") : t("Archived")}
               {!showArchived && <Badge variant="secondary">{allArchived.length}</Badge>}
             </Button>
           )}
-          <p className="px-1 pb-1 text-xs text-muted-foreground">Stopped browsers archive after 24h of inactivity. Saved logins are kept.</p>
+          <p className="px-1 pb-1 text-xs text-muted-foreground">{t("Stopped browsers archive after 24h of inactivity. Saved logins are kept.")}</p>
           {children(close)}
         </div>
       </PopoverContent>
@@ -148,6 +150,7 @@ function BrowserSessionRow({ session, archived, home, selected, currentSessionId
   onPick: (session: BrowserSessionInfo) => Promise<void>
   onArchive: (name: string) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const lastUsed = lastUsedLabel(session.lastUsedAt)
   const label = browserLabel(session, session.name)
   const drivenElsewhere = session.running && session.driverSessionId !== null
@@ -168,12 +171,12 @@ function BrowserSessionRow({ session, archived, home, selected, currentSessionId
         <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
           <span className="flex w-full min-w-0 items-center gap-1.5">
             <span className="truncate">{label}</span>
-            <span className="sr-only">{session.running ? "running" : "stopped"}</span>
-            {defaultBadge && <Badge variant="secondary">{defaultBadge}</Badge>}
-            {controlOf(session) === "watch" && <Badge variant="outline">View only</Badge>}
+            <span className="sr-only">{session.running ? t("running") : t("stopped")}</span>
+            {defaultBadge && <Badge variant="secondary">{t(defaultBadge)}</Badge>}
+            {controlOf(session) === "watch" && <Badge variant="outline">{t("View only")}</Badge>}
             {lastUsed && <span className="ml-auto shrink-0 text-xs font-normal text-muted-foreground">{lastUsed}</span>}
           </span>
-          {drivenElsewhere && <span className="max-w-full truncate text-xs font-normal text-muted-foreground">driven by another session</span>}
+          {drivenElsewhere && <span className="max-w-full truncate text-xs font-normal text-muted-foreground">{t("driven by another session")}</span>}
         </span>
         {session.name === selected && <Check data-icon="inline-end" />}
         {archived && <ArchiveRestore data-icon="inline-end" />}
@@ -182,8 +185,8 @@ function BrowserSessionRow({ session, archived, home, selected, currentSessionId
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label={`Archive ${session.name}`}
-          title={`Archive ${session.name}`}
+          aria-label={t("Archive {0}", { "0": session.name })}
+          title={t("Archive {0}", { "0": session.name })}
           disabled={busy}
           onClick={() => void onArchive(session.name)}
         >

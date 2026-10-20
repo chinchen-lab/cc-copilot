@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import { X, GitBranch, Play, Bot, Users, ChevronRight, Archive, ArchiveRestore } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -67,6 +68,7 @@ export function SessionRow({
   onPrefetchSession,
   onResumeSession,
 }: SessionRowProps) {
+  const { t } = useTranslation()
   const {
     isLive,
     isRunning,
@@ -136,7 +138,7 @@ export function SessionRow({
           {isTeammate && (
             <Badge variant="outline">
               <Bot data-icon="inline-start" />
-              {title !== s.agentName ? s.agentName : "Agent"}
+              {title !== s.agentName ? s.agentName : t("Agent")}
             </Badge>
           )}
           {isLive && !isDeferred && statusLabel && (
@@ -154,7 +156,7 @@ export function SessionRow({
           )}
           {isDeferred && (
             <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
-              deferred
+              {t("deferred")}
             </Badge>
           )}
           {worktreeName && (
@@ -182,8 +184,8 @@ export function SessionRow({
           size="xs"
           onClick={onToggleTeammates}
           className="shrink-0"
-          title={teammatesCollapsed ? "Show team agents" : "Hide team agents"}
-          aria-label={teammatesCollapsed ? `Show ${teammateCount} team agents` : `Hide ${teammateCount} team agents`}
+          title={teammatesCollapsed ? t("Show team agents") : t("Hide team agents")}
+          aria-label={teammatesCollapsed ? t("Show {0} team agents", { "0": teammateCount }) : t("Hide {0} team agents", { "0": teammateCount })}
           aria-expanded={!teammatesCollapsed}
         >
           <Users data-icon="inline-start" />
@@ -203,17 +205,17 @@ export function SessionRow({
           onClick={handleResume}
           disabled={resuming}
           className="shrink-0 text-warning"
-          title="Resume to evaluate deferred permission"
-          aria-label="Resume to evaluate"
+          title={t("Resume to evaluate deferred permission")}
+          aria-label={t("Resume to evaluate")}
         >
           <Play data-icon="inline-start" />
-          Resume
+          {t("Resume")}
         </Button>
       )}
 
       {s.matchedPullRequestNumber ? (
         <Badge variant="outline" className="shrink-0 px-1">
-          Matched #{s.matchedPullRequestNumber}
+          {t("Matched #")}{s.matchedPullRequestNumber}
         </Badge>
       ) : (
         <PullRequestChips pullRequests={s.pullRequests} max={1} compact />
@@ -251,8 +253,8 @@ export function SessionRow({
           onClick={(event) => onKill(proc.pid, event)}
           disabled={killingPids.has(proc.pid)}
           className="absolute right-0 top-0 text-destructive opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
-          title={`Kill PID ${proc.pid}`}
-          aria-label={`Kill process ${proc.pid}`}
+          title={t("Kill PID {0}", { "0": proc.pid })}
+          aria-label={t("Kill process {0}", { "0": proc.pid })}
         >
           <X data-icon="inline-start" />
         </Button>

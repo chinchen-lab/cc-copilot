@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useEffect, useCallback, useRef, type RefObject } from "react"
 import { cn } from "@/lib/utils"
 import { highlightCode, getLangFromPath, type ThemedToken } from "@/lib/shiki"
@@ -30,6 +31,7 @@ export function HighlightedEditor({
   onKeyDown,
   onSelect,
 }: HighlightedEditorProps) {
+  const { t } = useTranslation()
   const isDark = useIsDarkMode()
   const [tokens, setTokens] = useState<ThemedToken[][] | null>(null)
   const innerRef = useRef<HTMLTextAreaElement>(null)
@@ -105,7 +107,7 @@ export function HighlightedEditor({
           "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border",
           readOnly && "cursor-default",
         )}
-        placeholder="Empty file"
+        placeholder={t("Empty file")}
       />
     </div>
   )

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useMemo } from "react"
 import ReactMarkdown from "react-markdown"
 import {
@@ -99,13 +100,15 @@ function MarkdownText({ children }: { children: string }) {
 }
 
 function PrimitiveValue({ value }: { value: unknown }) {
+  const { t } = useTranslation()
   if (typeof value === "string") return <MarkdownText>{value}</MarkdownText>
-  if (value === null) return <span className="text-muted-foreground">None</span>
-  if (typeof value === "boolean") return <span>{value ? "Yes" : "No"}</span>
+  if (value === null) return <span className="text-muted-foreground">{t("None")}</span>
+  if (typeof value === "boolean") return <span>{value ? t("Yes") : t("No")}</span>
   return <span>{String(value)}</span>
 }
 
 function StructuredValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
+  const { t } = useTranslation()
   if (!isRecord(value) && !Array.isArray(value)) return <PrimitiveValue value={value} />
 
   if (depth > 5) {
@@ -117,7 +120,7 @@ function StructuredValue({ value, depth = 0 }: { value: unknown; depth?: number 
   }
 
   if (Array.isArray(value)) {
-    if (value.length === 0) return <p className="text-sm text-muted-foreground">No items</p>
+    if (value.length === 0) return <p className="text-sm text-muted-foreground">{t("No items")}</p>
 
     const primitivesOnly = value.every((item) => !isRecord(item) && !Array.isArray(item))
     if (primitivesOnly) {
@@ -184,6 +187,7 @@ function StructuredValue({ value, depth = 0 }: { value: unknown; depth?: number 
 }
 
 export function WorkflowResponse({ value, className }: { value: unknown; className?: string }) {
+  const { t } = useTranslation()
   const parsed = useMemo(() => typeof value === "string" ? parseJson(value) : value, [value])
   const appearsToBeTruncatedJson = typeof parsed === "string" && (
     parsed.trim().startsWith("{") || parsed.trim().startsWith("[")
@@ -194,7 +198,7 @@ export function WorkflowResponse({ value, className }: { value: unknown; classNa
     return (
       <div className={cn("flex flex-col gap-2", className)}>
         {summary && <p className="text-sm leading-relaxed text-foreground">{summary}</p>}
-        <p className="text-xs text-muted-foreground">Only a shortened preview was saved for this response.</p>
+        <p className="text-xs text-muted-foreground">{t("Only a shortened preview was saved for this response.")}</p>
       </div>
     )
   }

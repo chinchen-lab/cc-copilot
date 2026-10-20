@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react"
 import { X, ChevronUp, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -35,6 +36,7 @@ function getTextNodes(root: Node): Text[] {
 
 export const FindInSession = forwardRef<FindInSessionHandle, FindInSessionProps>(
   function FindInSession({ scrollContainerRef }, ref) {
+  const { t } = useTranslation()
     const [isOpen, setIsOpen] = useState(false)
     const [query, setQuery] = useState("")
     const [matches, setMatches] = useState<HTMLElement[]>([])
@@ -194,8 +196,8 @@ export const FindInSession = forwardRef<FindInSessionHandle, FindInSessionProps>
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Find in conversation"
-            aria-label="Find in conversation"
+            placeholder={t("Find in conversation")}
+            aria-label={t("Find in conversation")}
             autoFocus
           />
           <InputGroupAddon align="inline-end">
@@ -220,7 +222,7 @@ export const FindInSession = forwardRef<FindInSessionHandle, FindInSessionProps>
               ? "hover:text-foreground"
               : "cursor-default opacity-40"
           )}
-          aria-label="Previous match"
+          aria-label={t("Previous match")}
         >
           <ChevronUp data-icon="inline-start" />
         </Button>
@@ -236,7 +238,7 @@ export const FindInSession = forwardRef<FindInSessionHandle, FindInSessionProps>
               ? "hover:text-foreground"
               : "cursor-default opacity-40"
           )}
-          aria-label="Next match"
+          aria-label={t("Next match")}
         >
           <ChevronDown data-icon="inline-start" />
         </Button>
@@ -246,7 +248,7 @@ export const FindInSession = forwardRef<FindInSessionHandle, FindInSessionProps>
           size="icon-sm"
           onClick={handleClose}
           className="text-muted-foreground hover:text-foreground"
-          aria-label="Close search"
+          aria-label={t("Close search")}
         >
           <X data-icon="inline-start" />
         </Button>

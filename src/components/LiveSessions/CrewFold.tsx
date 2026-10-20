@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -49,6 +50,7 @@ export function CrewFold({
   activeSessionKey,
   onSelectSession,
 }: CrewFoldProps) {
+  const { t } = useTranslation()
   const [showAllDone, setShowAllDone] = useState(false)
   const byId = new Map([host, ...members].map((value) => [value.sessionId, value]))
   // Two levels: the sessions this one started, and any deeper one waiting on
@@ -70,14 +72,14 @@ export function CrewFold({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        aria-label={open ? `Hide crew: ${summary}` : `Show crew: ${summary}`}
+        aria-label={open ? t("Hide crew: {0}", { "0": summary }) : t("Show crew: {0}", { "0": summary })}
         className="flex w-full items-center gap-1.5 rounded-sm py-0.5 text-left text-[0.6875rem] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
         <ChevronRight className={cn("size-3 shrink-0 transition-transform duration-150", open && "rotate-90")} aria-hidden="true" />
-        <span className="font-medium text-foreground">Crew</span>
+        <span className="font-medium text-foreground">{t("Crew")}</span>
         <span className="tabular-nums">· {counts.size}</span>
-        {counts.needsYou > 0 && <span className="tabular-nums text-warning">· {counts.needsYou} need you</span>}
-        {counts.working > 0 && <span className="tabular-nums">· {counts.working} working</span>}
+        {counts.needsYou > 0 && <span className="tabular-nums text-warning">· {counts.needsYou} {t(" need you")}</span>}
+        {counts.working > 0 && <span className="tabular-nums">· {counts.working} {t(" working")}</span>}
       </button>
       {open && (
         <ul className="mt-1 ml-1.5 flex flex-col gap-px border-l border-border/70 pl-1.5">
@@ -124,7 +126,7 @@ export function CrewFold({
                 onClick={() => setShowAllDone(true)}
                 className="rounded-sm px-1.5 py-1 text-[0.6875rem] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
-                Show {hiddenDone.length} more done
+                {t("Show ")}{hiddenDone.length} {t(" more done")}
               </button>
             </li>
           )}

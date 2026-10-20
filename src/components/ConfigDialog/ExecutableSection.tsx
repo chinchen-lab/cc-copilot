@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useState } from "react"
 import { ChevronDown, ChevronRight, Cpu } from "lucide-react"
 
@@ -65,6 +66,7 @@ function isLaunchable(active: ActiveExecutable | null): boolean {
  * `claude update` just touched.
  */
 export function ExecutableSection({ kind, value, onChange, disabled, reportVersion }: ExecutableSectionProps) {
+  const { t } = useTranslation()
   const { displayName } = descriptorFor(kind)
   const [report, setReport] = useState<ExecutableReport | null>(null)
   const [open, setOpen] = useState(false)
@@ -105,7 +107,7 @@ export function ExecutableSection({ kind, value, onChange, disabled, reportVersi
           onChange={() => onChange(source === "custom" ? { source, path: value.path ?? "" } : { source })}
         />
         <FieldContent>
-          <FieldLabel htmlFor={id}>{label}</FieldLabel>
+          <FieldLabel htmlFor={id}>{t(label)}</FieldLabel>
           <FieldDescription className="break-all">{description}</FieldDescription>
         </FieldContent>
       </Field>
@@ -117,14 +119,14 @@ export function ExecutableSection({ kind, value, onChange, disabled, reportVersi
     return option(
       source,
       SOURCE_LABELS[source],
-      candidate ? describeBinary(candidate.path, candidate.version) : "Not found on this machine.",
+      candidate ? describeBinary(candidate.path, candidate.version) : t("Not found on this machine."),
       candidate !== undefined || value.source === source,
     )
   }
 
   const summary = active
-    ? `${SOURCE_LABELS[value.source]} · v${active.version ?? "?"}`
-    : SOURCE_LABELS[value.source]
+    ? `${t(SOURCE_LABELS[value.source])} · v${active.version ?? "?"}`
+    : t(SOURCE_LABELS[value.source])
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="flex flex-col gap-2">
@@ -139,7 +141,7 @@ export function ExecutableSection({ kind, value, onChange, disabled, reportVersi
       >
         <span className="flex items-center gap-2">
           <Cpu data-icon="inline-start" className="size-4 text-muted-foreground" />
-          {displayName} executable
+          {displayName} {t(" executable")}
         </span>
         <span className="flex min-w-0 items-center gap-1 text-xs font-normal text-muted-foreground">
           <span className="truncate">{summary}</span>
@@ -150,15 +152,14 @@ export function ExecutableSection({ kind, value, onChange, disabled, reportVersi
       <CollapsibleContent>
         <Field>
           <FieldDescription>
-            Which binary new sessions run. Automatic uses your installed CLI unless it is
-            older than the copy bundled with Cogpit.
+            {t("Which binary new sessions run. Automatic uses your installed CLI unless it is older than the copy bundled with Cogpit.")}
           </FieldDescription>
           <div className="flex flex-col gap-2 pl-1">
-            {option("auto", SOURCE_LABELS.auto, "Recommended.")}
+            {option("auto", SOURCE_LABELS.auto, t("Recommended."))}
             {DETECTED_EXECUTABLE_SOURCES.map(detected)}
             {option("custom", SOURCE_LABELS.custom, (
               <Input
-                aria-label={`${displayName} executable path`}
+                aria-label={t("{0} executable path", { "0": displayName })}
                 value={value.source === "custom" ? value.path ?? "" : ""}
                 placeholder="/path/to/binary"
                 disabled={disabled || value.source !== "custom"}

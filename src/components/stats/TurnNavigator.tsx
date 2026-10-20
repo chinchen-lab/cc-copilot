@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -16,6 +17,7 @@ interface TurnNavigatorProps {
 }
 
 export function TurnNavigator({ turns, onJumpToTurn }: TurnNavigatorProps): React.JSX.Element | null {
+  const { t } = useTranslation()
   const [activeTurn, setActiveTurn] = useState<number | null>(null)
   const nameOf = useSessionNamer()
 
@@ -23,7 +25,7 @@ export function TurnNavigator({ turns, onJumpToTurn }: TurnNavigatorProps): Reac
 
   return (
     <section>
-      <SectionHeading>Turns ({turns.length})</SectionHeading>
+      <SectionHeading>{t("Turns (")}{turns.length})</SectionHeading>
       <div className="max-h-[400px] overflow-y-auto">
         <div className="flex flex-col gap-0.5 pr-2">
           {turns.map((turn, i) => {
@@ -50,7 +52,7 @@ export function TurnNavigator({ turns, onJumpToTurn }: TurnNavigatorProps): Reac
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-xs">
-                  {preview ? truncate(preview, 50) : "(no message)"}
+                  {preview ? truncate(preview, 50) : t("(no message)")}
                 </span>
                 <span className="flex shrink-0 items-center gap-1">
                   {turn.toolCalls.length > 0 && (

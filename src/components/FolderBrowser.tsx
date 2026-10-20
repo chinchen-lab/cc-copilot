@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Fragment, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type RefObject } from "react"
 import { AlertCircle, ArrowLeft, ChevronRight, Folder, FolderOpen, FolderPlus, House } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -44,6 +45,7 @@ function messageOf(error: unknown, fallback: string): string {
  * empty filter to go up, Cmd/Ctrl+Enter to start the session.
  */
 export function FolderBrowser({ hostName, projectPaths, onStart, onBack }: FolderBrowserProps) {
+  const { t } = useTranslation()
   // `path` null is the projects root; each navigation is a new request, so a retry reads again.
   const [target, setTarget] = useState<{ path: string | null; request: number }>({ path: null, request: 0 })
   const request = `${target.request}:${target.path ?? ""}`
@@ -147,7 +149,7 @@ export function FolderBrowser({ hostName, projectPaths, onStart, onBack }: Folde
       {/* Outside the Command: its Enter handling would take the buttons' Enter for the highlighted folder.
           In a dialog, the right padding keeps clear of the dialog's close button. */}
       <div className="flex items-center gap-1 border-b px-2 py-1.5 in-data-[slot=dialog-content]:pr-12">
-        <Button type="button" variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to projects">
+        <Button type="button" variant="ghost" size="icon-sm" onClick={onBack} aria-label={t("Back to projects")}>
           <ArrowLeft />
         </Button>
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{title}</span>
@@ -157,7 +159,7 @@ export function FolderBrowser({ hostName, projectPaths, onStart, onBack }: Folde
             variant="ghost"
             size="icon-sm"
             onClick={() => open(null)}
-            aria-label="Go to the projects root"
+            aria-label={t("Go to the projects root")}
             title={listing.root}
           >
             <House />
@@ -169,7 +171,7 @@ export function FolderBrowser({ hostName, projectPaths, onStart, onBack }: Folde
       )}
       <Command
         shouldFilter={false}
-        label="Filter folders"
+        label={t("Filter folders")}
         value={highlight}
         onValueChange={setHighlighted}
         className="rounded-none p-0"
@@ -177,7 +179,7 @@ export function FolderBrowser({ hostName, projectPaths, onStart, onBack }: Folde
         <CommandInput
           ref={filterRef}
           autoFocus
-          placeholder="Filter folders..."
+          placeholder={t("Filter folders...")}
           value={filter}
           onValueChange={setFilter}
         />
@@ -191,15 +193,15 @@ export function FolderBrowser({ hostName, projectPaths, onStart, onBack }: Folde
           ) : listing === null ? (
             <div role="status" className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
               <Spinner className="size-4" />
-              Loading folders…
+              {t("Loading folders…")}
             </div>
           ) : folders.length === 0 ? (
             <Empty className="border-0 py-8">
               <EmptyHeader>
                 <EmptyMedia variant="icon"><FolderOpen /></EmptyMedia>
-                <EmptyTitle>{query ? "No folder matches" : "No folders here"}</EmptyTitle>
+                <EmptyTitle>{query ? t("No folder matches") : t("No folders here")}</EmptyTitle>
                 <EmptyDescription>
-                  {query ? "Try another name." : "Start a session right here, or make a new folder."}
+                  {query ? t("Try another name.") : t("Start a session right here, or make a new folder.")}
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -216,13 +218,13 @@ export function FolderBrowser({ hostName, projectPaths, onStart, onBack }: Folde
                 >
                   <Folder className="size-4 shrink-0 text-muted-foreground" />
                   <span className="min-w-0 flex-1 truncate">{folder.name}</span>
-                  {projectPaths.has(folder.path) && <Badge variant="secondary">Project</Badge>}
+                  {projectPaths.has(folder.path) && <Badge variant="secondary">{t("Project")}</Badge>}
                   <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
                 </CommandItem>
               ))}
               {listing.truncated && (
                 <p className="px-3 py-2 text-xs text-muted-foreground">
-                  Showing the first {FOLDER_LISTING_LIMIT.toLocaleString()} folders.
+                  {t("Showing the first ")}{FOLDER_LISTING_LIMIT.toLocaleString()} {t(" folders.")}
                 </p>
               )}
             </CommandGroup>
@@ -234,8 +236,8 @@ export function FolderBrowser({ hostName, projectPaths, onStart, onBack }: Folde
           <form onSubmit={(event) => void submitNewFolder(event)} className="flex items-center gap-2">
             <Input
               autoFocus
-              aria-label="New folder name"
-              placeholder="New folder name"
+              aria-label={t("New folder name")}
+              placeholder={t("New folder name")}
               value={newName}
               disabled={creating}
               aria-invalid={createError ? true : undefined}
@@ -252,17 +254,17 @@ export function FolderBrowser({ hostName, projectPaths, onStart, onBack }: Folde
             />
             <Button type="submit" size="sm" disabled={creating || !here || newName.trim() === ""}>
               {creating && <Spinner data-icon="inline-start" className="size-4" />}
-              Create
+              {t("Create")}
             </Button>
             <Button type="button" variant="ghost" size="sm" onClick={stopNaming}>
-              Cancel
+              {t("Cancel")}
             </Button>
           </form>
         ) : (
           <div className="flex items-center gap-2">
             <Button type="button" variant="ghost" size="sm" disabled={!here} onClick={() => setNaming(true)}>
               <FolderPlus data-icon="inline-start" />
-              New folder
+              {t("New folder")}
             </Button>
             <Button
               type="button"
@@ -272,7 +274,7 @@ export function FolderBrowser({ hostName, projectPaths, onStart, onBack }: Folde
               onClick={start}
               aria-keyshortcuts="Meta+Enter Control+Enter"
             >
-              Start session here
+              {t("Start session here")}
             </Button>
           </div>
         )}
@@ -318,16 +320,17 @@ function FolderCrumbs({
 }
 
 function FolderProblem({ message, onRetry, onRoot }: { message: string; onRetry: () => void; onRoot?: () => void }) {
+  const { t } = useTranslation()
   return (
     <Empty className="border-0 py-8">
       <EmptyHeader>
         <EmptyMedia variant="icon"><AlertCircle /></EmptyMedia>
-        <EmptyTitle>This folder could not be opened</EmptyTitle>
+        <EmptyTitle>{t("This folder could not be opened")}</EmptyTitle>
         <EmptyDescription>{message}</EmptyDescription>
       </EmptyHeader>
       <div className="flex gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onRetry}>Try again</Button>
-        {onRoot && <Button type="button" variant="ghost" size="sm" onClick={onRoot}>Go to the projects root</Button>}
+        <Button type="button" variant="outline" size="sm" onClick={onRetry}>{t("Try again")}</Button>
+        {onRoot && <Button type="button" variant="ghost" size="sm" onClick={onRoot}>{t("Go to the projects root")}</Button>}
       </div>
     </Empty>
   )

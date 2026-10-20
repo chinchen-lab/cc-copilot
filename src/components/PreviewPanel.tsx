@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ExternalLink,
@@ -124,6 +125,7 @@ function urlForPort(port: number, host: string): string {
 }
 
 export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
+  const { t } = useTranslation()
   const [tasks, setTasks] = useState<PreviewTask[]>([])
   const [url, setUrl] = useState("")
   const [draft, setDraft] = useState("")
@@ -296,7 +298,7 @@ export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
   return (
     <aside
       ref={panelRef}
-      aria-label="Development preview"
+      aria-label={t("Development preview")}
       className="view-transition-right-panel panel-enter-right relative flex min-h-0 shrink-0 flex-col border-l bg-canvas"
       style={{ width }}
     >
@@ -311,9 +313,9 @@ export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
 
       <div className="flex h-10 shrink-0 items-center gap-2 px-3">
         <Globe2 aria-hidden="true" className="size-4 text-muted-foreground" />
-        <h2 className="text-sm font-medium">Preview</h2>
+        <h2 className="text-sm font-medium">{t("Preview")}</h2>
         <span className="flex-1" />
-        <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close preview">
+        <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label={t("Close preview")}>
           <X data-icon="inline-start" />
         </Button>
       </div>
@@ -332,7 +334,7 @@ export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
             <InputGroup>
               <InputGroupInput
                 ref={urlInputRef}
-                aria-label="Preview URL"
+                aria-label={t("Preview URL")}
                 aria-invalid={Boolean(urlError)}
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
@@ -344,7 +346,7 @@ export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
                   size="icon-xs"
                   disabled={!url}
                   onClick={refresh}
-                  aria-label="Refresh preview"
+                  aria-label={t("Refresh preview")}
                 >
                   <RefreshCw data-icon="inline-start" className={loading ? "animate-spin" : undefined} />
                 </InputGroupButton>
@@ -352,7 +354,7 @@ export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
                   size="icon-xs"
                   disabled={!url}
                   onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
-                  aria-label="Open preview in browser"
+                  aria-label={t("Open preview in browser")}
                 >
                   <ExternalLink data-icon="inline-start" />
                 </InputGroupButton>
@@ -373,7 +375,7 @@ export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
               size="xs"
               className="font-mono text-xs"
               onClick={() => navigate(urlForPort(port, previewHost))}
-              aria-label={`Open ${previewHost}:${port} preview`}
+              aria-label={t("Open {0}:{1} preview", { "0": previewHost, "1": port })}
             >
               :{port}
             </Button>
@@ -383,7 +385,7 @@ export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
 
       <div className="flex shrink-0 items-center justify-between gap-2 px-2 pb-2">
         <ToggleGroup
-          aria-label="Preview viewport"
+          aria-label={t("Preview viewport")}
           value={[viewport]}
           onValueChange={(values) => {
             const next = values[0]
@@ -400,7 +402,7 @@ export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
                 <ToggleGroupItem
                   key={value}
                   value={value}
-                  aria-label={`${option.label} viewport`}
+                  aria-label={t("{0} viewport", { "0": option.label })}
                   title={option.width ? `${option.label} · ${option.width}×${option.height}` : option.label}
                 >
                   <Icon />
@@ -416,12 +418,12 @@ export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
             size="icon-sm"
             disabled={zoom <= MIN_ZOOM}
             onClick={() => setZoom((current) => Math.max(MIN_ZOOM, Number((current - ZOOM_STEP).toFixed(1))))}
-            aria-label="Zoom preview out"
-            title="Zoom out"
+            aria-label={t("Zoom preview out")}
+            title={t("Zoom out")}
           >
             <ZoomOut data-icon="inline-start" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setZoom(1)} aria-label="Reset preview zoom">
+          <Button variant="ghost" size="sm" onClick={() => setZoom(1)} aria-label={t("Reset preview zoom")}>
             {Math.round(zoom * 100)}%
           </Button>
           <Button
@@ -429,8 +431,8 @@ export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
             size="icon-sm"
             disabled={zoom >= MAX_ZOOM}
             onClick={() => setZoom((current) => Math.min(MAX_ZOOM, Number((current + ZOOM_STEP).toFixed(1))))}
-            aria-label="Zoom preview in"
-            title="Zoom in"
+            aria-label={t("Zoom preview in")}
+            title={t("Zoom in")}
           >
             <ZoomIn data-icon="inline-start" />
           </Button>
@@ -453,7 +455,7 @@ export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
           >
             <iframe
               key={`${url}-${reloadKey}`}
-              title="Development preview"
+              title={t("Development preview")}
               src={url}
               className="block border-0 bg-white"
               style={viewport === "responsive" ? {
@@ -476,9 +478,9 @@ export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
           <Empty className="size-full">
             <EmptyHeader>
               <EmptyMedia variant="icon"><Globe2 /></EmptyMedia>
-              <EmptyTitle>No preview selected</EmptyTitle>
+              <EmptyTitle>{t("No preview selected")}</EmptyTitle>
               <EmptyDescription>
-                Start a local development server or enter its URL above. Detected ports appear automatically.
+                {t("Start a local development server or enter its URL above. Detected ports appear automatically.")}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

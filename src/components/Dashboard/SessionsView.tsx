@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Fragment, type ReactNode } from "react"
 import { MessageSquare, Plus } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -71,6 +72,7 @@ export function SessionsView({
   onRetryFetch,
   loadMoreSessions,
 }: SessionsViewProps) {
+  const { t } = useTranslation()
   const { names: sessionNames, rename: renameSession } = useSessionNames()
   const permissionsOf = useListedPermissions()
   const selectedProjectName = projectName(selectedProject.path)
@@ -82,7 +84,7 @@ export function SessionsView({
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink render={<button type="button" onClick={onBack} />}>
-                Projects
+                {t("Projects")}
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
@@ -104,12 +106,12 @@ export function SessionsView({
           </p>
         </header>
 
-        <section className="flex flex-col gap-4" aria-label="Sessions">
+        <section className="flex flex-col gap-4" aria-label={t("Sessions")}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <SearchInput
               value={searchFilter}
               onChange={setSearchFilter}
-              placeholder="Search sessions or PRs..."
+              placeholder={t("Search sessions or PRs...")}
               loading={searchLoading}
             />
             {onNewSession && (
@@ -123,7 +125,7 @@ export function SessionsView({
                 ) : (
                   <Plus data-icon="inline-start" />
                 )}
-                New Session
+                {t("New Session")}
               </Button>
             )}
           </div>
@@ -170,7 +172,7 @@ export function SessionsView({
                     onClick={loadMoreSessions}
                   >
                     {sessionsLoading && <Spinner data-icon="inline-start" />}
-                    {sessionsLoading ? "Loading..." : "Load more sessions"}
+                    {sessionsLoading ? t("Loading...") : t("Load more sessions")}
                   </Button>
                 </div>
               )}
@@ -183,6 +185,7 @@ export function SessionsView({
 }
 
 function SessionsEmpty({ searchFilter, filterEmpty }: { searchFilter: string; filterEmpty: ReactNode }) {
+  const { t } = useTranslation()
   if (!searchFilter && filterEmpty) return filterEmpty
   return (
     <Empty className="min-h-72 border">
@@ -191,12 +194,12 @@ function SessionsEmpty({ searchFilter, filterEmpty }: { searchFilter: string; fi
           <MessageSquare />
         </EmptyMedia>
         <EmptyTitle>
-          {searchFilter ? "No sessions match your search" : "No sessions yet"}
+          {searchFilter ? t("No sessions match your search") : t("No sessions yet")}
         </EmptyTitle>
         <EmptyDescription>
           {searchFilter
-            ? "Try #157, honest-cms #157, or paste a PR URL."
-            : "Start a session in this project and it will appear here."}
+            ? t("Try #157, honest-cms #157, or paste a PR URL.")
+            : t("Start a session in this project and it will appear here.")}
         </EmptyDescription>
       </EmptyHeader>
     </Empty>

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   AlertTriangle,
@@ -181,6 +182,7 @@ function DeviceRow({
   dragging,
   dragHandleProps,
 }: DeviceRowProps) {
+  const { t } = useTranslation()
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(device.name)
   const [editingCredentials, setEditingCredentials] = useState(false)
@@ -256,8 +258,8 @@ function DeviceRow({
       <div className="flex items-center gap-2.5 px-3 py-2">
         <button
           type="button"
-          aria-label={`Reorder ${device.name}`}
-          title="Drag to reorder (or use ↑ ↓)"
+          aria-label={t("Reorder {0}", { "0": device.name })}
+          title={t("Drag to reorder (or use ↑ ↓)")}
           className="-ml-1 flex size-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
           {...dragHandleProps}
         >
@@ -265,12 +267,12 @@ function DeviceRow({
         </button>
         <span
           className="w-4 shrink-0 text-center font-mono text-xs text-muted-foreground"
-          title={hasShortcut ? `${shortcutLabel(`device.switch.${slot}` as KeybindingCommand)} opens this device` : "No shortcut"}
+          title={hasShortcut ? t("{0} opens this device", { "0": shortcutLabel(`device.switch.${slot}` as KeybindingCommand) }) : t("No shortcut")}
         >
           {hasShortcut && slot}
         </span>
         <span
-          aria-label={`Status: ${device.runtime.authState}`}
+          aria-label={t("Status: {0}", { "0": device.runtime.authState })}
           className={cn("size-2 shrink-0 rounded-full", AUTH_STATE_DOT[device.runtime.authState])}
         />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -278,7 +280,7 @@ function DeviceRow({
             <Input
               value={name}
               autoFocus
-              aria-label={`Rename ${device.name}`}
+              aria-label={t("Rename {0}", { "0": device.name })}
               onChange={(event) => setName(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") void saveName()
@@ -296,14 +298,14 @@ function DeviceRow({
               {version && (
                 <span
                   className={cn("shrink-0 font-mono text-xs", skewed ? "text-warning" : "text-muted-foreground")}
-                  title={skewed ? `Device runs v${version}; hub runs v${HUB_VERSION}` : undefined}
+                  title={skewed ? t("Device runs v{0}; hub runs v{1}", { "0": version, "1": HUB_VERSION }) : undefined}
                 >
                   v{version}
-                  {skewed && " ≠ hub"}
+                  {skewed && t(" ≠ hub")}
                 </span>
               )}
               {device.auth === "none" && (
-                <Badge variant="secondary">Unauthenticated</Badge>
+                <Badge variant="secondary">{t("Unauthenticated")}</Badge>
               )}
             </div>
           )}
@@ -312,10 +314,10 @@ function DeviceRow({
           </span>
           {device.username ? (
             <span className="truncate text-xs text-muted-foreground" title={device.username}>
-              Account: {device.username}
+              {t("Account: ")}{device.username}
             </span>
           ) : accountDevice ? (
-            <span className="text-xs text-warning">Account not configured</span>
+            <span className="text-xs text-warning">{t("Account not configured")}</span>
           ) : null}
         </div>
 
@@ -323,7 +325,7 @@ function DeviceRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={`Re-test ${device.name}`}
+            aria-label={t("Re-test {0}", { "0": device.name })}
             disabled={busy === "test"}
             onClick={async () => {
               setBusy("test")
@@ -336,7 +338,7 @@ function DeviceRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={`Edit account for ${device.name}`}
+            aria-label={t("Edit account for {0}", { "0": device.name })}
             onClick={() => {
               setEditingCredentials((value) => !value)
               setCredentialUsername(device.username ?? "")
@@ -349,7 +351,7 @@ function DeviceRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={`Rename ${device.name}`}
+            aria-label={t("Rename {0}", { "0": device.name })}
             onClick={() => setEditing(true)}
           >
             <Pencil data-icon="inline-start" />
@@ -361,14 +363,14 @@ function DeviceRow({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                aria-label={`Remove ${device.name}`}
+                aria-label={t("Remove {0}", { "0": device.name })}
                 className="text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 <Trash2 data-icon="inline-start" />
               </Button>
             )}
-            title={<>Remove {device.name}?</>}
-            description="This device will disappear from Cogpit. You can add it again later."
+            title={<>{t("Remove ")}{device.name}?</>}
+            description={t("This device will disappear from Cogpit. You can add it again later.")}
             confirmLabel="Remove device"
             destructive
             onConfirm={async () => {
@@ -395,36 +397,36 @@ function DeviceRow({
           <div className="grid gap-2 sm:grid-cols-2">
             <Field>
               <FieldLabel htmlFor={`device-username-${device.id}`}>
-                Username <span className="text-muted-foreground/60">(account sign-in)</span>
+                {t("Username ")}<span className="text-muted-foreground/60">{t("(account sign-in)")}</span>
               </FieldLabel>
               <Input
                 id={`device-username-${device.id}`}
-                aria-label={`Username for ${device.name}`}
+                aria-label={t("Username for {0}", { "0": device.name })}
                 value={credentialUsername}
                 onChange={(event) => setCredentialUsername(event.target.value)}
-                placeholder="Leave empty for password-only auth"
+                placeholder={t("Leave empty for password-only auth")}
                 autoComplete="off"
                 spellCheck={false}
               />
             </Field>
             <Field>
               <FieldLabel htmlFor={`device-password-${device.id}`}>
-                New password <span className="text-muted-foreground/60">(optional)</span>
+                {t("New password ")}<span className="text-muted-foreground/60">{t("(optional)")}</span>
               </FieldLabel>
               <Input
                 id={`device-password-${device.id}`}
-                aria-label={`New password for ${device.name}`}
+                aria-label={t("New password for {0}", { "0": device.name })}
                 type="password"
                 value={credentialPassword}
                 onChange={(event) => setCredentialPassword(event.target.value)}
-                placeholder="Leave blank to keep the stored password"
+                placeholder={t("Leave blank to keep the stored password")}
                 autoComplete="new-password"
               />
             </Field>
           </div>
           {device.username && credentialUsername.trim() === "" && (
             <p className="text-xs text-warning">
-              Clearing the username switches this device back to password-only authentication.
+              {t("Clearing the username switches this device back to password-only authentication.")}
             </p>
           )}
         </InlineEditPanel>
@@ -436,6 +438,7 @@ function DeviceRow({
 // ── Dialog ───────────────────────────────────────────────────────────────────
 
 export function DevicesDialog({ open, initialMode, onClose }: DevicesDialogProps) {
+  const { t } = useTranslation()
   const { devices, refresh, probe, addDevice, updateDevice, removeDevice, reorderDevices, testDevice } = useDevices()
 
   const [name, setName] = useState("")
@@ -571,10 +574,9 @@ export function DevicesDialog({ open, initialMode, onClose }: DevicesDialogProps
     >
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Devices</DialogTitle>
+          <DialogTitle>{t("Devices")}</DialogTitle>
           <DialogDescription>
-            Control another Cogpit device from here. The active device is chosen from the header
-            switcher — {SWITCH_TIP} jumps between devices. Drag a device by its handle to change its number; this machine is always 1.
+            {t("Control another Cogpit device from here. The active device is chosen from the header switcher — ")}{SWITCH_TIP} {t(" jumps between devices. Drag a device by its handle to change its number; this machine is always 1.")}
           </DialogDescription>
         </DialogHeader>
 
@@ -604,13 +606,13 @@ export function DevicesDialog({ open, initialMode, onClose }: DevicesDialogProps
         <div className="flex flex-col gap-4 border-t pt-4">
           <div className="flex items-center gap-2">
             <Plus data-icon="inline-start" className="size-4 text-muted-foreground" />
-            <p className="text-sm font-medium text-foreground">Add a device</p>
+            <p className="text-sm font-medium text-foreground">{t("Add a device")}</p>
           </div>
 
           <FieldGroup>
             <Field data-invalid={submitError?.field === "host"}>
-              <FieldLabel htmlFor="device-host">Host</FieldLabel>
-              <FieldDescription>Enter a local address or an HTTPS URL.</FieldDescription>
+              <FieldLabel htmlFor="device-host">{t("Host")}</FieldLabel>
+              <FieldDescription>{t("Enter a local address or an HTTPS URL.")}</FieldDescription>
               <Input
                 id="device-host"
                 ref={hostRef}
@@ -629,7 +631,7 @@ export function DevicesDialog({ open, initialMode, onClose }: DevicesDialogProps
               />
               {probing && (
                 <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Loader2 data-icon="inline-start" className="size-3.5 animate-spin" /> Checking device…
+                  <Loader2 data-icon="inline-start" className="size-3.5 animate-spin" /> {t(" Checking device…")}
                 </p>
               )}
               {!probing && probeState && (
@@ -645,29 +647,29 @@ export function DevicesDialog({ open, initialMode, onClose }: DevicesDialogProps
 
             <Field>
               <FieldLabel htmlFor="device-name">
-                Name <span className="text-muted-foreground/60">(optional)</span>
+                {t("Name ")}<span className="text-muted-foreground/60">{t("(optional)")}</span>
               </FieldLabel>
               <Input
                 id="device-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="Defaults to the device's own name"
+                placeholder={t("Defaults to the device's own name")}
               />
             </Field>
 
             {targetUsesAccounts && (
               <Field data-invalid={submitError?.field === "username"}>
-                <FieldLabel htmlFor="device-username">Username</FieldLabel>
+                <FieldLabel htmlFor="device-username">{t("Username")}</FieldLabel>
                 <Input
                   id="device-username"
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
-                  placeholder="Account username"
+                  placeholder={t("Account username")}
                   autoComplete="username"
                   spellCheck={false}
                 />
                 <FieldDescription>
-                  Requests through this hub act as this account on that server.
+                  {t("Requests through this hub act as this account on that server.")}
                 </FieldDescription>
                 {submitError?.field === "username" && (
                   <FieldError>{submitError.message}</FieldError>
@@ -677,13 +679,13 @@ export function DevicesDialog({ open, initialMode, onClose }: DevicesDialogProps
 
             {credentialsRequired && (
               <Field data-invalid={submitError?.field === "password"}>
-                <FieldLabel htmlFor="device-password">Password</FieldLabel>
+                <FieldLabel htmlFor="device-password">{t("Password")}</FieldLabel>
                 <Input
                   id="device-password"
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder={targetUsesAccounts ? "Password for that account" : "Network access password for that device"}
+                  placeholder={targetUsesAccounts ? t("Password for that account") : t("Network access password for that device")}
                   autoComplete={targetUsesAccounts ? "current-password" : "off"}
                 />
                 {submitError?.field === "password" && (
@@ -706,7 +708,7 @@ export function DevicesDialog({ open, initialMode, onClose }: DevicesDialogProps
               }}
             />
             <FieldLabel htmlFor="device-local-tunnel">
-              This is a local tunnel{targetUsesAccounts ? "" : " — no password"}
+              {t("This is a local tunnel")}{targetUsesAccounts ? "" : t(" — no password")}
             </FieldLabel>
           </Field>
           {allowLocalTunnel && (
@@ -714,9 +716,9 @@ export function DevicesDialog({ open, initialMode, onClose }: DevicesDialogProps
               <ShieldAlert />
               <AlertDescription className="text-warning">
                 {targetUsesAccounts ? (
-                  <>The loopback address is allowed because the tunnel is local; account sign-in still applies.</>
+                  <>{t("The loopback address is allowed because the tunnel is local; account sign-in still applies.")}</>
                 ) : (
-                  <>Traffic to this device is forwarded <strong>unauthenticated</strong>. Only use this for an SSH tunnel or another already-secured local channel.</>
+                  <>{t("Traffic to this device is forwarded ")}<strong>{t("unauthenticated")}</strong>{t(". Only use this for an SSH tunnel or another already-secured local channel.")}</>
                 )}
               </AlertDescription>
             </Alert>
@@ -724,13 +726,12 @@ export function DevicesDialog({ open, initialMode, onClose }: DevicesDialogProps
 
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="outline" onClick={onClose}>
-              Close
+              {t("Close")}
             </Button>
             <Button disabled={!canSubmit} onClick={() => void handleSubmit()}>
               {submitting ? (
                 <>
-                  <Loader2 data-icon="inline-start" className="size-4 animate-spin" /> Adding…
-                </>
+                  <Loader2 data-icon="inline-start" className="size-4 animate-spin" /> {t(" Adding…")}</>
               ) : (
                 "Add device"
               )}

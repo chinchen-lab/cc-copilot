@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import type { ReactNode } from "react"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -24,13 +25,14 @@ export function InlineEditPanel({
   onSave,
   className,
 }: InlineEditPanelProps) {
+  const { t } = useTranslation()
   return (
     <div className={cn("flex flex-col gap-3 border-t px-3 py-3", className)}>
       {children}
       {error && <FieldError>{error}</FieldError>}
       <div className="flex justify-end gap-1.5">
         <Button variant="outline" size="sm" onClick={onCancel}>
-          Cancel
+          {t("Cancel")}
         </Button>
         <Button size="sm" disabled={busy} onClick={onSave}>
           {busy ? <Loader2 data-icon="inline-start" className="animate-spin" /> : saveLabel}

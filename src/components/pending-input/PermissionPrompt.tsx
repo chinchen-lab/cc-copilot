@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 /**
  * The inline Allow/Deny block on a blocked card.
  *
@@ -42,6 +43,7 @@ export function PermissionPrompt({
   responding,
   onRespond,
 }: PermissionPromptProps) {
+  const { t } = useTranslation()
   const available = DECISION_BUTTONS.filter((button) => supports(request, button.decision))
   if (request.defaultToNo) available.sort((a, b) => Number(b.decision === "deny") - Number(a.decision === "deny"))
   // "Always" alone is not an answer — without allow or deny the card cannot
@@ -53,7 +55,7 @@ export function PermissionPrompt({
       <ShieldAlert className="text-warning" />
       <AlertTitle className="flex min-w-0 items-center gap-2">
         <span className="min-w-0 flex-1 truncate">
-          {request.title || `Allow ${request.toolName}?`}
+          {request.title || t("Allow {0}?", { "0": request.toolName })}
         </span>
         {queued > 0 && (
           <span className="shrink-0 font-mono text-xs text-warning">+{queued}</span>
@@ -88,7 +90,7 @@ export function PermissionPrompt({
         </div>
       ) : (
         <p className="col-start-2 mt-2 text-xs text-warning">
-          Resolve this approval in its own provider
+          {t("Resolve this approval in its own provider")}
         </p>
       ))}
     </Alert>

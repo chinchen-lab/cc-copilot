@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useRef, useState } from "react"
 import { AlertTriangle, Loader2 } from "lucide-react"
 import {
@@ -42,6 +43,7 @@ export function UndoConfirmDialog({
   onConfirm,
   onCancel,
 }: UndoConfirmDialogProps) {
+  const { t } = useTranslation()
   const lastStateRef = useRef(state)
   const [fileRestoreSelection, setFileRestoreSelection] = useState({
     key: "",
@@ -79,23 +81,23 @@ export function UndoConfirmDialog({
           <AlertDialogDescription>
             {renderedState.nativeRewind
               ? restoreFiles
-                ? "This removes the selected turn and everything after it, restoring captured files."
-                : "This removes the selected turn and everything after it. Files stay unchanged."
+                ? t("This removes the selected turn and everything after it, restoring captured files.")
+                : t("This removes the selected turn and everything after it. Files stay unchanged.")
               : DESCRIPTIONS[renderedState.type]}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         <div className="flex flex-col gap-2 py-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Turns affected</span>
+            <span className="text-muted-foreground">{t("Turns affected")}</span>
             <span className="text-foreground font-mono">{renderedState.summary.turnCount}</span>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Files affected</span>
+            <span className="text-muted-foreground">{t("Files affected")}</span>
             <span className="text-foreground font-mono">{renderedState.summary.fileCount}</span>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Operations</span>
+            <span className="text-muted-foreground">{t("Operations")}</span>
             <span className="text-foreground font-mono">{renderedState.summary.operationCount}</span>
           </div>
           {renderedState.summary.filePaths.length > 0 && (
@@ -117,7 +119,7 @@ export function UndoConfirmDialog({
                   selected: checked === true,
                 })}
               />
-              Restore captured file changes
+              {t("Restore captured file changes")}
             </label>
           )}
         </div>
@@ -130,7 +132,7 @@ export function UndoConfirmDialog({
 
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel} disabled={isApplying}>
-            Cancel
+            {t("Cancel")}
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={() => onConfirm(restoreFiles)}
@@ -139,10 +141,9 @@ export function UndoConfirmDialog({
             {isApplying ? (
               <>
                 <Loader2 data-icon="inline-start" className="animate-spin" />
-                Applying...
-              </>
+                {t("Applying...")}</>
             ) : (
-              renderedState.type === "undo" ? "Undo" : renderedState.type === "redo" ? "Redo" : "Switch"
+              renderedState.type === "undo" ? "Undo" : renderedState.type === "redo" ? "Redo" : t("Switch")
             )}
           </AlertDialogAction>
         </AlertDialogFooter>

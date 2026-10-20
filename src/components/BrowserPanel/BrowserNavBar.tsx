@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useState, type FormEvent, type KeyboardEvent } from "react"
 import { ArrowLeft, ArrowRight, ExternalLink, RotateCw, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -112,6 +113,7 @@ export const BrowserNavBar = memo(function BrowserNavBar({
   onFollow,
   onCloseTab,
 }: BrowserNavBarProps) {
+  const { t } = useTranslation()
   // `null` means "show the live url"; a string is the user's own text.
   const [draft, setDraft] = useState<string | null>(null)
   const liveUrl = page?.url ?? ""
@@ -137,7 +139,7 @@ export const BrowserNavBar = memo(function BrowserNavBar({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Back"
+          aria-label={t("Back")}
           disabled={readOnly || !page?.canGoBack}
           onClick={onBack}
         >
@@ -146,7 +148,7 @@ export const BrowserNavBar = memo(function BrowserNavBar({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Forward"
+          aria-label={t("Forward")}
           disabled={readOnly || !page?.canGoForward}
           onClick={onForward}
         >
@@ -155,7 +157,7 @@ export const BrowserNavBar = memo(function BrowserNavBar({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Reload"
+          aria-label={t("Reload")}
           disabled={readOnly || !page}
           onClick={onReload}
         >
@@ -165,9 +167,9 @@ export const BrowserNavBar = memo(function BrowserNavBar({
         <form className="ml-1 min-w-0 flex-1" onSubmit={submit}>
           <InputGroup className="h-7">
             <InputGroupInput
-              aria-label="Page URL"
+              aria-label={t("Page URL")}
               className="text-xs"
-              placeholder="Enter a URL"
+              placeholder={t("Enter a URL")}
               spellCheck={false}
               autoComplete="off"
               readOnly={readOnly}
@@ -180,7 +182,7 @@ export const BrowserNavBar = memo(function BrowserNavBar({
             <InputGroupAddon align="inline-end">
               <InputGroupButton
                 size="icon-xs"
-                aria-label="Open in your browser"
+                aria-label={t("Open in your browser")}
                 disabled={!liveUrl}
                 onClick={() => window.open(liveUrl, "_blank", "noopener,noreferrer")}
               >
@@ -226,8 +228,8 @@ export const BrowserNavBar = memo(function BrowserNavBar({
                   size="icon-xs"
                   variant="ghost"
                   className="rounded-l-none"
-                  aria-label={`Close tab: ${tabLabel(tab)}`}
-                  title="Close tab"
+                  aria-label={t("Close tab: {0}", { "0": tabLabel(tab) })}
+                  title={t("Close tab")}
                   onClick={() => onCloseTab(tab.targetId)}
                 >
                   <X data-icon="inline-start" />

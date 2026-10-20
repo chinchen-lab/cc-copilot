@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 /**
  * Questions from sessions this one handed work to — on this machine or another
  * device — shown above the composer so the user answers them without leaving
@@ -50,6 +51,7 @@ function DelegatedRequestCard({
   responding: Set<string>
   onRespond: (requestId: string, response: PendingInputResponse) => void
 }) {
+  const { t } = useTranslation()
   const path = sessionPath(request)
   const open = () => {
     if (path) revealSessionPath(path)
@@ -62,12 +64,11 @@ function DelegatedRequestCard({
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Server className="size-3.5" />
         <span className="truncate">
-          {request.device ? `Delegated session on ${request.device.name}` : "Delegated session"}
+          {request.device ? t("Delegated session on {0}", { "0": request.device.name }) : t("Delegated session")}
         </span>
         {path && (
           <Button variant="ghost" size="xs" className="ml-auto" onClick={open}>
-            Open
-            <ChevronRight data-icon="inline-end" />
+            {t("Open")}<ChevronRight data-icon="inline-end" />
           </Button>
         )}
       </div>

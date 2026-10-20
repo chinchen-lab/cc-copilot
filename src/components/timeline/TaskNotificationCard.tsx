@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, type ReactNode } from "react"
 import { Bell, ChevronDown, ChevronRight } from "lucide-react"
 import ReactMarkdown from "react-markdown"
@@ -30,6 +31,7 @@ const STATUS_STYLES = {
 const EVENT_STYLE = { Icon: Bell, color: "text-muted-foreground", bg: "border-border/40 bg-muted/30", badgeVariant: "outline" } as const
 
 export function TaskNotificationCard({ notification, action }: { notification: TaskNotification; action?: ReactNode }) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const statusStyle = STATUS_STYLES[notification.status as keyof typeof STATUS_STYLES]
     ?? { ...EVENT_STYLE, label: notification.status || "Event" }
@@ -80,7 +82,7 @@ export function TaskNotificationCard({ notification, action }: { notification: T
                   )}
                   {notification.outputFile && (
                     <div className="mt-2">
-                      <div className="text-xs font-medium text-muted-foreground">Output file</div>
+                      <div className="text-xs font-medium text-muted-foreground">{t("Output file")}</div>
                       <div className="mt-1 select-all break-all rounded bg-muted px-2 py-1 font-mono text-xs text-muted-foreground">
                         {notification.outputFile}
                       </div>

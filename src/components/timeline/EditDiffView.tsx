@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useEffect, useMemo, useCallback, memo } from "react"
 import { ChevronsUpDown, Maximize2, Minus, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -299,6 +300,7 @@ function collapseUnchangedLines(lines: DiffLine[]): CollapsedItem[] {
 }
 
 function CollapsedSeparator({ count, onExpand }: { count: number; onExpand: () => void }) {
+  const { t } = useTranslation()
   return (
     <Button
       type="button"
@@ -308,7 +310,7 @@ function CollapsedSeparator({ count, onExpand }: { count: number; onExpand: () =
       className="h-auto w-full justify-start rounded-none px-2 py-1 text-xs text-muted-foreground"
     >
       <ChevronsUpDown className="shrink-0" data-icon="inline-start" />
-      <span className="font-mono">{count} unchanged lines</span>
+      <span className="font-mono">{count} {t(" unchanged lines")}</span>
       <span className="flex-1 border-b border-border" />
     </Button>
   )
@@ -490,6 +492,7 @@ export function EditDiffView({
   startLine = 1,
   hideHeader = false,
 }: EditDiffViewProps): React.ReactElement {
+  const { t } = useTranslation()
   const [modalOpen, setModalOpen] = useState(false)
   const isDark = useIsDarkMode()
   const lines = useMemo(() => getCachedDiff(oldString, newString), [oldString, newString])
@@ -523,8 +526,8 @@ export function EditDiffView({
                   size="icon-xs"
                   onClick={() => setModalOpen(true)}
                   className="text-muted-foreground"
-                  title="Expand diff"
-                  aria-label="Expand diff"
+                  title={t("Expand diff")}
+                  aria-label={t("Expand diff")}
                 >
                   <Maximize2 data-icon="icon" />
                 </Button>
@@ -550,7 +553,7 @@ export function EditDiffView({
                 <DiffStats lines={lines} />
               </DialogTitle>
               <DialogDescription className="sr-only">
-                Diff view for edit operation
+                {t("Diff view for edit operation")}
               </DialogDescription>
             </DialogHeader>
             <div className="flex-1 overflow-auto rounded border border-border bg-background">

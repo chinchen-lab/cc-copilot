@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import { Check } from "lucide-react"
 import type { ToolCall } from "../../../shared/session/types"
@@ -29,6 +30,7 @@ export function QuestionOptionBody({
   selected: boolean
   showSelectedBadge?: boolean
 }): React.ReactElement {
+  const { t } = useTranslation()
   return (
     <>
       <span
@@ -45,7 +47,7 @@ export function QuestionOptionBody({
         <span className="block text-xs font-medium">
           {option.label}
           {showSelectedBadge && selected && (
-            <Badge variant="secondary" className="ml-2">Selected</Badge>
+            <Badge variant="secondary" className="ml-2">{t("Selected")}</Badge>
           )}
         </span>
         {option.description && (
@@ -65,6 +67,7 @@ export function AskUserAnswerForm({
   toolCall: ToolCall
   sessionId: string
 }): React.ReactElement | null {
+  const { t } = useTranslation()
   const questions = (toolCall.input.questions as AskUserQuestion[] | undefined) ?? []
   const [answers, setAnswers] = useState<Record<string, string>>(() => (
     Object.fromEntries(questions.map((question) => [question.question, ""]))
@@ -187,7 +190,7 @@ export function AskUserAnswerForm({
                 <FieldLabel
                   htmlFor={answerInputId}
                 >
-                  Answer
+                  {t("Answer")}
                 </FieldLabel>
                 <Textarea
                   id={answerInputId}
@@ -196,7 +199,7 @@ export function AskUserAnswerForm({
                     setAnswers({ ...answers, [question.question]: event.target.value })
                   }}
                   rows={2}
-                  placeholder="Type your answer..."
+                  placeholder={t("Type your answer...")}
                 />
               </Field>
             )}
@@ -208,7 +211,7 @@ export function AskUserAnswerForm({
         size="sm"
         disabled={submitting || submitted}
       >
-        {submitted ? "Sent" : submitting ? "Sending..." : "Send answer"}
+        {submitted ? "Sent" : submitting ? t("Sending...") : "Send answer"}
       </Button>
     </form>
   )

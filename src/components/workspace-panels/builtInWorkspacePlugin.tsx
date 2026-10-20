@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { lazy, Suspense, useEffect, useMemo, useState } from "react"
 import { FileCode2, FolderTree, GitBranch, Globe, Network, PanelRight } from "lucide-react"
 import { FileChangesPanel } from "@/components/FileChangesPanel"
@@ -29,10 +30,11 @@ const BrowserPanel = lazy(() =>
 )
 
 function PanelFallback() {
+  const { t } = useTranslation()
   return (
     <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground" role="status">
       <Spinner />
-      Loading panel…
+      {t("Loading panel…")}
     </div>
   )
 }
@@ -92,6 +94,7 @@ function BrowserWorkspacePanel(props: WorkspacePanelProps) {
  * a new call re-arms it, and a session that never browses schedules nothing.
  */
 function BrowserActivityIndicator({ context }: WorkspacePanelIndicatorProps) {
+  const { t } = useTranslation()
   const [, expire] = useState(0)
   // The rail re-renders on anything; the transcript is only walked when it moves.
   const at = useMemo(
@@ -110,7 +113,7 @@ function BrowserActivityIndicator({ context }: WorkspacePanelIndicatorProps) {
   return (
     <span
       role="status"
-      aria-label="The agent is using the browser"
+      aria-label={t("The agent is using the browser")}
       className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-emerald-500 motion-safe:animate-pulse"
     />
   )
@@ -129,13 +132,14 @@ function CrewWorkspacePanel(props: WorkspacePanelProps) {
  * any of them works. Nothing when the crew is idle.
  */
 function CrewIndicator({ context }: WorkspacePanelIndicatorProps) {
+  const { t } = useTranslation()
   const crew = context.crew
   if (!crew) return null
   if (crew.needsYou > 0) {
     return (
       <span
         role="status"
-        aria-label={`${crew.needsYou} ${crew.needsYou === 1 ? "session needs" : "sessions need"} you`}
+        aria-label={t("{0} {1} you", { "0": crew.needsYou, "1": crew.needsYou === 1 ? "session needs" : "sessions need" })}
         className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-warning px-1 text-[0.5625rem] font-semibold text-warning-foreground"
       >
         {crew.needsYou}
@@ -146,7 +150,7 @@ function CrewIndicator({ context }: WorkspacePanelIndicatorProps) {
   return (
     <span
       role="status"
-      aria-label={`${crew.working} ${crew.working === 1 ? "session" : "sessions"} working`}
+      aria-label={t("{0} {1} working", { "0": crew.working, "1": crew.working === 1 ? "session" : "sessions" })}
       className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-success ring-2 ring-success/30"
     />
   )

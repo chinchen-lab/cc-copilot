@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useMemo, useState } from "react"
 import { Play, Search, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,7 @@ interface ScriptRowProps {
 }
 
 function ScriptRow({ script, status, onRun, onStop }: ScriptRowProps) {
+  const { t } = useTranslation()
   const isRunning = status === "running"
   let statusClassName = "bg-transparent"
   if (isRunning) statusClassName = "bg-primary"
@@ -37,7 +39,7 @@ function ScriptRow({ script, status, onRun, onStop }: ScriptRowProps) {
       size="sm"
       className="motion-list-item group w-full justify-start px-2"
       onClick={isRunning ? onStop : onRun}
-      title={isRunning ? `Stop ${script.name}` : `Run: ${script.command}`}
+      title={isRunning ? t("Stop {0}", { "0": script.name }) : t("Run: {0}", { "0": script.command })}
     >
       <span
         className={cn(
@@ -67,6 +69,7 @@ export const ProcessPanelScripts = memo(function ProcessPanelScripts({
   projectDir,
   onProcessStarted,
 }: ProcessPanelScriptsProps) {
+  const { t } = useTranslation()
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -111,15 +114,15 @@ export const ProcessPanelScripts = memo(function ProcessPanelScripts({
 
   return (
     <>
-      <section className="flex w-56 shrink-0 flex-col" aria-label="Scripts">
+      <section className="flex w-56 shrink-0 flex-col" aria-label={t("Scripts")}>
         <div className="flex h-8 shrink-0 items-center gap-2 px-2">
-          <span className="flex-1 text-xs font-medium text-muted-foreground">Scripts</span>
-          {loading && <Spinner className="size-3 text-muted-foreground" aria-label="Loading scripts" />}
+          <span className="flex-1 text-xs font-medium text-muted-foreground">{t("Scripts")}</span>
+          {loading && <Spinner className="size-3 text-muted-foreground" aria-label={t("Loading scripts")} />}
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label={searchOpen ? "Close script search" : "Search scripts"}
+            aria-label={searchOpen ? t("Close script search") : t("Search scripts")}
             aria-expanded={searchOpen}
             onClick={() => {
               setSearchOpen((open) => !open)
@@ -136,8 +139,8 @@ export const ProcessPanelScripts = memo(function ProcessPanelScripts({
               type="search"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Filter scripts..."
-              aria-label="Filter scripts"
+              placeholder={t("Filter scripts...")}
+              aria-label={t("Filter scripts")}
               className="h-7"
               autoFocus
             />
@@ -184,7 +187,7 @@ export const ProcessPanelScripts = memo(function ProcessPanelScripts({
                     className="h-auto justify-start px-2 py-1"
                     onClick={() => toggleGroup(dirLabel)}
                   >
-                    {showAll ? "Show less" : `Show ${otherScripts.length} more`}
+                    {showAll ? t("Show less") : t("Show {0} more", { "0": otherScripts.length })}
                   </Button>
                 )}
               </div>
@@ -194,8 +197,8 @@ export const ProcessPanelScripts = memo(function ProcessPanelScripts({
           {!loading && groupedScripts.size === 0 && searchQuery && (
             <Empty className="gap-1 p-3">
               <EmptyHeader className="gap-1">
-                <EmptyTitle>No matching scripts</EmptyTitle>
-                <EmptyDescription>Try another name.</EmptyDescription>
+                <EmptyTitle>{t("No matching scripts")}</EmptyTitle>
+                <EmptyDescription>{t("Try another name.")}</EmptyDescription>
               </EmptyHeader>
             </Empty>
           )}

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import type { ReactNode } from "react"
 import {
   ArrowRightLeft,
@@ -78,6 +79,7 @@ export function MobileSessionInfoBar({
   expandAll,
   onToggleExpandAll,
 }: MobileSessionInfoBarProps) {
+  const { t } = useTranslation()
   const archiveToggle = useSessionArchiveToggle(session.sessionId, isLive, canArchive)
 
   const handleNewSession = () => {
@@ -93,7 +95,7 @@ export function MobileSessionInfoBar({
           variant="ghost"
           size="icon-sm"
           onClick={onBackToMain}
-          aria-label="Back to main agent"
+          aria-label={t("Back to main agent")}
         >
           <ChevronLeft data-icon="inline-start" />
         </Button>
@@ -105,9 +107,9 @@ export function MobileSessionInfoBar({
 
       <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5">
         <span className="truncate text-xs font-medium text-muted-foreground">
-          {session.cwd ? projectName(session.cwd) : "Session"}
+          {session.cwd ? projectName(session.cwd) : t("Session")}
         </span>
-        {isLive && <LiveIndicator aria-label="Session is live" />}
+        {isLive && <LiveIndicator aria-label={t("Session is live")} />}
       </div>
 
       {headerAccessory}
@@ -118,7 +120,7 @@ export function MobileSessionInfoBar({
               type="button"
               variant="ghost"
               size="icon-sm"
-              aria-label="Session actions"
+              aria-label={t("Session actions")}
             />
           )}
         >
@@ -128,29 +130,29 @@ export function MobileSessionInfoBar({
           <DropdownMenuGroup>
             <DropdownMenuLabel className="flex flex-col gap-0.5">
               <span className="truncate text-foreground">
-                {session.cwd ? projectName(session.cwd) : "Current session"}
+                {session.cwd ? projectName(session.cwd) : t("Current session")}
               </span>
               <span className="truncate font-normal">
-                {[session.model, session.gitBranch].filter(Boolean).join(" · ") || "Session actions"}
+                {[session.model, session.gitBranch].filter(Boolean).join(" · ") || t("Session actions")}
               </span>
             </DropdownMenuLabel>
 
             {sessionSource && (
               <DropdownMenuItem onClick={handleNewSession} disabled={creatingSession}>
                 {creatingSession ? <Spinner /> : <Plus />}
-                <span>New session</span>
+                <span>{t("New session")}</span>
               </DropdownMenuItem>
             )}
             {onDuplicateSession && (
               <DropdownMenuItem onClick={onDuplicateSession}>
                 <Copy />
-                <span>Duplicate session</span>
+                <span>{t("Duplicate session")}</span>
               </DropdownMenuItem>
             )}
             {onProviderHandoff && !isSubAgentView && (
               <DropdownMenuItem onClick={onProviderHandoff}>
                 <ArrowRightLeft />
-                <span>Continue with another provider…</span>
+                <span>{t("Continue with another provider…")}</span>
               </DropdownMenuItem>
             )}
             {archiveToggle && !isSubAgentView && (
@@ -170,25 +172,25 @@ export function MobileSessionInfoBar({
             {onSearch && (
               <DropdownMenuItem onClick={onSearch}>
                 <Search />
-                <span>Search conversation</span>
+                <span>{t("Search conversation")}</span>
               </DropdownMenuItem>
             )}
             {onToggleExpandAll && (
               <DropdownMenuItem onClick={onToggleExpandAll}>
                 {expandAll ? <ChevronsDownUp /> : <ChevronsUpDown />}
-                <span>{expandAll ? "Collapse tool calls" : "Expand tool calls"}</span>
+                <span>{expandAll ? t("Collapse tool calls") : t("Expand tool calls")}</span>
               </DropdownMenuItem>
             )}
             {hasFileChanges && onShowFileChanges && (
               <DropdownMenuItem onClick={onShowFileChanges}>
                 <FileCode2 />
-                <span>File changes</span>
+                <span>{t("File changes")}</span>
               </DropdownMenuItem>
             )}
             {onShowWorkflows && (workflowCount ?? 0) > 0 && (
               <DropdownMenuItem onClick={onShowWorkflows}>
                 <WorkflowIcon />
-                <span className="flex-1">Workflows</span>
+                <span className="flex-1">{t("Workflows")}</span>
                 <Badge variant="secondary">{workflowCount}</Badge>
               </DropdownMenuItem>
             )}

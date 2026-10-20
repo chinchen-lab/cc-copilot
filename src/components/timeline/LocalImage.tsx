@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import { Maximize2 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -24,6 +25,7 @@ export function LocalImage({
   className?: string
   thumbnailClassName?: string
 }): React.ReactElement | null {
+  const { t } = useTranslation()
   const canAccessHostFiles = useCapability("hostFiles")
   const [expanded, setExpanded] = useState(false)
   const [hasOpened, setHasOpened] = useState(false)
@@ -52,7 +54,7 @@ export function LocalImage({
   if (resolved && failedSrc === resolved) {
     return (
       <span role="status" className="my-3 block text-xs text-muted-foreground">
-        Image unavailable{alt ? `: ${alt}` : ""}
+        {t("Image unavailable")}{alt ? `: ${alt}` : ""}
       </span>
     )
   }
@@ -63,7 +65,7 @@ export function LocalImage({
         type="button"
         variant="ghost"
         onClick={openImage}
-        aria-label={`Open ${alt || "rendered image"}`}
+        aria-label={t("Open {0}", { "0": alt || "rendered image" })}
         className={cn(
           "group/image relative my-3 block h-auto max-w-full overflow-hidden rounded-lg border border-border bg-background p-1 transition-colors hover:bg-muted focus-visible:ring-ring/40",
           className,

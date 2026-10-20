@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useEffect, useState } from "react"
 import { AlertCircle, Link2Off, Users } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -41,6 +42,7 @@ function CenteredCard({ children }: { children: React.ReactNode }) {
 }
 
 export function SharedRoot() {
+  const { t } = useTranslation()
   const sessionId = sharedSessionId(window.location.pathname)
   const [state, setState] = useState<ShareState>(
     sessionId ? { kind: "probing" } : { kind: "error", message: "This share link is not valid." },
@@ -90,10 +92,9 @@ export function SharedRoot() {
             <div className="mb-2 flex size-9 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
               <Link2Off className="size-4" />
             </div>
-            <CardTitle>Sharing has ended</CardTitle>
+            <CardTitle>{t("Sharing has ended")}</CardTitle>
             <CardDescription>
-              The host stopped sharing this session or changed its passphrase. Ask for a new
-              link to rejoin.
+              {t("The host stopped sharing this session or changed its passphrase. Ask for a new link to rejoin.")}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -106,12 +107,12 @@ export function SharedRoot() {
       <CenteredCard>
         <Alert variant="destructive">
           <AlertCircle aria-hidden="true" />
-          <AlertTitle>Could not open this session</AlertTitle>
+          <AlertTitle>{t("Could not open this session")}</AlertTitle>
           <AlertDescription>{state.message}</AlertDescription>
         </Alert>
         {sessionId && (
           <Button className="mt-3 w-full" onClick={() => void probe()}>
-            Try again
+            {t("Try again")}
           </Button>
         )}
       </CenteredCard>
@@ -124,7 +125,7 @@ export function SharedRoot() {
         <CardContent
           className="flex min-h-24 items-center justify-center gap-2"
           role="status"
-          aria-label="Opening shared session"
+          aria-label={t("Opening shared session")}
         >
           <Users className="size-4 text-muted-foreground" aria-hidden="true" />
           <Spinner className="size-5 text-muted-foreground" />

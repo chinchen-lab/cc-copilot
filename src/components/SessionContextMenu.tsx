@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useRef } from "react"
 import { Archive, ArchiveRestore, Copy, Trash2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -54,6 +55,7 @@ export function SessionContextMenu({
   onUnarchive,
   archiveDisabled = false,
 }: SessionContextMenuProps) {
+  const { t } = useTranslation()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showRename, setShowRename] = useState(false)
   const [renameValue, setRenameValue] = useState("")
@@ -75,24 +77,24 @@ export function SessionContextMenu({
               {onRename && (
                 <ContextMenuItem onClick={openRename}>
                   <Pencil data-icon="inline-start" />
-                  Rename session
+                  {t("Rename session")}
                 </ContextMenuItem>
               )}
               {onDuplicate && (
                 <ContextMenuItem onClick={onDuplicate}>
                   <Copy data-icon="inline-start" />
-                  Duplicate session
+                  {t("Duplicate session")}
                 </ContextMenuItem>
               )}
               {onUnarchive ? (
                 <ContextMenuItem onClick={onUnarchive}>
                   <ArchiveRestore data-icon="inline-start" />
-                  Restore from archive
+                  {t("Restore from archive")}
                 </ContextMenuItem>
               ) : onArchive && (
                 <ContextMenuItem onClick={onArchive} disabled={archiveDisabled}>
                   <Archive data-icon="inline-start" />
-                  {archiveDisabled ? "Archive (stop the session first)" : "Archive session"}
+                  {archiveDisabled ? t("Archive (stop the session first)") : t("Archive session")}
                 </ContextMenuItem>
               )}
             </ContextMenuGroup>
@@ -106,7 +108,7 @@ export function SessionContextMenu({
                   onClick={() => setShowDeleteConfirm(true)}
                 >
                   <Trash2 data-icon="inline-start" />
-                  Delete session
+                  {t("Delete session")}
                 </ContextMenuItem>
               </ContextMenuGroup>
             </>
@@ -117,16 +119,15 @@ export function SessionContextMenu({
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete session?</AlertDialogTitle>
+            <AlertDialogTitle>{t("Delete session?")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete{" "}
-              <span className="font-medium text-foreground">{sessionLabel}</span>.
-              This action cannot be undone.
+              {t("This will permanently delete")}{" "}
+              <span className="font-medium text-foreground">{sessionLabel}</span>{t(". This action cannot be undone.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel size="sm">
-              Cancel
+              {t("Cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
@@ -136,7 +137,7 @@ export function SessionContextMenu({
                 setShowDeleteConfirm(false)
               }}
             >
-              Delete
+              {t("Delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -145,9 +146,9 @@ export function SessionContextMenu({
       <Dialog open={showRename} onOpenChange={setShowRename}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Rename session</DialogTitle>
+            <DialogTitle className="text-foreground">{t("Rename session")}</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Give this session a custom name. Clear to reset to default.
+              {t("Give this session a custom name. Clear to reset to default.")}
             </DialogDescription>
           </DialogHeader>
           <form className="flex flex-col gap-4"
@@ -158,7 +159,7 @@ export function SessionContextMenu({
             }}
           >
             <Field>
-              <FieldLabel htmlFor="session-rename">Session name</FieldLabel>
+              <FieldLabel htmlFor="session-rename">{t("Session name")}</FieldLabel>
               <Input
                 id="session-rename"
                 ref={renameInputRef}
@@ -174,10 +175,10 @@ export function SessionContextMenu({
                 size="sm"
                 onClick={() => setShowRename(false)}
               >
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button type="submit" size="sm">
-                Save
+                {t("Save")}
               </Button>
             </DialogFooter>
           </form>

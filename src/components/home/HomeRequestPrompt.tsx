@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import { ChevronRight, ClipboardCheck, ShieldQuestion } from "lucide-react"
 import { Alert, AlertTitle } from "@/components/ui/alert"
@@ -25,6 +26,7 @@ export function HomeRequestPrompt({
   canAnswer: boolean
   onOpen: () => void
 }) {
+  const { t } = useTranslation()
   const [goneQuestions, setGoneQuestions] = useState<ReadonlySet<string>>(new Set())
   const { sessionId } = request
   switch (request.kind) {
@@ -73,14 +75,13 @@ export function HomeRequestPrompt({
       return (
         <Alert className="border-warning/40 bg-warning/5">
           {request.kind === "plan" ? <ClipboardCheck className="text-warning" /> : <ShieldQuestion className="text-warning" />}
-          <AlertTitle>{request.kind === "plan" ? "A plan is waiting for review" : "A permission was deferred"}</AlertTitle>
+          <AlertTitle>{request.kind === "plan" ? t("A plan is waiting for review") : t("A permission was deferred")}</AlertTitle>
           <p className="col-start-2 mt-1 text-sm text-muted-foreground">
-            {request.kind === "plan" ? "Review it in its session." : "Open the session and resume it to answer."}
+            {request.kind === "plan" ? t("Review it in its session.") : t("Open the session and resume it to answer.")}
           </p>
           <div className="col-start-2 mt-2">
             <Button size="xs" onClick={onOpen}>
-              Open session
-              <ChevronRight data-icon="inline-end" />
+              {t("Open session")}<ChevronRight data-icon="inline-end" />
             </Button>
           </div>
         </Alert>

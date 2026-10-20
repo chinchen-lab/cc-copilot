@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { RotateCcw, ChevronsRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -8,6 +9,7 @@ interface UndoRedoBarProps {
 }
 
 export function UndoRedoBar({ redoTurnCount, onRedoAll }: UndoRedoBarProps) {
+  const { t } = useTranslation()
   if (redoTurnCount <= 0) return null
 
   return (
@@ -15,7 +17,7 @@ export function UndoRedoBar({ redoTurnCount, onRedoAll }: UndoRedoBarProps) {
         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <RotateCcw className="size-4" data-icon="inline-start" />
           <span className="font-mono">{redoTurnCount}</span>
-          <span>turn{redoTurnCount !== 1 ? "s" : ""} archived</span>
+          <span>{t("turn")}{redoTurnCount !== 1 ? "s" : ""} {t(" archived")}</span>
         </div>
         <Separator orientation="vertical" className="h-4" />
         <Button
@@ -24,7 +26,7 @@ export function UndoRedoBar({ redoTurnCount, onRedoAll }: UndoRedoBarProps) {
           onClick={onRedoAll}
         >
           <ChevronsRight data-icon="inline-start" />
-          Redo all
+          {t("Redo all")}
         </Button>
     </div>
   )

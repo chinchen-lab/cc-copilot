@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Archive, Cpu, Folder, GitBranch, MessageSquare, Users } from "lucide-react"
 import { PullRequestChips } from "@/components/PullRequestChips"
 import { cn } from "@/lib/utils"
@@ -31,6 +32,7 @@ export function SessionPreview({
   worktreeName,
   projectLabel,
 }: SessionPreviewProps) {
+  const { t } = useTranslation()
   const fullTitle = customName || s.aiTitle
   const firstPrompt = s.firstUserMessage
   const lastPrompt = s.lastUserMessage && s.lastUserMessage !== firstPrompt ? s.lastUserMessage : undefined
@@ -67,7 +69,7 @@ export function SessionPreview({
       )}
       {firstPrompt && (
         <div className="flex flex-col gap-0.5">
-          {lastPrompt && <span className="text-[0.625rem] text-muted-foreground/70">Started with</span>}
+          {lastPrompt && <span className="text-[0.625rem] text-muted-foreground/70">{t("Started with")}</span>}
           <div className="border-l-2 pl-2 text-muted-foreground">
             <span data-first-prompt className="line-clamp-8 leading-relaxed">{firstPrompt}</span>
           </div>
@@ -75,7 +77,7 @@ export function SessionPreview({
       )}
       {lastPrompt && (
         <div className="flex flex-col gap-0.5">
-          <span className="text-[0.625rem] text-muted-foreground/70">Latest</span>
+          <span className="text-[0.625rem] text-muted-foreground/70">{t("Latest")}</span>
           <div className="border-l-2 pl-2 text-muted-foreground">
             <span data-last-prompt className="line-clamp-4 leading-relaxed">{lastPrompt}</span>
           </div>
@@ -92,7 +94,7 @@ export function SessionPreview({
         {turnCount > 0 && (
           <span className="flex items-center gap-0.5">
             <MessageSquare className="size-2.5" />
-            {turnCount} {turnCount === 1 ? "turn" : "turns"}
+            {turnCount} {turnCount === 1 ? t("turn") : t("turns")}
           </span>
         )}
         <span>{formatFileSize(s.size)}</span>

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useEffect } from "react"
 import { X, Download, ArrowUpCircle } from "lucide-react"
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -14,6 +15,7 @@ interface DownloadedInfo {
 }
 
 export function UpdateBanner() {
+  const { t } = useTranslation()
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
   const [downloadedInfo, setDownloadedInfo] = useState<DownloadedInfo | null>(null)
   const [dismissed, setDismissed] = useState(false)
@@ -36,14 +38,14 @@ export function UpdateBanner() {
     return (
       <Alert className="grid-cols-[auto_minmax(0,1fr)_auto] rounded-none border-x-0 border-t-0 border-success/30 bg-success/10 px-4 py-2 pr-4 text-success has-data-[slot=alert-action]:pr-4">
         <ArrowUpCircle />
-        <AlertTitle>Cogpit v{downloadedInfo.version} is ready</AlertTitle>
-        <AlertDescription className="text-success/80">Restart to apply the update.</AlertDescription>
+        <AlertTitle>Cogpit v{downloadedInfo.version} {t(" is ready")}</AlertTitle>
+        <AlertDescription className="text-success/80">{t("Restart to apply the update.")}</AlertDescription>
         <AlertAction className="static col-start-3 row-span-2 row-start-1 self-center">
           <Button
             variant="ghost"
             size="icon-xs"
             onClick={() => setDismissed(true)}
-            aria-label="Dismiss update"
+            aria-label={t("Dismiss update")}
           >
             <X data-icon="inline-start" />
           </Button>
@@ -57,9 +59,9 @@ export function UpdateBanner() {
     return (
       <Alert className="grid-cols-[auto_minmax(0,1fr)_auto] rounded-none border-x-0 border-t-0 border-info/30 bg-info/10 px-4 py-2 pr-4 text-info has-data-[slot=alert-action]:pr-4">
         <ArrowUpCircle />
-        <AlertTitle>Cogpit v{updateInfo.version} is available</AlertTitle>
+        <AlertTitle>Cogpit v{updateInfo.version} {t(" is available")}</AlertTitle>
         {updateInfo.platform !== "mac" && (
-          <AlertDescription>Update through your package manager.</AlertDescription>
+          <AlertDescription>{t("Update through your package manager.")}</AlertDescription>
         )}
         <AlertAction className="static col-start-3 row-span-2 row-start-1 flex items-center gap-2 self-center">
           {updateInfo.platform === "mac" && (
@@ -70,7 +72,7 @@ export function UpdateBanner() {
               nativeButton={false}
             >
               <Download data-icon="inline-start" />
-              Download
+              {t("Download")}
             </Button>
           )}
           <Button
@@ -82,7 +84,7 @@ export function UpdateBanner() {
             }}
             className="whitespace-nowrap text-muted-foreground"
           >
-            Don't show again
+            {t("Don't show again")}
           </Button>
         </AlertAction>
       </Alert>

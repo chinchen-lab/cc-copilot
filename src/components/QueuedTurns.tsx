@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { randomUUID } from "@/lib/uuid"
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react"
 import { ArrowUp, Pencil, X } from "lucide-react"
@@ -83,6 +84,7 @@ interface QueuedTurnsProps {
 }
 
 export function QueuedTurns({ sessionId, turns = NO_TURNS, pendingMessages, canManage, isMobile }: QueuedTurnsProps) {
+  const { t } = useTranslation()
   const { isComposingEvent, onCompositionStart, onCompositionEnd } = useImeComposition()
   const owner = useMemo(() => sessionId && canManage ? conversationStateFor(sessionId) : null, [sessionId, canManage])
   const state = useSyncExternalStore(owner?.subscribe ?? noopSubscribe, owner?.snapshot ?? emptySnapshot)
@@ -120,11 +122,11 @@ export function QueuedTurns({ sessionId, turns = NO_TURNS, pendingMessages, canM
   }
 
   return (
-    <section aria-label="Queued messages" className={cn("flex flex-col gap-2 py-5", !isMobile && "px-4")}>
+    <section aria-label={t("Queued messages")} className={cn("flex flex-col gap-2 py-5", !isMobile && "px-4")}>
       <div className="flex min-h-6 items-center gap-2 text-xs text-muted-foreground">
-        <span className="shrink-0">{paused ? "Queue paused" : "Queued"}</span>
+        <span className="shrink-0">{paused ? t("Queue paused") : t("Queued")}</span>
         {paused?.error && <span className="min-w-0 truncate" title={paused.error}>{paused.error}</span>}
-        {paused && canManage && <Button size="xs" variant="outline" className="ml-auto" disabled={busy} onClick={() => void act(null, { action: "resume" })}>Resume</Button>}
+        {paused && canManage && <Button size="xs" variant="outline" className="ml-auto" disabled={busy} onClick={() => void act(null, { action: "resume" })}>{t("Resume")}</Button>}
       </div>
       {failure?.id === null && <p className="text-xs text-destructive">{failure.message}</p>}
       {waiting.map((command, i) => {
@@ -138,24 +140,24 @@ export function QueuedTurns({ sessionId, turns = NO_TURNS, pendingMessages, canM
             error={failure?.id === command.id ? failure.message : undefined}
             actions={manageable && draft === null && <>
               {movable.indexOf(command.id) > 0 && (
-                <Button size="icon-xs" variant="ghost" aria-label="Move up" title="Move up" disabled={busy} onClick={() => moveUp(command.id)}><ArrowUp /></Button>
+                <Button size="icon-xs" variant="ghost" aria-label={t("Move up")} title={t("Move up")} disabled={busy} onClick={() => moveUp(command.id)}><ArrowUp /></Button>
               )}
-              <Button size="icon-xs" variant="ghost" aria-label="Edit" title="Edit" disabled={busy} onClick={() => setEditing({ id: command.id, message })}><Pencil /></Button>
-              <Button size="icon-xs" variant="ghost" aria-label="Remove from queue" title="Remove from queue" disabled={busy} onClick={() => void act(command.id, { action: "cancel", commandId: command.id })}><X /></Button>
+              <Button size="icon-xs" variant="ghost" aria-label={t("Edit")} title={t("Edit")} disabled={busy} onClick={() => setEditing({ id: command.id, message })}><Pencil /></Button>
+              <Button size="icon-xs" variant="ghost" aria-label={t("Remove from queue")} title={t("Remove from queue")} disabled={busy} onClick={() => void act(command.id, { action: "cancel", commandId: command.id })}><X /></Button>
               <Button
                 size="xs"
                 variant="ghost"
-                title={canSteer ? "Add this to the current turn" : "Stop the current turn and send this now"}
+                title={canSteer ? t("Add this to the current turn") : t("Stop the current turn and send this now")}
                 disabled={busy}
                 onClick={() => void act(command.id, { action: canSteer ? "steer" : "restart", commandId: command.id, newCommandId: randomUUID() })}
               >
-                Send now
+                {t("Send now")}
               </Button>
             </>}
             editor={draft !== null ? (
               <form onSubmit={(event) => { event.preventDefault(); saveEdit(command.id, draft) }}>
                 <Textarea
-                  aria-label="Edit queued message"
+                  aria-label={t("Edit queued message")}
                   autoFocus
                   value={draft}
                   className="min-h-0 resize-none rounded-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 md:text-sm"
@@ -169,8 +171,8 @@ export function QueuedTurns({ sessionId, turns = NO_TURNS, pendingMessages, canM
                   }}
                 />
                 <div className="mt-2 flex justify-end gap-1">
-                  <Button type="button" size="xs" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
-                  <Button type="submit" size="xs" disabled={busy || !draft.trim()}>Save</Button>
+                  <Button type="button" size="xs" variant="ghost" onClick={() => setEditing(null)}>{t("Cancel")}</Button>
+                  <Button type="submit" size="xs" disabled={busy || !draft.trim()}>{t("Save")}</Button>
                 </div>
               </form>
             ) : undefined}

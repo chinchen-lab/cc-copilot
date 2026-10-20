@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useCallback, useLayoutEffect, useRef, useState } from "react"
 import { useAgentProgress, useStreamingOverlay } from "@/contexts/StreamingOverlayContext"
 import { messagesForToolUse } from "@/lib/streamingOverlay"
@@ -26,6 +27,7 @@ export const LiveSubagentTranscript = memo(function LiveSubagentTranscript({
 }: {
   toolUseId: string
 }) {
+  const { t } = useTranslation()
   const overlay = useStreamingOverlay()
   const summary = useAgentProgress(toolUseId)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -73,7 +75,7 @@ export const LiveSubagentTranscript = memo(function LiveSubagentTranscript({
         data-testid={summary ? "live-subagent-summary" : undefined}
         className="mb-1 text-xs font-medium text-muted-foreground"
       >
-        {summary ?? <span className="uppercase tracking-wide">Live</span>}
+        {summary ?? <span className="uppercase tracking-wide">{t("Live")}</span>}
       </div>
       {text && (
         <div
@@ -81,7 +83,7 @@ export const LiveSubagentTranscript = memo(function LiveSubagentTranscript({
           onScroll={handleScroll}
           data-testid="live-subagent-scroll"
           role="region"
-          aria-label="Live sub-agent output"
+          aria-label={t("Live sub-agent output")}
           tabIndex={0}
           className="text-xs break-words max-h-64 overflow-y-auto overscroll-contain pr-1"
         >

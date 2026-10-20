@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo } from "react"
 import { PanelLeftClose, Search } from "lucide-react"
 import { HeaderIconButton } from "@/components/header-shared"
@@ -23,12 +24,13 @@ export const SidebarHeader = memo(function SidebarHeader({
   sidebarShortcut,
   commandPaletteShortcut,
 }: SidebarHeaderProps) {
+  const { t } = useTranslation()
   return (
     <div className="electron-drag window-inset-start flex h-12 shrink-0 items-center gap-1 px-2">
       <button
         type="button"
-        aria-label="Home"
-        title="Mission Control"
+        aria-label={t("Home")}
+        title={t("Mission Control")}
         onClick={onGoHome}
         className="mr-auto min-w-0 rounded-md px-1 py-1.5 outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring"
       >
@@ -36,13 +38,13 @@ export const SidebarHeader = memo(function SidebarHeader({
       </button>
       <HeaderIconButton
         icon={Search}
-        label={`Search (${commandPaletteShortcut})`}
+        label={t("Search ({0})", { "0": commandPaletteShortcut })}
         onClick={onOpenCommandPalette}
         size="default"
       />
       <HeaderIconButton
         icon={PanelLeftClose}
-        label={`Hide sidebar (${sidebarShortcut})`}
+        label={t("Hide sidebar ({0})", { "0": sidebarShortcut })}
         onClick={onToggleSidebar}
         size="default"
       />

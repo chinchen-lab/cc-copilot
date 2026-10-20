@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, startTransition } from "react"
 import type { ReactNode } from "react"
 import {
@@ -73,6 +74,7 @@ export const SessionPill = memo(function SessionPill({
   onDuplicateSession,
   onOpenTerminal,
 }: SessionPillProps) {
+  const { t } = useTranslation()
   const subAgentInfo = sessionSource ? parseSubAgentPath(sessionSource.fileName) : null
   const subAgentLabel = subAgentInfo ? formatAgentLabel(subAgentInfo.agentId) : null
   const thinkingEnabled = session.turns.some((turn) => turn.thinking.length > 0)
@@ -105,10 +107,10 @@ export const SessionPill = memo(function SessionPill({
             onClick={onCopyResume}
             className="truncate rounded-full px-1.5 py-1 text-sm font-medium text-foreground"
           >
-            {copied ? "Copied" : session.slug || session.sessionId.slice(0, 8)}
+            {copied ? t("Copied") : session.slug || session.sessionId.slice(0, 8)}
           </button>
         )}
-        {isLive && <LiveIndicator aria-label="Session is live" />}
+        {isLive && <LiveIndicator aria-label={t("Session is live")} />}
         <ContextBadge rawMessages={rawMessages} />
       </TooltipTrigger>
       <TooltipContent role="tooltip" side="bottom" align="start" sideOffset={6} className="p-3">
@@ -148,37 +150,38 @@ function SessionDetails({
   pullRequests,
   rawMessages,
 }: SessionDetailsProps) {
+  const { t } = useTranslation()
   const ctx = getContextUsage(rawMessages)
   const duplicatedFrom = session.branchedFrom
 
   return (
     <div className="flex min-w-64 max-w-96 flex-col gap-1.5 text-xs">
       {session.model && (
-        <DetailRow label="Model">
+        <DetailRow label={t("Model")}>
           <span>{shortenModel(session.model)}</span>
-          {thinkingEnabled && <span className="text-muted-foreground">· thinking</span>}
+          {thinkingEnabled && <span className="text-muted-foreground">{t("· thinking")}</span>}
         </DetailRow>
       )}
       {session.gitBranch && (
-        <DetailRow label="Branch">
+        <DetailRow label={t("Branch")}>
           <span className="truncate font-mono">{session.gitBranch}</span>
         </DetailRow>
       )}
       {pullRequests.length > 0 && (
-        <DetailRow label="Pull requests">
+        <DetailRow label={t("Pull requests")}>
           <PullRequestChips pullRequests={pullRequests} />
         </DetailRow>
       )}
-      {subAgentLabel && <DetailRow label="Agent">{subAgentLabel}</DetailRow>}
+      {subAgentLabel && <DetailRow label={t("Agent")}>{subAgentLabel}</DetailRow>}
       {duplicatedFrom && (
-        <DetailRow label="Duplicated from">
+        <DetailRow label={t("Duplicated from")}>
           {duplicatedFrom.sessionId.slice(0, 8)}
-          {duplicatedFrom.turnIndex != null ? ` at turn ${duplicatedFrom.turnIndex + 1}` : ""}
+          {duplicatedFrom.turnIndex != null ? t(" at turn {0}", { "0": duplicatedFrom.turnIndex + 1 }) : ""}
         </DetailRow>
       )}
       {ctx && (
-        <DetailRow label="Context">
-          {formatTokenCount(Math.max(0, ctx.compactAt - ctx.used))} left before compact ·{" "}
+        <DetailRow label={t("Context")}>
+          {formatTokenCount(Math.max(0, ctx.compactAt - ctx.used))} {t(" left before compact ·")}{" "}
           {formatTokenCount(ctx.used)} / {formatTokenCount(ctx.limit)}
         </DetailRow>
       )}
@@ -207,6 +210,7 @@ function SessionBreadcrumb({
   onDuplicateSession,
   onOpenTerminal,
 }: SessionBreadcrumbProps) {
+  const { t } = useTranslation()
   const { dispatch } = useAppContext()
   const hasProject = Boolean(session.cwd || sessionSource.dirName)
   const isRemote = isRemoteDeviceActive()
@@ -235,14 +239,14 @@ function SessionBreadcrumb({
           type="button"
           onClick={onCopyResume}
           className="flex min-w-0 max-w-80 items-center gap-1.5 truncate rounded-full px-1.5 py-1 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          aria-label={`Copy resume command for ${breadcrumb}; open session actions with the context menu`}
+          aria-label={t("Copy resume command for {0}; open session actions with the context menu", { "0": breadcrumb })}
           aria-haspopup="menu"
-          title="Click to copy resume command. Right-click for session actions."
+          title={t("Click to copy resume command. Right-click for session actions.")}
         />}
       >
         {copied ? (
           <span className="flex items-center gap-1.5 text-success">
-            <Check className="size-3" /> Copied
+            <Check className="size-3" /> {t(" Copied")}
           </span>
         ) : (
           <>
@@ -258,12 +262,12 @@ function SessionBreadcrumb({
           onClick={() => onNewSession(sessionSource.dirName, session.cwd)}
         >
           {creatingSession ? <Spinner className="size-3.5" /> : <Plus className="size-3.5" />}
-          New session in this project
+          {t("New session in this project")}
         </ContextMenuItem>
         {onDuplicateSession && (
           <ContextMenuItem onClick={onDuplicateSession}>
             <Copy className="size-3.5" />
-            Duplicate this session
+            {t("Duplicate this session")}
           </ContextMenuItem>
         )}
         {hasProject && (canOpenEditor || canReveal) && (
@@ -272,13 +276,13 @@ function SessionBreadcrumb({
             {canOpenEditor && (
               <ContextMenuItem onClick={() => openProject(project)}>
                 <Code2 className="size-3.5" />
-                Open project in editor
+                {t("Open project in editor")}
               </ContextMenuItem>
             )}
             {canReveal && (
               <ContextMenuItem onClick={() => revealInFolder(project)}>
                 <FolderSearch className="size-3.5" />
-                Reveal in file manager
+                {t("Reveal in file manager")}
               </ContextMenuItem>
             )}
           </>
@@ -286,13 +290,13 @@ function SessionBreadcrumb({
         {onOpenTerminal && !isRemote && can("terminal") && (
           <ContextMenuItem onClick={onOpenTerminal}>
             <TerminalSquare className="size-3.5" />
-            Open terminal in project
+            {t("Open terminal in project")}
           </ContextMenuItem>
         )}
         <ContextMenuSeparator />
         <ContextMenuItem onClick={handleViewProjectSessions}>
           <FolderOpen className="size-3.5" />
-          View all sessions in this project
+          {t("View all sessions in this project")}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

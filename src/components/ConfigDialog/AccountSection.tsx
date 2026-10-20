@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import { ChevronDown, ChevronRight, Loader2, Users } from "lucide-react"
 
@@ -36,12 +37,13 @@ function accountName(account: AgentAccount): string {
 }
 
 function UsageMeter({ label, window }: { label: string; window: AccountUsageWindow | null }) {
+  const { t } = useTranslation()
   if (!window) return null
   const heavy = window.pct >= 80
   return (
     <span
       className="flex items-center gap-1.5 text-xs text-muted-foreground"
-      title={window.resetsIn ? `${label} window resets in ${window.resetsIn}` : undefined}
+      title={window.resetsIn ? t("{0} window resets in {1}", { "0": label, "1": window.resetsIn }) : undefined}
     >
       <span className="w-5">{label}</span>
       <span className="relative h-1 w-16 overflow-hidden rounded-full bg-muted">
@@ -77,6 +79,7 @@ function outcomeText(outcome: AccountSwitchOutcome, displayName: string): string
  * advertise a tool the user does not have.
  */
 export function AccountSection({ kind, disabled }: AccountSectionProps) {
+  const { t } = useTranslation()
   const { displayName } = descriptorFor(kind)
   const { report, switchingSlot, outcome, switchTo } = useAgentAccounts(kind)
   const [open, setOpen] = useState(false)
@@ -104,7 +107,7 @@ export function AccountSection({ kind, disabled }: AccountSectionProps) {
       >
         <span className="flex items-center gap-2">
           <Users data-icon="inline-start" className="size-4 text-muted-foreground" />
-          {displayName} accounts
+          {displayName} {t(" accounts")}
         </span>
         <span className="flex min-w-0 items-center gap-1 text-xs font-normal text-muted-foreground">
           <span className="truncate">{summary}</span>
@@ -115,8 +118,8 @@ export function AccountSection({ kind, disabled }: AccountSectionProps) {
       <CollapsibleContent>
         <Field>
           <FieldDescription>
-            {report.status === "ok" && `Logins managed by ${report.tool}${report.version ? ` ${report.version}` : ""}. `}
-            Switching changes which login {displayName} sessions authenticate with.
+            {report.status === "ok" && t("Logins managed by {0}{1}. ", { "0": report.tool, "1": report.version ? ` ${report.version}` : "" })}
+            {t("Switching changes which login ")}{displayName} {t(" sessions authenticate with.")}
           </FieldDescription>
 
           {report.status === "error" ? (
@@ -135,8 +138,8 @@ export function AccountSection({ kind, disabled }: AccountSectionProps) {
                         {account.alias && (
                           <span className="truncate text-xs text-muted-foreground">{account.email}</span>
                         )}
-                        {account.active && <Badge>Active</Badge>}
-                        {account.disabled && <Badge variant="outline">Disabled</Badge>}
+                        {account.active && <Badge>{t("Active")}</Badge>}
+                        {account.disabled && <Badge variant="outline">{t("Disabled")}</Badge>}
                         {status && <Badge variant="destructive">{status}</Badge>}
                       </div>
                       {account.organization && (
@@ -156,15 +159,14 @@ export function AccountSection({ kind, disabled }: AccountSectionProps) {
                         variant="outline"
                         disabled={switchingSlot !== null}
                         onClick={() => switchTo(account.slot)}
-                        aria-label={`Switch to ${accountName(account)}`}
+                        aria-label={t("Switch to {0}", { "0": accountName(account) })}
                       >
                         {switching ? (
                           <>
                             <Loader2 data-icon="inline-start" className="size-3.5 animate-spin" />
-                            Switching…
-                          </>
+                            {t("Switching…")}</>
                         ) : (
-                          "Switch"
+                          t("Switch")
                         )}
                       </Button>
                     )}

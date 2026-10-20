@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useState } from "react"
 import { Bot } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -18,6 +19,7 @@ import type { BrowserAgentActivity } from "../../../shared/session/browserActivi
 const LINGER_MS = 6_000
 
 export function AgentCaption({ activity }: { activity: BrowserAgentActivity | null }) {
+  const { t } = useTranslation()
   const [visible, setVisible] = useState(true)
   const stamp = activity ? `${activity.toolCallId}:${activity.done}` : null
 
@@ -42,7 +44,7 @@ export function AgentCaption({ activity }: { activity: BrowserAgentActivity | nu
       <div className="flex min-w-0 items-center gap-2 rounded-full bg-popover px-3 py-1 text-xs shadow-xs">
         <Bot aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
         <code className="min-w-0 truncate font-mono text-[0.6875rem]">{activity.command}</code>
-        <span className="shrink-0 text-muted-foreground">{activity.done ? "ran" : "running"}</span>
+        <span className="shrink-0 text-muted-foreground">{activity.done ? "ran" : t("running")}</span>
       </div>
     </div>
   )

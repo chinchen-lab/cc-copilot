@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import type { ReactNode } from "react"
 import { GitBranch } from "lucide-react"
 import { McpPicker } from "./McpPicker"
@@ -46,10 +47,11 @@ export function DesktopChatInputSettings({
   changeAndApply,
   trailingExtra,
 }: DesktopChatInputSettingsProps) {
+  const { t } = useTranslation()
   const { worktrees: showWorktree } = capabilitiesFor(agentKind)
 
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-1" role="group" aria-label="Session settings">
+    <div className="flex min-w-0 flex-1 items-center gap-1" role="group" aria-label={t("Session settings")}>
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
         {onPermissionModeChange && permissionMode && (
           <PermissionPicker
@@ -70,7 +72,7 @@ export function DesktopChatInputSettings({
             onClick={() => onWorktreeEnabledChange(!worktreeEnabled)}
           >
             <GitBranch data-icon="inline-start" />
-            Worktree
+            {t("Worktree")}
           </Button>
         )}
 

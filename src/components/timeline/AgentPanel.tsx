@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, memo, useMemo } from "react"
 import { Users, ChevronRight, ChevronDown, Clock, Wrench, CheckCircle2, XCircle, Loader2, ExternalLink } from "lucide-react"
 import { formatDuration, parseSubAgentPath } from "@/lib/format"
@@ -34,6 +35,7 @@ export const AgentPanel = memo(function AgentPanel({
   label,
   countLabel,
 }: AgentPanelProps): React.ReactElement | null {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const isOpen = expandAll || open
 
@@ -153,7 +155,7 @@ export const AgentPanel = memo(function AgentPanel({
           </span>
         ) : (
           <span className="text-xs text-muted-foreground">
-            ({agentIds.length} agent{agentIds.length !== 1 ? "s" : ""})
+            ({agentIds.length} {t(" agent")}{agentIds.length !== 1 ? "s" : ""})
           </span>
         )}
       </Button>
@@ -169,12 +171,12 @@ export const AgentPanel = memo(function AgentPanel({
         <div className="motion-enter mt-2 flex flex-col gap-2">
           {unavailable ? (
             <div className="py-1 text-xs italic text-muted-foreground">
-              Sub-agent transcripts aren't available in a shared session.
+              {t("Sub-agent transcripts aren't available in a shared session.")}
             </div>
           ) : isLoading && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
               <Loader2 className="size-3 animate-spin" />
-              Loading agent output...
+              {t("Loading agent output...")}
             </div>
           )}
           {agentIds.map((id) => {
@@ -226,6 +228,7 @@ function AgentReturnItem({
   canNavigate,
   onOpen,
 }: AgentReturnItemProps): React.ReactElement {
+  const { t } = useTranslation()
   const text = message?.text
   const markdownText = useMemo(() => preprocessMediaPaths((text ?? []).join("\n\n")), [text])
   const hasText = (text?.length ?? 0) > 0
@@ -264,10 +267,10 @@ function AgentReturnItem({
               size="xs"
               onClick={onOpen}
               className="ml-auto"
-              title="Open this sub-agent's full chat session"
+              title={t("Open this sub-agent's full chat session")}
             >
               <ExternalLink data-icon="inline-start" />
-              Open chat
+              {t("Open chat")}
             </Button>
           )}
         </div>
@@ -285,10 +288,9 @@ function AgentReturnItem({
               {isRunning ? (
                 <>
                   <Loader2 className="size-3 animate-spin" />
-                  Working — no return yet
-                </>
+                  {t("Working — no return yet")}</>
               ) : (
-                <>No return message from this agent</>
+                <>{t("No return message from this agent")}</>
               )}
             </div>
             {parentToolUseId && <LiveSubagentTranscript toolUseId={parentToolUseId} />}

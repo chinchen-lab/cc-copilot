@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Bot, ChevronRight, Clock, GitBranch, GitFork, MessagesSquare, Trees } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -54,10 +55,11 @@ function statusDot(session: SessionInfo, live: boolean): keyof typeof STATUS_DOT
  * it ended badly, which is the case worth scanning a long list for.
  */
 function StatusBadge({ session, live }: { session: SessionInfo; live: boolean }) {
+  const { t } = useTranslation()
   if (session.agentStatus === "deferred") {
     return (
       <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
-        Needs review
+        {t("Needs review")}
       </Badge>
     )
   }
@@ -117,6 +119,7 @@ interface SessionListRowProps {
 }
 
 export function SessionListRow({ session, customName, onSelect }: SessionListRowProps) {
+  const { t } = useTranslation()
   const lastActivity = session.lastActivityAt || session.lastModified
   const live = isRecentlyActive(lastActivity)
   const dot = statusDot(session, live)
@@ -159,9 +162,9 @@ export function SessionListRow({ session, customName, onSelect }: SessionListRow
               </Badge>
             )}
             {session.branchedFrom && (
-              <Badge variant="outline" className="shrink-0" title="Branched from another session">
+              <Badge variant="outline" className="shrink-0" title={t("Branched from another session")}>
                 <GitFork data-icon="inline-start" />
-                branch
+                {t("branch")}
               </Badge>
             )}
 
@@ -184,11 +187,11 @@ export function SessionListRow({ session, customName, onSelect }: SessionListRow
             {session.model && <Badge variant="outline">{shortenModel(session.model)}</Badge>}
             {turnCount > 0 && (
               <MetaItem icon={MessagesSquare}>
-                {turnCount} {turnCount === 1 ? "turn" : "turns"}
+                {turnCount} {turnCount === 1 ? t("turn") : t("turns")}
               </MetaItem>
             )}
             {span && (
-              <MetaItem icon={Clock} title="First prompt to last activity">
+              <MetaItem icon={Clock} title={t("First prompt to last activity")}>
                 {span}
               </MetaItem>
             )}
@@ -204,7 +207,7 @@ export function SessionListRow({ session, customName, onSelect }: SessionListRow
 
       <span className="flex shrink-0 items-center gap-2 pt-1.5">
         {session.matchedPullRequestNumber ? (
-          <Badge variant="outline">Matched #{session.matchedPullRequestNumber}</Badge>
+          <Badge variant="outline">{t("Matched #")}{session.matchedPullRequestNumber}</Badge>
         ) : (
           <PullRequestChips pullRequests={session.pullRequests} max={2} compact />
         )}

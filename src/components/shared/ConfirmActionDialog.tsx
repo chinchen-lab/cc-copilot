@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, type ReactElement, type ReactNode } from "react"
 import { Loader2 } from "lucide-react"
 import {
@@ -41,6 +42,7 @@ export function ConfirmActionDialog({
   destructive = false,
   onConfirm,
 }: ConfirmActionDialogProps) {
+  const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -70,7 +72,7 @@ export function ConfirmActionDialog({
         </AlertDialogHeader>
         {error && <FieldError className="text-center">{error}</FieldError>}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
           <AlertDialogAction
             variant={destructive ? "destructive" : "default"}
             disabled={busy}

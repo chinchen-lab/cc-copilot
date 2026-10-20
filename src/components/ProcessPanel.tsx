@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useEffect, useRef, useCallback, memo, lazy, Suspense } from "react"
 import { stripAnsi } from "@/lib/ansi"
 import { openSessionStream } from "@/lib/sessionStream"
@@ -28,6 +29,7 @@ function ProcessOutput({
 }: {
   process: ProcessEntry
 }) {
+  const { t } = useTranslation()
   const [output, setOutput] = useState("")
   const [connected, setConnected] = useState(false)
   const outputRef = useRef<HTMLPreElement>(null)
@@ -77,7 +79,7 @@ function ProcessOutput({
     >
       {output || (
         <span className="text-muted-foreground">
-          {connected ? "Waiting for output..." : "Connecting..."}
+          {connected ? t("Waiting for output...") : t("Connecting...")}
         </span>
       )}
     </pre>
@@ -97,6 +99,7 @@ function ProcessTab({
   onClose: () => void
   mobile: boolean
 }) {
+  const { t } = useTranslation()
   return (
     <div
       title={process.source ?? process.name}
@@ -134,8 +137,8 @@ function ProcessTab({
         type="button"
         variant="ghost"
         size="icon-xs"
-        aria-label={`Close ${process.name}`}
-        title={`Close ${process.name}`}
+        aria-label={t("Close {0}", { "0": process.name })}
+        title={t("Close {0}", { "0": process.name })}
         onClick={onClose}
         className="mr-0.5 text-muted-foreground"
       >
@@ -191,6 +194,7 @@ export const ProcessPanel = memo(function ProcessPanel({
   onProcessStarted,
   mobile = false,
 }: ProcessPanelProps) {
+  const { t } = useTranslation()
   const pty = usePty()
   const [height, setHeight] = useState(loadHeight)
   const dragRef = useRef<{ startY: number; startH: number } | null>(null)
@@ -240,7 +244,7 @@ export const ProcessPanel = memo(function ProcessPanel({
       onValueChange={(value) => {
         if (typeof value === "string") onSetActive(value)
       }}
-      className="shrink-0 gap-0 border-t bg-background"
+      className="terminal-panel shrink-0 gap-0 border-t bg-background"
     >
       {!mobile && !collapsed && activeProcess && (
         <div
@@ -262,7 +266,7 @@ export const ProcessPanel = memo(function ProcessPanel({
           size="sm"
           className="h-7 px-2"
           onClick={onToggleCollapse}
-          aria-label={collapsed ? "Expand terminal panel" : "Collapse terminal panel"}
+          aria-label={collapsed ? t("Expand terminal panel") : t("Collapse terminal panel")}
           aria-expanded={!collapsed}
         >
           {collapsed ? (
@@ -270,12 +274,12 @@ export const ProcessPanel = memo(function ProcessPanel({
           ) : (
             <ChevronDown data-icon="inline-start" />
           )}
-          <span className={cn(mobile && "sr-only")}>Terminal</span>
+          <span className={cn(mobile && "sr-only")}>{t("Terminal")}</span>
         </Button>
 
         <TabsList
           variant="default"
-          aria-label="Open processes"
+          aria-label={t("Open processes")}
           className={cn(
             "min-w-0 flex-1 justify-start overflow-x-auto no-scrollbar",
             !mobile && "ml-2",
@@ -300,8 +304,8 @@ export const ProcessPanel = memo(function ProcessPanel({
             size="icon-sm"
             disabled={!projectDir}
             onClick={onRequestTerminal}
-            aria-label="New terminal"
-            title={projectDir ? "New terminal" : "Open a project to start a terminal"}
+            aria-label={t("New terminal")}
+            title={projectDir ? t("New terminal") : t("Open a project to start a terminal")}
           >
             <Plus />
           </Button>
@@ -334,7 +338,7 @@ export const ProcessPanel = memo(function ProcessPanel({
                     <Suspense
                       fallback={(
                         <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
-                          Loading terminal…
+                          {t("Loading terminal…")}
                         </div>
                       )}
                     >
@@ -356,16 +360,16 @@ export const ProcessPanel = memo(function ProcessPanel({
                     <EmptyMedia variant="icon">
                       <TerminalSquare />
                     </EmptyMedia>
-                    <EmptyTitle>No terminal open</EmptyTitle>
+                    <EmptyTitle>{t("No terminal open")}</EmptyTitle>
                     <EmptyDescription>
-                      Start a terminal here or run a project script from the left.
+                      {t("Start a terminal here or run a project script from the left.")}
                     </EmptyDescription>
                   </EmptyHeader>
                   {onRequestTerminal && projectDir && (
                     <EmptyContent>
                       <Button type="button" size="sm" onClick={onRequestTerminal}>
                         <Plus data-icon="inline-start" />
-                        New terminal
+                        {t("New terminal")}
                       </Button>
                     </EmptyContent>
                   )}

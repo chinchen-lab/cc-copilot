@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import type { ComponentProps, ComponentType, ReactNode } from "react"
 import { Radio } from "@base-ui/react/radio"
 import { RadioGroup } from "@base-ui/react/radio-group"
@@ -97,6 +98,7 @@ interface PickerOptionProps {
 }
 
 export function PickerOption({ value, title, description, icon: Icon, disabled }: PickerOptionProps) {
+  const { t } = useTranslation()
   return (
     <Radio.Root
       value={value}
@@ -110,7 +112,7 @@ export function PickerOption({ value, title, description, icon: Icon, disabled }
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate leading-5 group-data-checked/option:font-medium">{title}</span>
         {description && (
-          <span className="truncate text-xs leading-4 text-muted-foreground" title={description}>{description}</span>
+          <span className="truncate text-xs leading-4 text-muted-foreground" title={t(description)}>{t(description)}</span>
         )}
       </span>
       <Radio.Indicator

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { RotateCcw, GitFork, Copy } from "lucide-react"
 import type { Branch } from "../../shared/session/types"
 import {
@@ -26,6 +27,7 @@ export function TurnContextMenu({
   onOpenBranches,
   onBranchFromHere,
 }: TurnContextMenuProps) {
+  const { t } = useTranslation()
   return (
     <ContextMenu>
       {/* Overrides the trigger's default select-none: transcript text must stay copyable. */}
@@ -34,7 +36,7 @@ export function TurnContextMenu({
         <ContextMenuGroup>
           <ContextMenuItem onClick={() => onRestoreToHere(turnIndex)}>
             <RotateCcw data-icon="inline-start" />
-            Restore to this point
+            {t("Restore to this point")}
           </ContextMenuItem>
         </ContextMenuGroup>
         {branches.length > 0 && (
@@ -43,7 +45,7 @@ export function TurnContextMenu({
             <ContextMenuGroup>
               <ContextMenuItem onClick={() => onOpenBranches(turnIndex)}>
                 <GitFork data-icon="inline-start" />
-                View branches ({branches.length})
+                {t("View branches (")}{branches.length})
               </ContextMenuItem>
             </ContextMenuGroup>
           </>
@@ -54,7 +56,7 @@ export function TurnContextMenu({
             <ContextMenuGroup>
               <ContextMenuItem onClick={() => onBranchFromHere(turnIndex)}>
                 <Copy data-icon="inline-start" />
-                Duplicate from here
+                {t("Duplicate from here")}
               </ContextMenuItem>
             </ContextMenuGroup>
           </>

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { AtSign, MessageSquare, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -18,6 +19,7 @@ const NO_KINDS: ReadonlyMap<string, AgentKind> = new Map()
 
 /** `kinds` names each member's agent, for its provider mark. */
 export function CrewChat({ rootId, kinds = NO_KINDS, active = true }: { rootId: string; kinds?: ReadonlyMap<string, AgentKind>; active?: boolean }) {
+  const { t } = useTranslation()
   const { isComposingEvent, onCompositionStart, onCompositionEnd } = useImeComposition()
   const chat = useCrewChat(rootId)
   const [draft, setDraft] = useState("")
@@ -39,43 +41,43 @@ export function CrewChat({ rootId, kinds = NO_KINDS, active = true }: { rootId: 
   }
 
   return (
-    <section aria-label="Crew chat" className="flex h-full min-h-0 flex-col">
+    <section aria-label={t("Crew chat")} className="flex h-full min-h-0 flex-col">
       <details className="shrink-0 border-b px-3 py-2">
         <summary className="cursor-pointer text-xs text-muted-foreground">
-          {chat.page ? `${members.filter((member) => member.listening).length} listening · Members & mentions` : "Loading chat…"}
+          {chat.page ? t("{0} listening · Members & mentions", { "0": members.filter((member) => member.listening).length }) : t("Loading chat…")}
         </summary>
         <FieldGroup className="max-h-48 gap-2 overflow-y-auto py-2">
           {members.map((member) => (
             <Field key={member.sessionId} orientation="horizontal" className="items-center gap-2">
               <CrewAvatar role={member.sessionId === rootId ? "lead" : "agent"} sessionId={member.sessionId} kinds={kinds} tints={tints} className="size-5" />
-              <FieldLabel className="min-w-0 flex-1 items-baseline gap-1.5" htmlFor={`listen-${member.sessionId}`} aria-label={`Listen for ${member.name}`}>
+              <FieldLabel className="min-w-0 flex-1 items-baseline gap-1.5" htmlFor={`listen-${member.sessionId}`} aria-label={t("Listen for {0}", { "0": member.name })}>
                 <span className="truncate">{member.name}</span>
                 <span className="truncate text-xs font-normal text-muted-foreground">@{member.handle}</span>
               </FieldLabel>
-              <Button variant="ghost" size="icon-xs" disabled={!chat.page?.canPost || !member.canInteract} onClick={() => setDraft((current) => `${current}${current && !/\s$/.test(current) ? " " : ""}@${member.handle} `)} aria-label={`Mention ${member.name}`} title={`Mention @${member.handle}`} className="text-muted-foreground">
+              <Button variant="ghost" size="icon-xs" disabled={!chat.page?.canPost || !member.canInteract} onClick={() => setDraft((current) => `${current}${current && !/\s$/.test(current) ? " " : ""}@${member.handle} `)} aria-label={t("Mention {0}", { "0": member.name })} title={t("Mention @{0}", { "0": member.handle })} className="text-muted-foreground">
                 <AtSign data-icon="inline-start" />
               </Button>
               <Switch id={`listen-${member.sessionId}`} size="sm" checked={member.listening} disabled={!member.canInteract || chat.busyMembers.has(member.sessionId)} onCheckedChange={(value) => void chat.setListening(member.sessionId, value)} />
             </Field>
           ))}
         </FieldGroup>
-        <p className="pb-1 text-xs text-muted-foreground">Listening sends short notices while an agent works. @mentions send the full message, even when listening is off.</p>
+        <p className="pb-1 text-xs text-muted-foreground">{t("Listening sends short notices while an agent works. @mentions send the full message, even when listening is off.")}</p>
       </details>
       <ScrollArea className="min-h-0 flex-1" onScrollCapture={(event) => {
         const viewport = event.target as HTMLElement
         follow.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 80
       }}>
-        {chat.hasOlder && <div className="flex justify-center py-2"><Button variant="ghost" size="xs" disabled={chat.loadingOlder} onClick={() => void chat.older()}>{chat.loadingOlder ? "Loading…" : "Load earlier messages"}</Button></div>}
+        {chat.hasOlder && <div className="flex justify-center py-2"><Button variant="ghost" size="xs" disabled={chat.loadingOlder} onClick={() => void chat.older()}>{chat.loadingOlder ? t("Loading…") : t("Load earlier messages")}</Button></div>}
         {chat.page && chat.messages.length === 0 && (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon"><MessageSquare /></EmptyMedia>
-              <EmptyTitle>Talk to the crew</EmptyTitle>
-              <EmptyDescription>Share a discovery, ask a question, or tag someone for their input.</EmptyDescription>
+              <EmptyTitle>{t("Talk to the crew")}</EmptyTitle>
+              <EmptyDescription>{t("Share a discovery, ask a question, or tag someone for their input.")}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}
-        <div role="log" aria-label="Shared messages" aria-live="polite" aria-relevant="additions" className="flex flex-col gap-4 px-3 py-3">
+        <div role="log" aria-label={t("Shared messages")} aria-live="polite" aria-relevant="additions" className="flex flex-col gap-4 px-3 py-3">
           {runs.map((run) => (
             <Fragment key={run.messages[0]!.sequence}>
               {run.day !== undefined && <CrewChatDay day={run.day} />}
@@ -88,16 +90,16 @@ export function CrewChat({ rootId, kinds = NO_KINDS, active = true }: { rootId: 
       <form className="shrink-0 border-t p-3" onSubmit={(event) => { event.preventDefault(); void send() }}>
         <FieldGroup className="gap-2">
           <Field data-invalid={Boolean(chat.error)}>
-            <FieldLabel htmlFor={`crew-chat-${rootId}`} className="sr-only">Message the crew</FieldLabel>
-            <Textarea id={`crew-chat-${rootId}`} value={draft} rows={3} maxLength={CREW_CHAT_MAX_LENGTH} placeholder="Message the crew… use @ to tag an agent" disabled={!chat.page?.canPost} aria-invalid={Boolean(chat.error)} onChange={(event) => setDraft(event.target.value)} onCompositionStart={onCompositionStart} onCompositionEnd={onCompositionEnd} onKeyDown={(event) => {
+            <FieldLabel htmlFor={`crew-chat-${rootId}`} className="sr-only">{t("Message the crew")}</FieldLabel>
+            <Textarea id={`crew-chat-${rootId}`} value={draft} rows={3} maxLength={CREW_CHAT_MAX_LENGTH} placeholder={t("Message the crew… use @ to tag an agent")} disabled={!chat.page?.canPost} aria-invalid={Boolean(chat.error)} onChange={(event) => setDraft(event.target.value)} onCompositionStart={onCompositionStart} onCompositionEnd={onCompositionEnd} onKeyDown={(event) => {
               if (isComposingEvent(event)) return
               if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void send() }
             }} />
             {chat.error && <p role="alert" className="text-xs text-destructive">{chat.error}</p>}
           </Field>
           <div className="flex items-center gap-2">
-            <FieldDescription className="flex-1">{chat.page?.canPost === false ? "You have read access to this crew." : "⌘ / Ctrl + Enter to send"}</FieldDescription>
-            <Button type="submit" size="sm" disabled={!chat.page?.canPost || !draft.trim() || chat.posting}><Send data-icon="inline-start" />{chat.posting ? "Sending…" : "Send"}</Button>
+            <FieldDescription className="flex-1">{chat.page?.canPost === false ? t("You have read access to this crew.") : t("⌘ / Ctrl + Enter to send")}</FieldDescription>
+            <Button type="submit" size="sm" disabled={!chat.page?.canPost || !draft.trim() || chat.posting}><Send data-icon="inline-start" />{chat.posting ? t("Sending…") : t("Send")}</Button>
           </div>
         </FieldGroup>
       </form>

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,6 +20,7 @@ export function FullTurnCard({
   branchId: string
   onRedoToHere?: (branchId: string, archiveTurnIndex: number) => void
 }) {
+  const { t } = useTranslation()
   const userText = typeof turn.userMessage === "string"
     ? turn.userMessage
     : Array.isArray(turn.userMessage)
@@ -28,19 +30,19 @@ export function FullTurnCard({
   return (
     <Card size="sm" className="motion-list-item gap-0 py-0">
       <CardHeader className="border-b py-2">
-        <CardTitle>Turn {archiveIndex + 1}</CardTitle>
+        <CardTitle>{t("Turn ")}{archiveIndex + 1}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 py-3">
         {userText && (
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-3">
-            <span className="text-xs font-medium text-muted-foreground">You</span>
+            <span className="text-xs font-medium text-muted-foreground">{t("You")}</span>
             <div className="text-sm text-foreground">{userText}</div>
           </div>
         )}
 
         {turn.thinking.length > 0 && (
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-3">
-            <span className="text-xs font-medium text-muted-foreground">Thinking</span>
+            <span className="text-xs font-medium text-muted-foreground">{t("Thinking")}</span>
             <div className="text-xs text-muted-foreground italic">
               {turn.thinking[0].thinking.slice(0, 300)}
               {turn.thinking[0].thinking.length > 300 ? "..." : ""}
@@ -50,7 +52,7 @@ export function FullTurnCard({
 
         {turn.assistantText.length > 0 && (
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-3">
-            <span className="text-xs font-medium text-success">Assistant</span>
+            <span className="text-xs font-medium text-success">{t("Assistant")}</span>
             <div className="text-sm text-muted-foreground">
               {turn.assistantText.join("\n")}
             </div>
@@ -59,7 +61,7 @@ export function FullTurnCard({
 
         {turn.toolCalls.length > 0 && (
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-3">
-            <span className="text-xs font-medium text-muted-foreground">Tools</span>
+            <span className="text-xs font-medium text-muted-foreground">{t("Tools")}</span>
             <div className="flex flex-wrap gap-x-2 gap-y-1">
               {turn.toolCalls.map((tc) => {
                 const presentation = getToolPresentation(tc)
@@ -89,7 +91,7 @@ export function FullTurnCard({
             onClick={() => onRedoToHere(branchId, archiveIndex)}
           >
             <RotateCcw data-icon="inline-start" className="scale-x-[-1]" />
-            Redo to here
+            {t("Redo to here")}
           </Button>
         </CardFooter>
       )}
@@ -110,21 +112,22 @@ export function ArchivedTurnCard({
   branchId: string
   onRedoToHere: (branchId: string, archiveTurnIndex: number) => void
 }) {
+  const { t } = useTranslation()
   return (
     <Card size="sm" className="motion-list-item gap-0 py-0">
       <CardHeader className="border-b py-2">
-        <CardTitle>Turn {archiveIndex + 1}</CardTitle>
+        <CardTitle>{t("Turn ")}{archiveIndex + 1}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 py-3">
         {turn.userMessage && (
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-3">
-            <span className="text-xs font-medium text-muted-foreground">You</span>
+            <span className="text-xs font-medium text-muted-foreground">{t("You")}</span>
             <div className="text-sm text-foreground">{turn.userMessage}</div>
           </div>
         )}
         {turn.thinkingBlocks.length > 0 && (
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-3">
-            <span className="text-xs font-medium text-muted-foreground">Thinking</span>
+            <span className="text-xs font-medium text-muted-foreground">{t("Thinking")}</span>
             <div className="text-xs text-muted-foreground italic">
               {turn.thinkingBlocks[0].slice(0, 300)}...
             </div>
@@ -132,13 +135,13 @@ export function ArchivedTurnCard({
         )}
         {turn.assistantText.length > 0 && (
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-3">
-            <span className="text-xs font-medium text-success">Assistant</span>
+            <span className="text-xs font-medium text-success">{t("Assistant")}</span>
             <div className="text-sm text-muted-foreground">{turn.assistantText.join("\n")}</div>
           </div>
         )}
         {turn.toolCalls.length > 0 && (
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-3">
-            <span className="text-xs font-medium text-muted-foreground">Tools</span>
+            <span className="text-xs font-medium text-muted-foreground">{t("Tools")}</span>
             <div className="flex flex-wrap gap-x-2 gap-y-1">
               {turn.toolCalls.map((tc, i) => (
                 <span
@@ -159,7 +162,7 @@ export function ArchivedTurnCard({
           onClick={() => onRedoToHere(branchId, archiveIndex)}
         >
           <RotateCcw data-icon="inline-start" className="scale-x-[-1]" />
-          Redo to here
+          {t("Redo to here")}
         </Button>
       </CardFooter>
     </Card>

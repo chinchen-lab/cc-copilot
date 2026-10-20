@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useRef } from "react"
 import { File, Loader2 } from "lucide-react"
 import {
@@ -24,6 +25,7 @@ export function FileSuggestions({
   onSelect,
   onHover,
 }: FileSuggestionsProps) {
+  const { t } = useTranslation()
   const itemRefs = useRef<Map<number, HTMLElement>>(new Map())
 
   useEffect(() => {
@@ -46,14 +48,13 @@ export function FileSuggestions({
           <CommandGroup
             heading={(
               <span className="flex items-center justify-between">
-                Project files
-                {loading && <Loader2 data-icon="inline-end" aria-label="Loading project files" className="size-3.5 animate-spin" />}
+                {t("Project files")}{loading && <Loader2 data-icon="inline-end" aria-label={t("Loading project files")} className="size-3.5 animate-spin" />}
               </span>
             )}
           >
             {!loading && files.length === 0 ? (
               <p className="px-2 py-3 text-xs text-muted-foreground">
-                {query ? `No files matching “${query}”` : "No project files found"}
+                {query ? t("No files matching “{0}”", { "0": query }) : t("No project files found")}
               </p>
             ) : (
               files.map((path, index) => (

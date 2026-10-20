@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useState } from "react"
 import { AlertCircle, Eye, EyeOff, Users } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -51,6 +52,7 @@ function loginErrorMessage(status: number, serverError: string | undefined): str
 }
 
 export function SharedLoginScreen({ sessionId, onAuthenticated }: SharedLoginScreenProps) {
+  const { t } = useTranslation()
   const [passphrase, setPassphrase] = useState("")
   const [showPassphrase, setShowPassphrase] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -97,16 +99,16 @@ export function SharedLoginScreen({ sessionId, onAuthenticated }: SharedLoginScr
             <div className="mb-2 flex size-9 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
               <Users className="size-4" />
             </div>
-            <CardTitle>Join this session</CardTitle>
+            <CardTitle>{t("Join this session")}</CardTitle>
             <CardDescription>
-              Enter the passphrase you were given to join the shared session.
+              {t("Enter the passphrase you were given to join the shared session.")}
             </CardDescription>
           </CardHeader>
 
           <CardContent className="flex flex-col gap-4">
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="share-passphrase">Passphrase</FieldLabel>
+                <FieldLabel htmlFor="share-passphrase">{t("Passphrase")}</FieldLabel>
                 <InputGroup>
                   <InputGroupInput
                     id="share-passphrase"
@@ -121,7 +123,7 @@ export function SharedLoginScreen({ sessionId, onAuthenticated }: SharedLoginScr
                     <InputGroupButton
                       size="icon-xs"
                       onClick={() => setShowPassphrase((visible) => !visible)}
-                      aria-label={showPassphrase ? "Hide passphrase" : "Show passphrase"}
+                      aria-label={showPassphrase ? t("Hide passphrase") : t("Show passphrase")}
                     >
                       {showPassphrase ? <EyeOff /> : <Eye />}
                     </InputGroupButton>
@@ -133,7 +135,7 @@ export function SharedLoginScreen({ sessionId, onAuthenticated }: SharedLoginScr
             {error && (
               <Alert variant="destructive">
                 <AlertCircle aria-hidden="true" />
-                <AlertTitle>Could not join</AlertTitle>
+                <AlertTitle>{t("Could not join")}</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
@@ -142,7 +144,7 @@ export function SharedLoginScreen({ sessionId, onAuthenticated }: SharedLoginScr
           <CardFooter>
             <Button type="submit" className="w-full" disabled={loading || !passphrase.trim()}>
               {loading && <Spinner data-icon="inline-start" />}
-              Connect
+              {t("Connect")}
             </Button>
           </CardFooter>
         </Card>

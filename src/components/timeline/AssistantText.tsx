@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useMemo } from "react"
 import { Check, Copy } from "lucide-react"
 import ReactMarkdown from "react-markdown"
@@ -28,6 +29,7 @@ export const AssistantText = memo(function AssistantText({
   messageKey,
   compact = false,
 }: AssistantTextProps) {
+  const { t } = useTranslation()
   const markdownText = useMemo(() => preprocessMediaPaths(text), [text])
   const blockScope = useMemo(() => ({ messageKey: messageKey ?? timestamp ?? `${text.length}:${text.slice(0, 64)}` }), [messageKey, timestamp, text])
   const [copied, copy] = useCopyWithFeedback()
@@ -58,8 +60,8 @@ export const AssistantText = memo(function AssistantText({
           size="icon-sm"
           className="opacity-60 transition-opacity hover:opacity-100 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
           onClick={() => copy(text)}
-          aria-label={copied ? "Response copied" : "Copy response"}
-          title={copied ? "Copied" : "Copy response"}
+          aria-label={copied ? t("Response copied") : t("Copy response")}
+          title={copied ? t("Copied") : t("Copy response")}
         >
           {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
         </Button>

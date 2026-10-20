@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Check, Copy, RefreshCw } from "lucide-react"
 
@@ -58,14 +59,15 @@ function formatBytesPerSecond(value: number): string | null {
 }
 
 function SystemProcessRow({ metric, onKill }: { metric: SystemProcessMetric; onKill?: (pid: number) => void }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-start gap-3 py-2.5">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="truncate text-sm font-medium">{metric.label}</span>
           <Badge variant="outline">PID {metric.pid}</Badge>
-          {metric.suspectedLeak && <Badge variant="destructive">possible leak</Badge>}
-          {metric.orphaned && !metric.suspectedLeak && <Badge variant="secondary">orphaned</Badge>}
+          {metric.suspectedLeak && <Badge variant="destructive">{t("possible leak")}</Badge>}
+          {metric.orphaned && !metric.suspectedLeak && <Badge variant="secondary">{t("orphaned")}</Badge>}
         </div>
         <p className="mt-1 truncate font-mono text-xs text-muted-foreground" title={metric.command}>
           {metric.command}
@@ -78,7 +80,7 @@ function SystemProcessRow({ metric, onKill }: { metric: SystemProcessMetric; onK
           className="shrink-0"
           onClick={() => onKill(metric.pid)}
         >
-          Kill
+          {t("Kill")}
         </Button>
       )}
       <div className="shrink-0 text-right">
@@ -125,6 +127,7 @@ function diagnosis(totalCpu: number, hottest?: ElectronProcessMetric, systemLeak
 }
 
 function ProcessRow({ metric }: { metric: ElectronProcessMetric }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-start gap-3 py-2.5">
       <div className="min-w-0 flex-1">
@@ -144,7 +147,7 @@ function ProcessRow({ metric }: { metric: ElectronProcessMetric }) {
         <div className="text-xs text-muted-foreground">{formatMemory(metric.memoryMb)}</div>
         {metric.idleWakeupsPerSecond !== undefined && metric.idleWakeupsPerSecond > 0 && (
           <div className="text-xs text-muted-foreground">
-            {metric.idleWakeupsPerSecond.toFixed(0)} wakeups/s
+            {metric.idleWakeupsPerSecond.toFixed(0)} {t(" wakeups/s")}
           </div>
         )}
       </div>
@@ -153,6 +156,7 @@ function ProcessRow({ metric }: { metric: ElectronProcessMetric }) {
 }
 
 function ActivityRows({ metrics, emptyLabel }: { metrics: ActivityMetric[]; emptyLabel: string }) {
+  const { t } = useTranslation()
   const visible = metrics.slice(0, 8)
   if (visible.length === 0) {
     return <p className="py-3 text-sm text-muted-foreground">{emptyLabel}</p>
@@ -170,12 +174,12 @@ function ActivityRows({ metrics, emptyLabel }: { metrics: ActivityMetric[]; empt
               <span>{formatRate(metric.ratePerSecond)}</span>
               {bytes && <span>{bytes}</span>}
               {metric.averageDurationMs !== undefined && (
-                <span>{metric.averageDurationMs.toFixed(0)} ms avg</span>
+                <span>{metric.averageDurationMs.toFixed(0)} {t(" ms avg")}</span>
               )}
             </div>
           </div>
           {metric.active !== undefined && metric.active > 0 && (
-            <Badge variant="secondary">{metric.active} open</Badge>
+            <Badge variant="secondary">{metric.active} {t(" open")}</Badge>
           )}
         </div>
       </div>
@@ -184,15 +188,16 @@ function ActivityRows({ metrics, emptyLabel }: { metrics: ActivityMetric[]; empt
 }
 
 function CpuHistory({ values }: { values: number[] }) {
+  const { t } = useTranslation()
   const ceiling = Math.max(100, ...values)
   return (
     <div
       className="flex h-14 items-end gap-1 rounded-md bg-muted/50 p-2"
       role="img"
-      aria-label={`Recent Cogpit CPU: ${values.map((value) => formatCpu(value)).join(", ")}`}
+      aria-label={t("Recent Cogpit CPU: {0}", { "0": values.map((value) => formatCpu(value)).join(", ") })}
     >
       {values.length === 0 ? (
-        <span className="self-center text-xs text-muted-foreground">Collecting samples…</span>
+        <span className="self-center text-xs text-muted-foreground">{t("Collecting samples…")}</span>
       ) : values.map((value, index) => (
         <div
           // Sampling order is stable and samples have no separate identity.
@@ -215,6 +220,7 @@ interface PowerMonitorProps {
 }
 
 export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
+  const { t } = useTranslation()
   const [electronSnapshot, setElectronSnapshot] = useState<ElectronPerformanceSnapshot | null>(null)
   const [serverSnapshot, setServerSnapshot] = useState<ServerPerformanceSnapshot | null>(null)
   const [history, setHistory] = useState<number[]>([])
@@ -301,21 +307,21 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
           <div className="flex items-start gap-3 pr-8">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <DialogTitle>Power & activity monitor</DialogTitle>
+                <DialogTitle>{t("Power & activity monitor")}</DialogTitle>
                 <Badge variant={status === "High" ? "destructive" : "secondary"}>{status}</Badge>
               </div>
               <DialogDescription className="mt-1">
-                Live CPU, memory, and wakeups. Sampling runs only while this window is open.
+                {t("Live CPU, memory, and wakeups. Sampling runs only while this window is open.")}
               </DialogDescription>
             </div>
             <div className="flex shrink-0 gap-1">
               <Button variant="outline" size="sm" onClick={() => void refresh()} disabled={refreshing}>
                 <RefreshCw data-icon="inline-start" className={cn(refreshing && "animate-spin")} />
-                Refresh
+                {t("Refresh")}
               </Button>
               <Button variant="outline" size="sm" onClick={handleCopy} disabled={!serverSnapshot && !electronSnapshot}>
                 {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
-                {copied ? "Copied" : "Copy data"}
+                {copied ? t("Copied") : t("Copy data")}
               </Button>
             </div>
           </div>
@@ -333,7 +339,7 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
 
             <Card size="sm">
               <CardHeader>
-                <CardTitle>Current load</CardTitle>
+                <CardTitle>{t("Current load")}</CardTitle>
                 <CardDescription>{diagnosis(totalCpu, hottest, systemLeaks)}</CardDescription>
                 <CardAction>
                   <span className={cn(
@@ -351,8 +357,8 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
 
             <Card size="sm">
               <CardHeader>
-                <CardTitle>Processes</CardTitle>
-                <CardDescription>Which part of Cogpit is consuming CPU and memory.</CardDescription>
+                <CardTitle>{t("Processes")}</CardTitle>
+                <CardDescription>{t("Which part of Cogpit is consuming CPU and memory.")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {processes.length > 0 ? processes.map((metric, index) => (
@@ -369,7 +375,7 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
                     memoryMb: serverSnapshot.memory.rssMb,
                   }} />
                 ) : (
-                  <p className="py-3 text-sm text-muted-foreground">Collecting process data…</p>
+                  <p className="py-3 text-sm text-muted-foreground">{t("Collecting process data…")}</p>
                 )}
               </CardContent>
             </Card>
@@ -377,9 +383,9 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
             {systemProcesses.length > 0 && (
               <Card size="sm">
                 <CardHeader>
-                  <CardTitle>Agent processes</CardTitle>
+                  <CardTitle>{t("Agent processes")}</CardTitle>
                   <CardDescription>
-                    Claude sessions, browsers, and scripts running outside Cogpit.
+                    {t("Claude sessions, browsers, and scripts running outside Cogpit.")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -396,9 +402,9 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
             <div className="grid gap-4 md:grid-cols-2">
               <Card size="sm">
                 <CardHeader>
-                  <CardTitle>Server activity</CardTitle>
+                  <CardTitle>{t("Server activity")}</CardTitle>
                   <CardDescription>
-                    File checks, streams, and agent work over the last {serverSnapshot?.sampleWindowSeconds ?? 10} seconds.
+                    {t("File checks, streams, and agent work over the last ")}{serverSnapshot?.sampleWindowSeconds ?? 10} {t(" seconds.")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -411,8 +417,8 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
 
               <Card size="sm">
                 <CardHeader>
-                  <CardTitle>API activity</CardTitle>
-                  <CardDescription>Requests ranked by recent frequency and time.</CardDescription>
+                  <CardTitle>{t("API activity")}</CardTitle>
+                  <CardDescription>{t("Requests ranked by recent frequency and time.")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ActivityRows
@@ -425,7 +431,7 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
 
             {serverSnapshot && (
               <p className="text-xs text-muted-foreground">
-                Server event loop {formatCpu(serverSnapshot.eventLoopPercent)} · heap {formatMemory(serverSnapshot.memory.heapUsedMb)} · RSS {formatMemory(serverSnapshot.memory.rssMb)}
+                {t("Server event loop ")}{formatCpu(serverSnapshot.eventLoopPercent)} {t(" · heap ")}{formatMemory(serverSnapshot.memory.heapUsedMb)} {t(" · RSS ")}{formatMemory(serverSnapshot.memory.rssMb)}
               </p>
             )}
           </div>

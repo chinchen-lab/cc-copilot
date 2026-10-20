@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useMemo, useState } from "react"
 import {
   Check,
@@ -326,6 +327,7 @@ export function BashCommandCard({
   expandAll?: boolean
   isAgentActive?: boolean
 }): React.ReactElement {
+  const { t } = useTranslation()
   const call = useMemo(
     () => toCallView(toolCall, isAgentActive),
     [isAgentActive, toolCall],
@@ -337,7 +339,7 @@ export function BashCommandCard({
     <section className="min-w-0" aria-label={commandCount === 1 ? "Bash command" : "Bash commands"}>
       <div className="mb-1 flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-muted-foreground">
-          {commandCount === 1 ? "Command" : `${commandCount} commands`}
+          {commandCount === 1 ? t("Command") : `${commandCount} commands`}
         </span>
         <Button
           type="button"
@@ -345,12 +347,12 @@ export function BashCommandCard({
           size="icon-xs"
           onClick={() => copyCommands(call.command)}
           aria-label={copied ? "Commands copied" : commandCount === 1 ? "Copy command" : "Copy commands"}
-          title={copied ? "Copied" : commandCount === 1 ? "Copy command" : "Copy commands"}
+          title={copied ? t("Copied") : commandCount === 1 ? "Copy command" : "Copy commands"}
         >
           {copied ? <Check data-icon="inline-start" aria-hidden="true" /> : <Copy data-icon="inline-start" aria-hidden="true" />}
         </Button>
       </div>
-      <div className="flex min-w-0 flex-col gap-2" aria-label="Command sections">
+      <div className="flex min-w-0 flex-col gap-2" aria-label={t("Command sections")}>
         {call.options.length > 0 && (
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 py-1 text-xs text-muted-foreground [overflow-wrap:anywhere]">
             {call.options.map((option) => <span key={option}>{option}</span>)}

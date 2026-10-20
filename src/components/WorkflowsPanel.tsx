@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Workflow as WorkflowIcon, RefreshCw, ChevronLeft } from "lucide-react"
 import {
@@ -53,6 +54,7 @@ export function WorkflowsPanel({
   canStop,
   onRefetchList,
 }: WorkflowsPanelProps) {
+  const { t } = useTranslation()
   const [preferredRunId, setPreferredRunId] = useState<string | null>(null)
   const [showRunList, setShowRunList] = useState(false)
   const [detail, setDetail] = useState<WorkflowDetail | null>(null)
@@ -150,26 +152,25 @@ export function WorkflowsPanel({
           <div className="flex items-center justify-between gap-3 pr-9">
             <SheetTitle className="flex items-center gap-2">
               <WorkflowIcon className="size-4" />
-              Workflows
-              {workflows.length > 0 && (
+              {t("Workflows")}{workflows.length > 0 && (
                 <Badge variant="secondary">{workflows.length}</Badge>
               )}
               {isLive && (
                 <Badge variant="outline" className="border-info/30 text-info">
                   <LiveIndicator className="size-1.5" />
-                  Live
+                  {t("Live")}
                 </Badge>
               )}
             </SheetTitle>
             <SheetDescription className="sr-only">
-              Inspect workflow runs, agent progress, and run controls for this session.
+              {t("Inspect workflow runs, agent progress, and run controls for this session.")}
             </SheetDescription>
             <Button
               variant="ghost"
               size="icon-sm"
               onClick={onRefetchList}
-              aria-label="Refresh workflows"
-              title="Refresh workflows"
+              aria-label={t("Refresh workflows")}
+              title={t("Refresh workflows")}
             >
               <RefreshCw data-icon="inline-start" />
             </Button>
@@ -182,9 +183,9 @@ export function WorkflowsPanel({
               <Empty className="min-h-[60dvh]">
                 <EmptyHeader>
                   <EmptyMedia variant="icon"><WorkflowIcon /></EmptyMedia>
-                  <EmptyTitle>No workflows in this session</EmptyTitle>
+                  <EmptyTitle>{t("No workflows in this session")}</EmptyTitle>
                   <EmptyDescription>
-                    Phases, agents, and their responses will appear here when this session starts a workflow.
+                    {t("Phases, agents, and their responses will appear here when this session starts a workflow.")}
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
@@ -200,7 +201,7 @@ export function WorkflowsPanel({
                         className="w-fit px-2 text-muted-foreground"
                       >
                         <ChevronLeft data-icon="inline-start" />
-                        All runs
+                        {t("All runs")}
                       </Button>
                     )}
                     {(!selectedRunId || !detail) &&
@@ -221,7 +222,7 @@ export function WorkflowsPanel({
                 {loadingDetail && !detail ? (
                   <div className="flex min-h-[50dvh] items-center justify-center gap-2 text-sm text-muted-foreground">
                     <Spinner />
-                    Loading workflow…
+                    {t("Loading workflow…")}
                   </div>
                 ) : detail ? (
                   <>
@@ -242,8 +243,8 @@ export function WorkflowsPanel({
                 ) : selected ? (
                   <Empty className="min-h-[50dvh]">
                     <EmptyHeader>
-                      <EmptyTitle>Could not load this workflow</EmptyTitle>
-                      <EmptyDescription>The journal may have moved or the run may no longer be available.</EmptyDescription>
+                      <EmptyTitle>{t("Could not load this workflow")}</EmptyTitle>
+                      <EmptyDescription>{t("The journal may have moved or the run may no longer be available.")}</EmptyDescription>
                     </EmptyHeader>
                   </Empty>
                 ) : null}
@@ -265,6 +266,7 @@ function WorkflowListRow({
   active: boolean
   onClick: () => void
 }) {
+  const { t } = useTranslation()
   const status = workflowStatusStyle(workflow.status)
   const done = workflow.agentCounts.done + workflow.agentCounts.error
   return (
@@ -281,12 +283,12 @@ function WorkflowListRow({
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium text-foreground">{workflow.workflowName}</span>
           <Badge variant="outline" className={status.badge}>
-            {status.label}
+            {t(status.label)}
           </Badge>
         </div>
         {workflow.summary && <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{workflow.summary}</p>}
         <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{done}/{workflow.agentCount} agents</span>
+          <span>{done}/{workflow.agentCount} {t(" agents")}</span>
           {workflow.startTime > 0 && <span>{formatRelativeTime(new Date(workflow.startTime).toISOString())}</span>}
         </div>
       </div>

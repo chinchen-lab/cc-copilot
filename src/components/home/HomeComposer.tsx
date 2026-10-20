@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useRef, useState, type FormEvent, type KeyboardEvent } from "react"
 import { FolderOpen, Send } from "lucide-react"
 import { ChatInputSettings } from "@/components/ChatInput/ChatInputSettings"
@@ -42,6 +43,7 @@ const MAX_CHIPS = 6
  * composer takes over from there.
  */
 export function HomeComposer({ recent, start }: { recent: readonly HomeProject[]; start: HomeStart }) {
+  const { t } = useTranslation()
   const { isComposingEvent, onCompositionStart, onCompositionEnd } = useImeComposition()
   const [picked, setPicked] = useState<HomeProject | null>(null)
   const [text, setText] = useState("")
@@ -75,8 +77,8 @@ export function HomeComposer({ recent, start }: { recent: readonly HomeProject[]
   }
 
   return (
-    <section aria-label="Start a session" className="flex min-w-0 flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Projects">
+    <section aria-label={t("Start a session")} className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t("Projects")}>
         {chips.map((candidate) => {
           const selected = project !== null && sameFolder(candidate, project)
           return (
@@ -105,7 +107,7 @@ export function HomeComposer({ recent, start }: { recent: readonly HomeProject[]
           <ExpandablePromptEditor value={text} onChange={setText} inputRef={inputRef} />
           <Textarea
             ref={inputRef}
-            aria-label="First message"
+            aria-label={t("First message")}
             value={text}
             onChange={(event) => {
               // Sessions reorder as they work, so the project selected when typing started is the one the message goes to.
@@ -115,7 +117,7 @@ export function HomeComposer({ recent, start }: { recent: readonly HomeProject[]
             onKeyDown={onKeyDown}
             onCompositionStart={onCompositionStart}
             onCompositionEnd={onCompositionEnd}
-            placeholder={project ? `Describe the task for ${project.name}` : "Pick a project, then describe the task"}
+            placeholder={project ? t("Describe the task for {0}", { "0": project.name }) : t("Pick a project, then describe the task")}
             rows={1}
             className="max-h-48 min-h-9 flex-1 resize-none rounded-none border-0 bg-transparent px-0 py-2 shadow-none focus-visible:border-transparent focus-visible:ring-0"
           />
@@ -131,7 +133,7 @@ export function HomeComposer({ recent, start }: { recent: readonly HomeProject[]
                 onEffortChange={start.model.onEffortChange}
               />
             )}
-            <Button type="submit" size="icon-xs" disabled={!canStart} aria-label="Start session" title="Start session (Enter)">
+            <Button type="submit" size="icon-xs" disabled={!canStart} aria-label={t("Start session")} title={t("Start session (Enter)")}>
               <Send data-icon="icon" />
             </Button>
           </div>
@@ -158,13 +160,14 @@ function ProjectPicker({
   onChooseFolder: (cwd: string) => void
   anyListed: boolean
 }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const projects = useProjectList(open)
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger render={<Button variant={anyListed ? "ghost" : "outline"} size="xs" className="rounded-full text-muted-foreground" />}>
         <FolderOpen data-icon="inline-start" />
-        {anyListed ? "Other project" : "Choose a project"}
+        {anyListed ? t("Other project") : t("Choose a project")}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-96 max-w-[calc(100vw-2rem)] p-0">
         <ProjectSwitcherList

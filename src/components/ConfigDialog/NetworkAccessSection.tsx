@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Eye, EyeOff, Wifi, WifiOff, Smartphone, Tablet, Monitor } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -49,12 +50,13 @@ function shareSummary(share: HostShare): string {
  * forgotten becomes visible again — which is the whole reason it exists.
  */
 function SharedSessionsList() {
+  const { t } = useTranslation()
   const { shares, revoke, revokeAll } = useShares()
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex h-6 items-center justify-between">
-        <p className="text-xs text-muted-foreground">Shared sessions</p>
+        <p className="text-xs text-muted-foreground">{t("Shared sessions")}</p>
         {shares.length > 0 && (
           <Button
             variant="ghost"
@@ -62,13 +64,13 @@ function SharedSessionsList() {
             className="text-destructive hover:text-destructive"
             onClick={() => void revokeAll()}
           >
-            Revoke all
+            {t("Revoke all")}
           </Button>
         )}
       </div>
 
       {shares.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No sessions are shared.</p>
+        <p className="text-xs text-muted-foreground">{t("No sessions are shared.")}</p>
       ) : (
         <div className="flex flex-col gap-1.5">
           {shares.map((share) => {
@@ -85,11 +87,11 @@ function SharedSessionsList() {
                 <Button
                   variant="ghost"
                   size="xs"
-                  aria-label={`Revoke share of ${label}`}
+                  aria-label={t("Revoke share of {0}", { "0": label })}
                   className="text-destructive hover:text-destructive"
                   onClick={() => void revoke(share.sessionId)}
                 >
-                  Revoke
+                  {t("Revoke")}
                 </Button>
               </div>
             )
@@ -125,6 +127,7 @@ export function NetworkAccessSection({
   connectedDevices,
   minPasswordLength,
 }: NetworkAccessSectionProps) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-4 border-t pt-5">
       <div className="flex items-center justify-between">
@@ -135,12 +138,12 @@ export function NetworkAccessSection({
             <WifiOff data-icon="inline-start" className="size-4 text-muted-foreground" />
           )}
           <div>
-            <p className="text-sm font-medium text-foreground">Network Access</p>
-            <p className="text-xs text-muted-foreground">Allow other devices to connect</p>
+            <p className="text-sm font-medium text-foreground">{t("Network Access")}</p>
+            <p className="text-xs text-muted-foreground">{t("Allow other devices to connect")}</p>
           </div>
         </div>
         <Switch
-          aria-label="Network Access"
+          aria-label={t("Network Access")}
           checked={networkAccess}
           onCheckedChange={(checked) => setNetworkAccess(checked)}
         />
@@ -148,11 +151,11 @@ export function NetworkAccessSection({
 
       {networkAccess && (
         <Field data-invalid={networkPassword.length > 0 && networkPassword.length < minPasswordLength}>
-          <FieldLabel htmlFor="network-password">Password</FieldLabel>
+          <FieldLabel htmlFor="network-password">{t("Password")}</FieldLabel>
           <FieldDescription>
             {hasExistingPassword && networkPassword.length === 0
-              ? "A password is already set. Leave blank to keep it."
-              : `Use at least ${minPasswordLength} characters.`}
+              ? t("A password is already set. Leave blank to keep it.")
+              : t("Use at least {0} characters.", { "0": minPasswordLength })}
           </FieldDescription>
           <InputGroup>
             <InputGroupInput
@@ -160,12 +163,12 @@ export function NetworkAccessSection({
               type={showNetworkPassword ? "text" : "password"}
               value={networkPassword}
               onChange={(e) => setNetworkPassword(e.target.value)}
-              placeholder={hasExistingPassword ? "Enter new password to change" : "Set a password for remote access"}
+              placeholder={hasExistingPassword ? t("Enter new password to change") : t("Set a password for remote access")}
             />
             <InputGroupAddon align="inline-end">
               <InputGroupButton
                 size="icon-xs"
-                aria-label={showNetworkPassword ? "Hide password" : "Show password"}
+                aria-label={showNetworkPassword ? t("Hide password") : t("Show password")}
                 onClick={() => setShowNetworkPassword(!showNetworkPassword)}
               >
                 {showNetworkPassword ? <EyeOff data-icon="inline-start" /> : <Eye data-icon="inline-start" />}
@@ -174,19 +177,18 @@ export function NetworkAccessSection({
           </InputGroup>
           {networkPassword.length > 0 && networkPassword.length < minPasswordLength && (
             <FieldError>
-              Password must be at least {minPasswordLength} characters ({networkPassword.length}/{minPasswordLength})
+              {t("Password must be at least ")}{minPasswordLength} {t(" characters (")}{networkPassword.length}/{minPasswordLength})
             </FieldError>
           )}
           <FieldDescription>
-            Requires app restart. Remote browsers need an HTTPS reverse proxy;
-            port 19384 remains available to Cogpit hubs and device clients.
+            {t("Requires app restart. Remote browsers need an HTTPS reverse proxy; port 19384 remains available to Cogpit hubs and device clients.")}
           </FieldDescription>
         </Field>
       )}
 
       {networkAccess && initialNetworkAccess && connectedDevices.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-muted-foreground">Connected devices</p>
+          <p className="text-xs text-muted-foreground">{t("Connected devices")}</p>
           <div className="flex flex-col gap-1.5">
             {connectedDevices.map((device, i) => (
               <div key={`${device.ip}-${i}`} className="flex items-center justify-between rounded-lg border px-3 py-2">

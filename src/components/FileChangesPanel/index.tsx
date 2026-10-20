@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useRef, useCallback, useEffect, useMemo, memo } from "react"
 import { FileCode2, ChevronsDownUp, ChevronsUpDown, Layers, Clock, X, Sigma, List, ChevronLeft, ChevronRight, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -50,6 +51,7 @@ function AgentGroupSection({
   highlightPath: string | null
   diffMode: DiffMode
 }) {
+  const { t } = useTranslation()
   const name = group.agentName || group.agentId.slice(0, 8)
   const type = group.subagentType
 
@@ -61,7 +63,7 @@ function AgentGroupSection({
           variant="ghost"
           size="xs"
           className="h-auto min-w-0 truncate px-1 text-xs font-semibold"
-          title={`Open subagent ${group.agentId}`}
+          title={t("Open subagent {0}", { "0": group.agentId })}
           onClick={() => {
             window.dispatchEvent(new CustomEvent(OPEN_SUBAGENT_EVENT, { detail: { agentId: group.agentId } }))
           }}
@@ -96,6 +98,7 @@ function AgentGroupSection({
 }
 
 export const FileChangesPanel = memo(function FileChangesPanel({ session, sessionChangeKey }: FileChangesPanelProps) {
+  const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
@@ -286,13 +289,13 @@ export const FileChangesPanel = memo(function FileChangesPanel({ session, sessio
       <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
         <FileCode2 data-icon="inline-start" className="size-3.5 text-muted-foreground" />
         <span className="text-xs font-medium text-foreground">
-          File Changes
+          {t("File Changes")}
         </span>
         <Badge
           variant="outline"
           className="h-5 px-1.5 text-xs text-muted-foreground"
         >
-          {totalFileCount} file{totalFileCount !== 1 ? "s" : ""}
+          {totalFileCount} {t(" file")}{totalFileCount !== 1 ? "s" : ""}
         </Badge>
         <div className="flex-1" />
         <LineCounts add={groupedAdd} del={groupedDel} />
@@ -302,14 +305,14 @@ export const FileChangesPanel = memo(function FileChangesPanel({ session, sessio
               variant={groupByAgent ? "secondary" : "ghost"}
               size="icon-xs"
               onClick={() => setGroupByAgent(!groupByAgent)}
-              aria-label={groupByAgent ? "Show all changes" : "Group by subagent"}
+              aria-label={groupByAgent ? t("Show all changes") : t("Group by subagent")}
             />}>
               <Users data-icon="inline-start" />
           </TooltipTrigger>
           <TooltipContent>
             {groupByAgent
-              ? "Show all changes"
-              : "Group by subagent"}
+              ? t("Show all changes")
+              : t("Group by subagent")}
           </TooltipContent>
         </Tooltip>
 
@@ -318,14 +321,14 @@ export const FileChangesPanel = memo(function FileChangesPanel({ session, sessio
               variant={scope === "all" ? "secondary" : "ghost"}
               size="icon-xs"
               onClick={handleScopeToggle}
-              aria-label={scope === "last" ? "Show all turns" : "Show last turn only"}
+              aria-label={scope === "last" ? t("Show all turns") : t("Show last turn only")}
             />}>
               {scope === "all" ? <Layers data-icon="inline-start" /> : <Clock data-icon="inline-start" />}
           </TooltipTrigger>
           <TooltipContent>
             {scope === "last"
-              ? "Click for all turns"
-              : "Click for last turn only"}
+              ? t("Click for all turns")
+              : t("Click for last turn only")}
           </TooltipContent>
         </Tooltip>
 
@@ -334,14 +337,14 @@ export const FileChangesPanel = memo(function FileChangesPanel({ session, sessio
               variant={diffMode === "per-edit" ? "secondary" : "ghost"}
               size="icon-xs"
               onClick={() => setDiffMode(diffMode === "net" ? "per-edit" : "net")}
-              aria-label={diffMode === "net" ? "Show per-edit diffs" : "Show net diff"}
+              aria-label={diffMode === "net" ? t("Show per-edit diffs") : t("Show net diff")}
             />}>
               {diffMode === "net" ? <Sigma data-icon="inline-start" /> : <List data-icon="inline-start" />}
           </TooltipTrigger>
           <TooltipContent>
             {diffMode === "net"
-              ? "Switch to per-edit diffs"
-              : "Switch to net diff"}
+              ? t("Switch to per-edit diffs")
+              : t("Switch to net diff")}
           </TooltipContent>
         </Tooltip>
 
@@ -350,17 +353,17 @@ export const FileChangesPanel = memo(function FileChangesPanel({ session, sessio
               variant="ghost"
               size="icon-xs"
               onClick={() => setAllExpanded(!allExpanded)}
-              aria-label={allExpanded ? "Collapse all" : "Expand all"}
+              aria-label={allExpanded ? t("Collapse all") : t("Expand all")}
             />}>
               {allExpanded ? <ChevronsDownUp data-icon="inline-start" /> : <ChevronsUpDown data-icon="inline-start" />}
           </TooltipTrigger>
-          <TooltipContent>{allExpanded ? "Collapse all" : "Expand all"}</TooltipContent>
+          <TooltipContent>{allExpanded ? t("Collapse all") : t("Expand all")}</TooltipContent>
         </Tooltip>
       </div>
 
       <div className="flex shrink-0 items-center gap-1 border-b bg-muted/30 px-3 py-1">
         <span className="text-xs text-muted-foreground">
-          Showing:
+          {t("Showing:")}
         </span>
         {scope !== "all" && lastTurnIndex > 0 && (
           <Button
@@ -371,7 +374,7 @@ export const FileChangesPanel = memo(function FileChangesPanel({ session, sessio
               if (current > 0) setScope(current - 1)
             }}
             disabled={(typeof scope === "number" ? scope : lastTurnIndex) <= 0}
-            aria-label="Previous turn"
+            aria-label={t("Previous turn")}
           >
             <ChevronLeft data-icon="inline-start" />
           </Button>
@@ -393,7 +396,7 @@ export const FileChangesPanel = memo(function FileChangesPanel({ session, sessio
               })
             }}
             disabled={scope === "last"}
-            aria-label="Next turn"
+            aria-label={t("Next turn")}
           >
             <ChevronRight data-icon="inline-start" />
           </Button>
@@ -403,7 +406,7 @@ export const FileChangesPanel = memo(function FileChangesPanel({ session, sessio
             variant="ghost"
             size="icon-xs"
             onClick={() => setScope("last")}
-            aria-label="Back to last turn"
+            aria-label={t("Back to last turn")}
           >
             <X data-icon="inline-start" />
           </Button>
@@ -436,7 +439,7 @@ export const FileChangesPanel = memo(function FileChangesPanel({ session, sessio
                 ))
               ) : (
                 <div className="py-4 text-center text-xs text-muted-foreground">
-                  No subagent changes in {scopeLabel.toLowerCase()}
+                  {t("No subagent changes in ")}{scopeLabel.toLowerCase()}
                 </div>
               )
             ) : activeGrouped.length > 0 ? (
@@ -451,7 +454,7 @@ export const FileChangesPanel = memo(function FileChangesPanel({ session, sessio
               ))
             ) : (
               <div className="py-4 text-center text-xs text-muted-foreground">
-                No file changes in {scopeLabel.toLowerCase()}
+                {t("No file changes in ")}{scopeLabel.toLowerCase()}
               </div>
             )}
           </div>

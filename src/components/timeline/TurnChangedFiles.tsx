@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useMemo, useState, memo } from "react"
 import { ChevronDown, ChevronRight, Folder, FileCode2 } from "lucide-react"
 import { diffLineCount } from "../../../shared/diff-utils"
@@ -218,6 +219,7 @@ interface TurnChangedFilesProps {
 }
 
 export const TurnChangedFiles = memo(function TurnChangedFiles({ turn, turnIndex, cwd }: TurnChangedFilesProps) {
+  const { t } = useTranslation()
   const canAccessHostFiles = useCapability("hostFiles")
   const fileChanges = useMemo(() => computeTurnFileChanges(turn, cwd), [turn, cwd])
   const tree = useMemo(() => buildFileTree(fileChanges, cwd), [fileChanges, cwd])
@@ -249,7 +251,7 @@ export const TurnChangedFiles = memo(function TurnChangedFiles({ turn, turnIndex
         />
         <FileCode2 className="size-3.5 shrink-0" data-icon="inline-start" />
         <span className="font-medium tabular-nums">
-          {fileChanges.length} file{fileChanges.length !== 1 ? "s" : ""}
+          {fileChanges.length} {t(" file")}{fileChanges.length !== 1 ? "s" : ""}
         </span>
         <LineCounts add={totals.add} del={totals.del} className="opacity-80" />
         <ChangeBar add={totals.add} del={totals.del} />

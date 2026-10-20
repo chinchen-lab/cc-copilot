@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useEffect, useCallback, useRef, memo } from "react"
 import { ArrowLeft, Search, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -59,6 +60,7 @@ interface ConfigBrowserProps {
 }
 
 export const ConfigBrowser = memo(function ConfigBrowser({ projectPath, initialFilePath }: ConfigBrowserProps) {
+  const { t } = useTranslation()
   const canWriteConfig = useCapability("configWrite")
   const [sections, setSections] = useState<ConfigTreeSection[]>([])
   const [loading, setLoading] = useState(true)
@@ -208,7 +210,7 @@ export const ConfigBrowser = memo(function ConfigBrowser({ projectPath, initialF
   if (!canWriteConfig) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        Server configuration is available to administrators only.
+        {t("Server configuration is available to administrators only.")}
       </div>
     )
   }
@@ -217,7 +219,7 @@ export const ConfigBrowser = memo(function ConfigBrowser({ projectPath, initialF
     <div className="flex flex-1 min-h-0 min-w-0">
       <div className={cn("min-h-0 shrink-0 flex-col border-r bg-sidebar md:flex md:w-80", selectedFile && !mobileBrowse ? "hidden" : "flex w-full")}>
         <div className="flex h-11 items-center gap-2 border-b px-3">
-          <span className="text-sm font-medium text-foreground">Configuration</span>
+          <span className="text-sm font-medium text-foreground">{t("Configuration")}</span>
           {projectPath && (
             <span className="ml-auto truncate text-xs text-muted-foreground" title={projectPath}>
               {projectPath.split("/").pop()}
@@ -232,13 +234,13 @@ export const ConfigBrowser = memo(function ConfigBrowser({ projectPath, initialF
             <InputGroupInput
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search configuration"
+              placeholder={t("Search configuration")}
             />
             {searchQuery && (
               <InputGroupAddon align="inline-end">
                 <InputGroupButton
                   size="icon-xs"
-                  aria-label="Clear search"
+                  aria-label={t("Clear search")}
                   onClick={() => setSearchQuery("")}
                 >
                   <X data-icon="inline-start" />
@@ -250,7 +252,7 @@ export const ConfigBrowser = memo(function ConfigBrowser({ projectPath, initialF
         <ScrollArea className="flex-1">
           <div className="flex flex-col gap-1 py-2">
             {loading ? (
-              <div className="flex flex-col gap-2 px-3 py-2" aria-label="Loading configuration">
+              <div className="flex flex-col gap-2 px-3 py-2" aria-label={t("Loading configuration")}>
                 {Array.from({ length: 6 }, (_, index) => (
                   <Skeleton key={index} className="h-8 w-full" />
                 ))}
@@ -288,7 +290,7 @@ export const ConfigBrowser = memo(function ConfigBrowser({ projectPath, initialF
         {selectedFile ? (
           <>
             <Button variant="ghost" className="min-h-11 shrink-0 justify-start md:hidden" onClick={() => setMobileBrowse(true)}>
-              <ArrowLeft data-icon="inline-start" />All configuration files
+              <ArrowLeft data-icon="inline-start" />{t("All configuration files")}
             </Button>
             <ConfigEditor file={selectedFile} onDeleted={handleDeleted} readOnly={!canWriteConfig} />
           </>
@@ -303,15 +305,15 @@ export const ConfigBrowser = memo(function ConfigBrowser({ projectPath, initialF
       >
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete configuration file?</AlertDialogTitle>
+            <AlertDialogTitle>{t("Delete configuration file?")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Delete "{pendingDeleteItem?.name}" permanently? This action cannot be undone.
+              {t("Delete \"")}{pendingDeleteItem?.name}{t("\" permanently? This action cannot be undone.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel size="sm">Cancel</AlertDialogCancel>
+            <AlertDialogCancel size="sm">{t("Cancel")}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" size="sm" onClick={() => void confirmDeleteItem()}>
-              Delete file
+              {t("Delete file")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useState } from "react"
 import { ChevronRight, ChevronDown, Webhook, AlertCircle } from "lucide-react"
 import type { ParsedHookEvent } from "../../../shared/session/types"
@@ -12,6 +13,7 @@ interface Props {
 const TERMINAL_EVENTS = new Set(["StopFailure", "PermissionDenied", "PostToolUseFailure"])
 
 export const HookEventChip = memo(function HookEventChip({ events }: Props) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   if (events.length === 0) return null
   const hasError = events.some(
@@ -35,7 +37,7 @@ export const HookEventChip = memo(function HookEventChip({ events }: Props) {
           <Webhook className="size-3" data-icon="inline-start" />
         )}
         <span className="font-mono">
-          {events.length} hook event{events.length === 1 ? "" : "s"}
+          {events.length} {t(" hook event")}{events.length === 1 ? "" : "s"}
         </span>
         <span className="truncate text-muted-foreground/60">
           {events.map((e) => e.eventName).join(", ")}
@@ -61,13 +63,13 @@ export const HookEventChip = memo(function HookEventChip({ events }: Props) {
                 </pre>
               )}
               {e.updatedToolOutput && (
-                <span className="text-info"> · output replaced by hook</span>
+                <span className="text-info"> {t(" · output replaced by hook")}</span>
               )}
               {e.sessionTitle && (
-                <span className="text-foreground"> · title: {e.sessionTitle}</span>
+                <span className="text-foreground"> {t(" · title: ")}{e.sessionTitle}</span>
               )}
               {e.worktreePath && (
-                <span className="text-success"> · path: {e.worktreePath}</span>
+                <span className="text-success"> {t(" · path: ")}{e.worktreePath}</span>
               )}
             </li>
           ))}

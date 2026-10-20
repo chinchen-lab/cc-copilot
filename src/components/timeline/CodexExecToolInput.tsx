@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useId, useMemo, useState } from "react"
 import { Check, ChevronRight, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -10,6 +11,7 @@ import { ToolCallInput } from "./ToolCallInput"
 import { ToolCodeHighlighted } from "./ToolCallResult"
 
 function NestedCall({ name, input }: { name: string; input: Record<string, unknown> }): React.ReactElement {
+  const { t } = useTranslation()
   const presentation = getToolPresentation(typeof input.raw === "string" && input.raw.startsWith("{")
     ? { name: "exec", input: { raw: `tools.${name}(${input.raw})` } }
     : { name, input })
@@ -23,13 +25,14 @@ function NestedCall({ name, input }: { name: string; input: Record<string, unkno
         <span className="font-medium">{presentation.label}</span>
         {presentation.summary && !command && <span className="truncate text-muted-foreground">{presentation.summary}</span>}
       </div>
-      {command && <ToolCodeHighlighted code={command} language="bash" label="Command" />}
+      {command && <ToolCodeHighlighted code={command} language="bash" label={t("Command")} />}
       <ToolCallInput input={fields} />
     </section>
   )
 }
 
 export function CodexExecToolInput({ input }: { input: Record<string, unknown> }): React.ReactElement {
+  const { t } = useTranslation()
   const script = String(input.raw ?? "")
   const calls = useMemo(() => getCodexExecCalls(input), [input])
   const [sourceOpen, setSourceOpen] = useState(false)
@@ -38,7 +41,7 @@ export function CodexExecToolInput({ input }: { input: Record<string, unknown> }
   const showSource = calls.length === 0 || sourceOpen
 
   return (
-    <section className="mt-2 min-w-0" aria-label="Tool script">
+    <section className="mt-2 min-w-0" aria-label={t("Tool script")}>
       {calls.length > 0 && (
         <div className="flex min-w-0 flex-col gap-3">
           {calls.map((call, index) => <NestedCall key={index} {...call} />)}
@@ -48,16 +51,16 @@ export function CodexExecToolInput({ input }: { input: Record<string, unknown> }
         {calls.length > 0 ? (
           <Button type="button" variant="ghost" size="xs" aria-expanded={showSource} aria-controls={sourceId} onClick={() => setSourceOpen((open) => !open)}>
             <ChevronRight data-icon="inline-start" className={cn(showSource && "rotate-90")} />
-            Source
+            {t("Source")}
           </Button>
-        ) : <span className="text-xs text-muted-foreground">Script</span>}
+        ) : <span className="text-xs text-muted-foreground">{t("Script")}</span>}
         <Button type="button" variant="ghost" size="icon-xs" onClick={() => copyScript(script)} aria-label={copied ? "Tool script copied" : "Copy script"}>
           {copied ? <Check data-icon="icon" /> : <Copy data-icon="icon" />}
         </Button>
       </div>
       <Collapsible open={showSource}>
         <CollapsibleContent id={sourceId}>
-          <ToolCodeHighlighted code={script} language="typescript" label="Codex exec script" />
+          <ToolCodeHighlighted code={script} language="typescript" label={t("Codex exec script")} />
         </CollapsibleContent>
       </Collapsible>
     </section>

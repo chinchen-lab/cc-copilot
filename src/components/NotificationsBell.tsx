@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import { Bell, CheckCheck, CircleAlert, MessageSquare, UsersRound, type LucideIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -36,6 +37,7 @@ const KIND_ICON: Record<NotificationKind, LucideIcon> = {
  * click-to-open-session navigation.
  */
 export function NotificationsBell() {
+  const { t } = useTranslation()
   const { notifications, unreadCount, refresh, markRead, markAllRead } = useNotifications()
   const [open, setOpen] = useState(false)
 
@@ -63,7 +65,7 @@ export function NotificationsBell() {
             variant={open ? "secondary" : "ghost"}
             size="icon-sm"
             className="relative"
-            aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+            aria-label={unreadCount > 0 ? t("Notifications, {0} unread", { "0": unreadCount }) : t("Notifications")}
           />
         }
       >
@@ -77,7 +79,7 @@ export function NotificationsBell() {
 
       <DropdownMenuContent align="end" sideOffset={6} className="w-80 overflow-hidden p-0">
         <div className="flex h-11 items-center justify-between border-b px-3">
-          <span className="text-sm font-medium">Notifications</span>
+          <span className="text-sm font-medium">{t("Notifications")}</span>
           {unreadCount > 0 && (
             <Button
               variant="ghost"
@@ -85,7 +87,7 @@ export function NotificationsBell() {
               onClick={() => void markAllRead()}
             >
               <CheckCheck data-icon="inline-start" />
-              Mark all read
+              {t("Mark all read")}
             </Button>
           )}
         </div>
@@ -94,8 +96,8 @@ export function NotificationsBell() {
             <Empty className="min-h-40 p-6">
               <EmptyHeader>
                 <EmptyMedia variant="icon"><Bell /></EmptyMedia>
-                <EmptyTitle>No notifications</EmptyTitle>
-                <EmptyDescription>Session updates will appear here.</EmptyDescription>
+                <EmptyTitle>{t("No notifications")}</EmptyTitle>
+                <EmptyDescription>{t("Session updates will appear here.")}</EmptyDescription>
               </EmptyHeader>
             </Empty>
           ) : (

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useRef, useState, type ClipboardEventHandler, type RefObject } from "react"
 import { Maximize2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -13,6 +14,7 @@ interface ExpandablePromptEditorProps {
 
 /** A larger view of the same draft; closing never submits or discards it. */
 export function ExpandablePromptEditor({ value, onChange, inputRef, onPaste }: ExpandablePromptEditorProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const selection = useRef({ start: 0, end: 0 })
@@ -22,7 +24,7 @@ export function ExpandablePromptEditor({ value, onChange, inputRef, onPaste }: E
       setOpen(next)
     }}>
       {value.includes("\n") && (
-        <DialogTrigger render={<Button type="button" variant="ghost" size="icon-xs" aria-label="Expand prompt editor" title="Expand prompt editor" className="absolute right-2 top-2 z-10 bg-popover text-muted-foreground" />}>
+        <DialogTrigger render={<Button type="button" variant="ghost" size="icon-xs" aria-label={t("Expand prompt editor")} title={t("Expand prompt editor")} className="absolute right-2 top-2 z-10 bg-popover text-muted-foreground" />}>
           <Maximize2 />
         </DialogTrigger>
       )}
@@ -40,12 +42,12 @@ export function ExpandablePromptEditor({ value, onChange, inputRef, onPaste }: E
         }}
       >
         <DialogHeader className="shrink-0 pr-8">
-          <DialogTitle>Edit prompt</DialogTitle>
-          <DialogDescription>Enter starts a new line. Done returns to the chat without sending.</DialogDescription>
+          <DialogTitle>{t("Edit prompt")}</DialogTitle>
+          <DialogDescription>{t("Enter starts a new line. Done returns to the chat without sending.")}</DialogDescription>
         </DialogHeader>
         <Textarea
           ref={editorRef}
-          aria-label="Expanded prompt"
+          aria-label={t("Expanded prompt")}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onSelect={(event) => { selection.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd } }}
@@ -53,7 +55,7 @@ export function ExpandablePromptEditor({ value, onChange, inputRef, onPaste }: E
           className="min-h-0 flex-1 resize-none overflow-y-auto text-sm"
         />
         <DialogFooter className="shrink-0">
-          <Button type="button" onClick={() => setOpen(false)}>Done</Button>
+          <Button type="button" onClick={() => setOpen(false)}>{t("Done")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

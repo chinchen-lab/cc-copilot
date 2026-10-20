@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useEffect, useState } from "react"
 import { Check, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -34,6 +35,7 @@ export function BrowserSkillDialog({
   readTargets,
   install,
 }: BrowserSkillDialogProps) {
+  const { t } = useTranslation()
   const [targets, setTargets] = useState<BrowserSkillTarget[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<SkillTarget | null>(null)
@@ -68,13 +70,10 @@ export function BrowserSkillDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Agent skill</DialogTitle>
+          <DialogTitle>{t("Agent skill")}</DialogTitle>
           <DialogDescription>
-            The skill teaches an agent how Cogpit&rsquo;s browsers work: when to use a named
-            one, when to keep to a throwaway, and that this panel is watching. Install it for
-            agents you run outside Cogpit &mdash; it writes a{" "}
-            <code className="font-mono">SKILL.md</code> into that CLI&rsquo;s configuration
-            directory in your home folder.
+            {t("The skill teaches an agent how Cogpit’s browsers work: when to use a named one, when to keep to a throwaway, and that this panel is watching. Install it for agents you run outside Cogpit — it writes a")}{" "}
+            <code className="font-mono">SKILL.md</code> {t(" into that CLI’s configuration directory in your home folder.")}
           </DialogDescription>
         </DialogHeader>
 
@@ -84,7 +83,7 @@ export function BrowserSkillDialog({
           ? (
             <div role="status" className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
               <Spinner />
-              Reading where it is installed…
+              {t("Reading where it is installed…")}
             </div>
           )
           : (
@@ -98,7 +97,7 @@ export function BrowserSkillDialog({
                     </span>
                     {target.automatic && (
                       <span className="truncate text-xs text-muted-foreground">
-                        Already automatic in the sessions Cogpit starts
+                        {t("Already automatic in the sessions Cogpit starts")}
                       </span>
                     )}
                   </span>
@@ -106,18 +105,18 @@ export function BrowserSkillDialog({
                     ? (
                       <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                         <Check aria-hidden className="size-3.5 text-emerald-500" />
-                        Installed
+                        {t("Installed")}
                       </span>
                     )
                     : (
                       <Button
                         size="xs"
                         variant="outline"
-                        aria-label={`Install for ${target.label}`}
+                        aria-label={t("Install for {0}", { "0": target.label })}
                         disabled={pending !== null}
                         onClick={() => void run(target.kind)}
                       >
-                        Install
+                        {t("Install")}
                       </Button>
                     )}
                 </li>
@@ -132,9 +131,9 @@ export function BrowserSkillDialog({
             onClick={() => void run(ALL_SKILL_TARGETS)}
           >
             <Sparkles data-icon="inline-start" />
-            Install for all
+            {t("Install for all")}
           </Button>
-          <DialogClose render={<Button type="button" />}>Done</DialogClose>
+          <DialogClose render={<Button type="button" />}>{t("Done")}</DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>

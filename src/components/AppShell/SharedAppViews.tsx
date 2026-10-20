@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { lazy, Suspense, useState, type MutableRefObject, type ReactNode } from "react"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -105,16 +106,17 @@ export function ProjectDashboard({ navigation }: { navigation: ShellNavigation }
 
 /** The home and its project history, shared by desktop and mobile shells. */
 export function MissionControlView({ navigation, showProjectHistory = false }: { navigation: ShellNavigation; showProjectHistory?: boolean }) {
+  const { t } = useTranslation()
   const { state, config } = useAppContext()
   const [browsing, setBrowsing] = useState(false)
   return (
-    <Suspense fallback={<LazyViewFallback label="Loading Mission Control…" />}>
+    <Suspense fallback={<LazyViewFallback label={t("Loading Mission Control…")} />}>
       <div className="motion-session-enter flex min-h-0 flex-1 flex-col">
         {browsing || (showProjectHistory && state.dashboardProject) ? (
           <>
             <div className="px-4 pt-12">
               <Button variant="ghost" size="sm" onClick={() => { navigation.onSelectProject(null); setBrowsing(false) }}>
-                <ArrowLeft data-icon="inline-start" /> Mission Control
+                <ArrowLeft data-icon="inline-start" /> {t(" Mission Control")}
               </Button>
             </div>
             <ProjectDashboard navigation={navigation} />
@@ -134,9 +136,10 @@ export function MissionControlView({ navigation, showProjectHistory = false }: {
 
 /** A main view an edition registers, shared by desktop and mobile shells. Callers check it is available. */
 export function ExtensionMainView({ view, onClose }: { view: EditionMainView; onClose: () => void }) {
+  const { t } = useTranslation()
   const { Component } = view
   return (
-    <Suspense fallback={<LazyViewFallback label={`Loading ${view.label}…`} />}>
+    <Suspense fallback={<LazyViewFallback label={t("Loading {0}…", { "0": view.label })} />}>
       <div className="motion-session-enter flex min-h-0 flex-1 flex-col">
         <Component onClose={onClose} />
       </div>

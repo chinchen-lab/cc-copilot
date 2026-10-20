@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo } from "react"
 import {
   Search,
@@ -43,18 +44,19 @@ interface SearchHeaderProps {
 }
 
 function SearchHeader({ searchInputRef }: SearchHeaderProps): React.JSX.Element {
+  const { t } = useTranslation()
   const { state: { searchQuery, expandAll }, dispatch } = useAppContext()
   const { actions: { handleToggleExpandAll } } = useSessionContext()
   return (
     <div className="sticky top-0 border-b bg-popover px-3 py-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-medium text-foreground">Session details</span>
+        <span className="text-sm font-medium text-foreground">{t("Session details")}</span>
         <Button
           variant="ghost"
           size="icon-sm"
           className="shrink-0"
           onClick={handleToggleExpandAll}
-          aria-label={expandAll ? "Collapse all" : "Expand all"}
+          aria-label={expandAll ? t("Collapse all") : t("Expand all")}
         >
           {expandAll ? (
             <ChevronsDownUp data-icon="inline-start" />
@@ -69,8 +71,8 @@ function SearchHeader({ searchInputRef }: SearchHeaderProps): React.JSX.Element 
           type="text"
           value={searchQuery ?? ""}
           onChange={(e) => dispatch({ type: "SET_SEARCH_QUERY", value: e.target.value })}
-          placeholder="Search conversation"
-          aria-label="Search conversation"
+          placeholder={t("Search conversation")}
+          aria-label={t("Search conversation")}
         />
         <InputGroupAddon align="inline-start">
           <Search />
@@ -90,6 +92,7 @@ export const StatsPanel = memo(function StatsPanel({
   onLoadSession,
   backgroundAgents,
 }: StatsPanelProps) {
+  const { t } = useTranslation()
   const { isMobile } = useAppContext()
   const { session: sessionOrNull, sessionSource, permissions } = useSessionContext()
   const canKillAny = useCapability("killAny")
@@ -116,10 +119,10 @@ export const StatsPanel = memo(function StatsPanel({
 
       <Tabs defaultValue="activity" className={cn(isMobile ? "p-4" : "p-3")}>
         <TabsList variant="line" className="grid w-full grid-cols-4">
-          <TabsTrigger value="activity">Activity</TabsTrigger>
-          <TabsTrigger value="agents">Agents</TabsTrigger>
-          <TabsTrigger value="cost">Cost</TabsTrigger>
-          <TabsTrigger value="issues">Issues</TabsTrigger>
+          <TabsTrigger value="activity">{t("Activity")}</TabsTrigger>
+          <TabsTrigger value="agents">{t("Agents")}</TabsTrigger>
+          <TabsTrigger value="cost">{t("Cost")}</TabsTrigger>
+          <TabsTrigger value="issues">{t("Issues")}</TabsTrigger>
         </TabsList>
         <TabsContent value="activity" className="flex flex-col gap-6 pt-3">
           <TurnNavigator turns={turns} onJumpToTurn={onJumpToTurn} />

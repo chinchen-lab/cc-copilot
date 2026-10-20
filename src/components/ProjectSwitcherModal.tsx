@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect } from "react"
 import {
   Dialog,
@@ -32,6 +33,7 @@ export function ProjectSwitcherModal({
   currentProjectCwd,
   initialView,
 }: ProjectSwitcherModalProps) {
+  const { t } = useTranslation()
   const projects = useProjectList(open)
 
   // Second press of the shortcut while modal is open → new session in current project
@@ -59,8 +61,8 @@ export function ProjectSwitcherModal({
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-md gap-0 overflow-hidden p-0">
         <DialogHeader className="sr-only">
-          <DialogTitle>Start a session</DialogTitle>
-          <DialogDescription>Choose a project, enter an absolute folder path, or browse the folders.</DialogDescription>
+          <DialogTitle>{t("Start a session")}</DialogTitle>
+          <DialogDescription>{t("Choose a project, enter an absolute folder path, or browse the folders.")}</DialogDescription>
         </DialogHeader>
         <ProjectSwitcherList
           projects={projects}

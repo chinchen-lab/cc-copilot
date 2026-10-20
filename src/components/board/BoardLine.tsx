@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { ChevronUp } from "lucide-react"
 import { useLocalStorage } from "@/hooks/useLocalStorage"
 import { useSessionBoard } from "@/hooks/useSessionBoard"
@@ -15,6 +16,7 @@ const TONE_DOT: Record<NonNullable<BoardSection["tone"]>, string> = { warning: "
  * until the crew's lead keeps a board.
  */
 export function BoardLine({ boardSessionId }: { boardSessionId: string | null }) {
+  const { t } = useTranslation()
   const board = useSessionBoard(boardSessionId)
   const nameOf = useSessionNamer()
   const [openBoards, setOpenBoards] = useLocalStorage<string[]>("board-line-open", [])
@@ -28,7 +30,7 @@ export function BoardLine({ boardSessionId }: { boardSessionId: string | null })
   const filled = board.sections.filter((section) => section.items.length > 0)
 
   return (
-    <section aria-label="Board" data-board className="mx-3 overflow-hidden rounded-xl border border-border bg-card/80 text-[0.78125rem]">
+    <section aria-label={t("Board")} data-board className="mx-3 overflow-hidden rounded-xl border border-border bg-card/80 text-[0.78125rem]">
       <button
         type="button"
         onClick={toggle}
@@ -41,7 +43,7 @@ export function BoardLine({ boardSessionId }: { boardSessionId: string | null })
             <span className="h-1 w-12 overflow-hidden rounded-full bg-muted" aria-hidden="true">
               <span className="block h-full rounded-full bg-foreground" style={{ width: `${(board.progress.done / board.progress.total) * 100}%` }} />
             </span>
-            {board.progress.done} of {board.progress.total}
+            {board.progress.done} {t(" of ")}{board.progress.total}
           </span>
         )}
         <span className="flex min-w-0 flex-1 items-center gap-2.5 truncate text-muted-foreground">
@@ -52,7 +54,7 @@ export function BoardLine({ boardSessionId }: { boardSessionId: string | null })
           ))}
         </span>
         <span className="hidden shrink-0 text-[0.6875rem] text-muted-foreground/80 sm:inline">
-          updated {formatRelativeTime(new Date(board.updatedAt).toISOString())}{keeper ? ` by ${keeper}` : ""}
+          {t("updated ")}{formatRelativeTime(new Date(board.updatedAt).toISOString())}{keeper ? t(" by {0}", { "0": keeper }) : ""}
         </span>
         <ChevronUp className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", !open && "rotate-180")} aria-hidden="true" />
       </button>

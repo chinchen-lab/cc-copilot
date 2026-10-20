@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import type { ReactNode } from "react"
 import { Activity, AlertTriangle, Archive, Layers, ListTree, LoaderCircle, RefreshCw, Search, X } from "lucide-react"
 
@@ -48,6 +49,7 @@ export function LiveSessionsToolbar({
   onToggleShowArchived,
   onRefresh,
 }: LiveSessionsToolbarProps) {
+  const { t } = useTranslation()
   const archivedSummary = archivedCount === 0
     ? "No archived sessions"
     : `${archivedCount} archived ${archivedCount === 1 ? "session" : "sessions"}`
@@ -58,8 +60,8 @@ export function LiveSessionsToolbar({
           type="search"
           value={searchQuery}
           onChange={(event) => onSearchQueryChange(event.target.value)}
-          placeholder="Search sessions or PRs"
-          aria-label="Search sessions by project, branch, title, prompt, PR number, or PR URL"
+          placeholder={t("Search sessions or PRs")}
+          aria-label={t("Search sessions by project, branch, title, prompt, PR number, or PR URL")}
           aria-busy={searchLoading}
         />
         <InputGroupAddon align="inline-start">
@@ -70,7 +72,7 @@ export function LiveSessionsToolbar({
             <InputGroupButton
               size="icon-xs"
               onClick={() => onSearchQueryChange("")}
-              aria-label="Clear session search"
+              aria-label={t("Clear session search")}
             >
               <X data-icon="inline-start" />
             </InputGroupButton>
@@ -86,7 +88,7 @@ export function LiveSessionsToolbar({
                 size={isMobile ? "icon-sm" : "icon-xs"}
                 onClick={onToggleGroupCrews}
                 aria-pressed={groupCrews}
-                aria-label={groupCrews ? "List spawned sessions on their own" : "Group spawned sessions"}
+                aria-label={groupCrews ? t("List spawned sessions on their own") : t("Group spawned sessions")}
                 className={cn(groupCrews && "bg-accent text-accent-foreground")}
               />
             }
@@ -95,8 +97,8 @@ export function LiveSessionsToolbar({
           </TooltipTrigger>
           <TooltipContent side="bottom">
             {groupCrews
-              ? "Sessions another session started are listed under it"
-              : "Group spawned sessions under the session that started them"}
+              ? t("Sessions another session started are listed under it")
+              : t("Group spawned sessions under the session that started them")}
           </TooltipContent>
         </Tooltip>
       )}
@@ -108,7 +110,7 @@ export function LiveSessionsToolbar({
               size={isMobile ? "icon-sm" : "icon-xs"}
               onClick={onToggleShowArchived}
               aria-pressed={showArchived}
-              aria-label={showArchived ? "Hide archived sessions" : "Show archived sessions"}
+              aria-label={showArchived ? t("Hide archived sessions") : t("Show archived sessions")}
               className={cn(showArchived && "bg-accent text-accent-foreground")}
             />
           }
@@ -116,14 +118,14 @@ export function LiveSessionsToolbar({
           <Archive data-icon="inline-start" />
         </TooltipTrigger>
         <TooltipContent side="bottom">
-          {showArchived ? "Hide archived" : "Show archived"} · {archivedSummary}
+          {showArchived ? t("Hide archived") : t("Show archived")} · {archivedSummary}
         </TooltipContent>
       </Tooltip>
       <Button
         variant="ghost"
         size={isMobile ? "icon-sm" : "icon-xs"}
         onClick={onRefresh}
-        aria-label="Refresh sessions"
+        aria-label={t("Refresh sessions")}
       >
         <RefreshCw data-icon="inline-start" className={cn(loading && "animate-spin")} />
       </Button>
@@ -163,16 +165,17 @@ export function LiveSessionsFeedback({
   onShowArchived,
   onRetry,
 }: LiveSessionsFeedbackProps) {
+  const { t } = useTranslation()
   const empty = emptyVariant({ showEmpty, searching, focusedProject, hiddenArchivedCount, filtered: Boolean(filterEmpty) })
   return (
     <>
       {fetchError && (
         <Alert variant="destructive">
           <AlertTriangle />
-          <AlertTitle>Could not load sessions</AlertTitle>
+          <AlertTitle>{t("Could not load sessions")}</AlertTitle>
           <AlertDescription className="truncate">{fetchError}</AlertDescription>
           <AlertAction>
-            <Button variant="outline" size="xs" onClick={onRetry}>Retry</Button>
+            <Button variant="outline" size="xs" onClick={onRetry}>{t("Retry")}</Button>
           </AlertAction>
         </Alert>
       )}
@@ -183,16 +186,16 @@ export function LiveSessionsFeedback({
             <EmptyMedia variant="icon">
               <Archive />
             </EmptyMedia>
-            <EmptyTitle>Everything is archived</EmptyTitle>
+            <EmptyTitle>{t("Everything is archived")}</EmptyTitle>
             <EmptyDescription>
               {hiddenArchivedCount === 1
-                ? "1 archived session is hidden."
-                : `${hiddenArchivedCount} archived sessions are hidden.`}
+                ? t("1 archived session is hidden.")
+                : t("{0} archived sessions are hidden.", { "0": hiddenArchivedCount })}
             </EmptyDescription>
           </EmptyHeader>
           <Button variant="outline" size="sm" onClick={onShowArchived}>
             <Archive data-icon="inline-start" />
-            Show archived
+            {t("Show archived")}
           </Button>
         </Empty>
       )}
@@ -204,7 +207,7 @@ export function LiveSessionsFeedback({
               {searching ? <Search /> : <Activity />}
             </EmptyMedia>
             <EmptyTitle>
-              {searching ? `No matching sessions in ${focusedProject}` : `No sessions in ${focusedProject}`}
+              {searching ? t("No matching sessions in {0}", { "0": focusedProject }) : t("No sessions in {0}", { "0": focusedProject })}
             </EmptyTitle>
             <EmptyDescription>
               {focusedEmptyDescription(searching, hiddenArchivedCount)}
@@ -213,12 +216,12 @@ export function LiveSessionsFeedback({
           <div className="flex flex-wrap justify-center gap-2">
             <Button variant="outline" size="sm" onClick={onShowAllProjects}>
               <Layers data-icon="inline-start" />
-              All projects
+              {t("All projects")}
             </Button>
             {!searching && hiddenArchivedCount > 0 && (
               <Button variant="ghost" size="sm" onClick={onShowArchived}>
                 <Archive data-icon="inline-start" />
-                Show archived
+                {t("Show archived")}
               </Button>
             )}
           </div>
@@ -233,18 +236,18 @@ export function LiveSessionsFeedback({
             <EmptyMedia variant="icon">
               {searching ? <Search /> : <Activity />}
             </EmptyMedia>
-            <EmptyTitle>{searching ? "No matching sessions" : "No sessions yet"}</EmptyTitle>
+            <EmptyTitle>{searching ? t("No matching sessions") : t("No sessions yet")}</EmptyTitle>
             <EmptyDescription>
               {searching
-                ? "Try #157, honest-cms #157, or paste a PR URL."
-                : "Start Claude Code, Codex, or Copilot to see recent work here."}
+                ? t("Try #157, honest-cms #157, or paste a PR URL.")
+                : t("Start Claude Code, Codex, or Copilot to see recent work here.")}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
       )}
 
       {loading && sessionCount === 0 && (
-        <div className="flex flex-col gap-2 px-2 py-4" aria-label="Loading sessions">
+        <div className="flex flex-col gap-2 px-2 py-4" aria-label={t("Loading sessions")}>
           {SKELETON_ROWS.map((row) => (
             <div key={row} className="flex items-center gap-2 py-1">
               <Skeleton className="size-2 shrink-0 rounded-full" />

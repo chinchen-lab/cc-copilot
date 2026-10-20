@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { ClipboardCheck } from "lucide-react"
 import { Alert, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -24,6 +25,7 @@ export function PendingInputPrompt({
   onRespond: (requestId: string, response: PendingInputResponse) => void
   onOpen: () => void
 }) {
+  const { t } = useTranslation()
   switch (pending.kind) {
     case "permission":
       return (
@@ -57,13 +59,13 @@ export function PendingInputPrompt({
       return (
         <Alert className="border-info/40 bg-info/5">
           <ClipboardCheck className="text-info" />
-          <AlertTitle>Approve the plan?</AlertTitle>
+          <AlertTitle>{t("Approve the plan?")}</AlertTitle>
           {pending.summary && (
             <p className="col-start-2 mt-1 line-clamp-3 text-sm text-foreground">{pending.summary}</p>
           )}
           <div className="col-start-2 mt-3 flex items-center gap-2">
             <Button size="xs" disabled={responding} onClick={() => onRespond(pending.requestId, { approved: true })}>
-              Approve
+              {t("Approve")}
             </Button>
             <Button
               size="xs"
@@ -71,7 +73,7 @@ export function PendingInputPrompt({
               disabled={responding}
               onClick={() => onRespond(pending.requestId, { approved: false })}
             >
-              Reject
+              {t("Reject")}
             </Button>
           </div>
         </Alert>

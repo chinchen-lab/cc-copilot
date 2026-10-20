@@ -1,5 +1,7 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useCallback, useEffect } from "react"
 import { FontScaleSettings } from "@/components/FontScaleSettings"
+import { LanguageSettings } from "@/components/LanguageSettings"
 import { FolderOpen, CheckCircle, XCircle, Loader2, TerminalSquare, Code2, PanelsTopLeft } from "lucide-react"
 import {
   Dialog,
@@ -11,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import {
   Field,
@@ -53,11 +56,12 @@ function sameChoice(a: ExecutableChoice, b: ExecutableChoice): boolean {
 }
 
 function ValidationStatus({ status, error }: { status: string; error: string | null }) {
+  const { t } = useTranslation()
   if (status === "validating") {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 data-icon="inline-start" className="size-3.5 animate-spin" />
-        Checking path...
+        {t("Checking path...")}
       </div>
     )
   }
@@ -65,7 +69,7 @@ function ValidationStatus({ status, error }: { status: string; error: string | n
     return (
       <div className="flex items-center gap-2 text-sm text-success">
         <CheckCircle data-icon="inline-start" className="size-3.5" />
-        Valid .claude directory found
+        {t("Valid .claude directory found")}
       </div>
     )
   }
@@ -88,6 +92,8 @@ interface ConfigDialogProps {
 }
 
 export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDialogProps) {
+  const { t } = useTranslation()
+  const [tab, setTab] = useState<"general" | "agents" | "network">("general")
   const [path, setPath] = useState(currentPath)
   const [saving, setSaving] = useState(false)
   const { status, error, debouncedValidate, reset, save } = useConfigValidation()
@@ -128,6 +134,7 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
   // Reset when dialog opens
   useEffect(() => {
     if (open) {
+      setTab("general")
       setPath(currentPath)
       reset()
       // Fetch current network settings
@@ -222,137 +229,162 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-foreground">Configuration</DialogTitle>
+      <DialogContent className="flex h-[min(46rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+        <DialogHeader className="shrink-0 px-5 pb-4 pt-5 pr-12">
+          <DialogTitle className="text-foreground">{t("Settings")}</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Adjust display preferences, local paths, preferred apps, and remote access.
+            {t("Choose a category to manage your preferences and server settings.")}
           </DialogDescription>
         </DialogHeader>
 
-        <FieldGroup>
-          <FontScaleSettings />
-          <Field>
-            <FieldLabel htmlFor="claude-directory">Claude directory</FieldLabel>
-            <FieldDescription>The directory containing your Claude configuration.</FieldDescription>
-            <InputGroup>
-              <InputGroupAddon>
-                <FolderOpen data-icon="inline-start" />
-              </InputGroupAddon>
-              <InputGroupInput
-                id="claude-directory"
-                value={path}
-                onChange={handleChange}
-                placeholder="/Users/you/.claude"
-                disabled={!canWriteConfig}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && canSave && !saving) handleSave()
-                }}
-              />
-            </InputGroup>
-            <div aria-live="polite">
-              <ValidationStatus status={status} error={error} />
-            </div>
-          </Field>
+        <Tabs value={tab === "network" && (remoteDevice || !canWriteConfig) ? "general" : tab} onValueChange={(value) => {
+          if (value === "general" || value === "agents" || value === "network") setTab(value)
+        }} className="min-h-0 flex-1 gap-0">
+          <div className="shrink-0 px-5 pb-4">
+            <TabsList aria-label={t("Settings categories")} className="w-full">
+              <TabsTrigger value="general">{t("General")}</TabsTrigger>
+              <TabsTrigger value="agents">{t("Agents")}</TabsTrigger>
+              {!remoteDevice && canWriteConfig && <TabsTrigger value="network">{t("Network & sharing")}</TabsTrigger>}
+            </TabsList>
+          </div>
+          <div className="grid min-h-0 flex-1 grid-cols-1 items-start overflow-y-auto border-t px-5 py-5 [&>[data-slot=tabs-content]]:col-start-1 [&>[data-slot=tabs-content]]:row-start-1">
+            <TabsContent value="general" keepMounted>
+              <FieldGroup>
+                <LanguageSettings />
+                <FontScaleSettings />
+                <Field>
+                  <FieldLabel htmlFor="terminal-application">
+                    <TerminalSquare data-icon="inline-start" className="size-4 text-muted-foreground" />
+                    {t("Terminal application")}
+                  </FieldLabel>
+                  <FieldDescription>{t("Leave blank to use the system default for Ctrl+Cmd+T.")}</FieldDescription>
+                  <Input
+                    id="terminal-application"
+                    value={terminalApp}
+                    onChange={(e) => setTerminalApp(e.target.value)}
+                    placeholder="Ghostty, iTerm, or /path/to/binary"
+                    disabled={!canWriteConfig}
+                  />
+                </Field>
 
-          <Field>
-            <FieldLabel htmlFor="terminal-application">
-              <TerminalSquare data-icon="inline-start" className="size-4 text-muted-foreground" />
-              Terminal application
-            </FieldLabel>
-            <FieldDescription>Leave blank to use the system default for Ctrl+Cmd+T.</FieldDescription>
-            <Input
-              id="terminal-application"
-              value={terminalApp}
-              onChange={(e) => setTerminalApp(e.target.value)}
-              placeholder="Ghostty, iTerm, or /path/to/binary"
-              disabled={!canWriteConfig}
-            />
-          </Field>
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="use-built-in-editor"
+                    checked={useBuiltInEditor}
+                    onCheckedChange={(checked) => setUseBuiltInEditor(checked === true)}
+                    disabled={!canWriteConfig}
+                  />
+                  <FieldContent>
+                    <FieldLabel htmlFor="use-built-in-editor">
+                      <PanelsTopLeft data-icon="inline-start" className="size-4 text-muted-foreground" />
+                      {t("Open files in Cogpit")}
+                    </FieldLabel>
+                    <FieldDescription>
+                      {t("Files and diffs open in Cogpit’s file workspace instead of launching an external editor.")}
+                    </FieldDescription>
+                  </FieldContent>
+                </Field>
 
-          <Field orientation="horizontal">
-            <Checkbox
-              id="use-built-in-editor"
-              checked={useBuiltInEditor}
-              onCheckedChange={(checked) => setUseBuiltInEditor(checked === true)}
-              disabled={!canWriteConfig}
-            />
-            <FieldContent>
-              <FieldLabel htmlFor="use-built-in-editor">
-                <PanelsTopLeft data-icon="inline-start" className="size-4 text-muted-foreground" />
-                Open files in Cogpit
-              </FieldLabel>
-              <FieldDescription>
-                Files and diffs open in Cogpit&rsquo;s file workspace instead of launching an
-                external editor.
-              </FieldDescription>
-            </FieldContent>
-          </Field>
+                <Field>
+                  <FieldLabel htmlFor="editor-application">
+                    <Code2 data-icon="inline-start" className="size-4 text-muted-foreground" />
+                    {t("Editor application")}
+                  </FieldLabel>
+                  <FieldDescription>
+                    {useBuiltInEditor
+                      ? t("Not used while files open in Cogpit.")
+                      : t("Leave blank to use $VISUAL or automatic detection.")}
+                  </FieldDescription>
+                  <Input
+                    id="editor-application"
+                    value={editorApp}
+                    onChange={(e) => setEditorApp(e.target.value)}
+                    placeholder="cursor, code, zed, or /path/to/binary"
+                    disabled={!canWriteConfig || useBuiltInEditor}
+                  />
+                </Field>
+              </FieldGroup>
+            </TabsContent>
+            <TabsContent value="agents" keepMounted>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="claude-directory">{t("Claude directory")}</FieldLabel>
+                  <FieldDescription>{t("The directory containing your Claude configuration.")}</FieldDescription>
+                  <InputGroup>
+                    <InputGroupAddon>
+                      <FolderOpen data-icon="inline-start" />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      id="claude-directory"
+                      value={path}
+                      onChange={handleChange}
+                      placeholder="/Users/you/.claude"
+                      disabled={!canWriteConfig}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && canSave && !saving) handleSave()
+                      }}
+                    />
+                  </InputGroup>
+                  <div aria-live="polite">
+                    <ValidationStatus status={status} error={error} />
+                  </div>
+                </Field>
 
-          <Field>
-            <FieldLabel htmlFor="editor-application">
-              <Code2 data-icon="inline-start" className="size-4 text-muted-foreground" />
-              Editor application
-            </FieldLabel>
-            <FieldDescription>
-              {useBuiltInEditor
-                ? "Not used while files open in Cogpit."
-                : "Leave blank to use $VISUAL or automatic detection."}
-            </FieldDescription>
-            <Input
-              id="editor-application"
-              value={editorApp}
-              onChange={(e) => setEditorApp(e.target.value)}
-              placeholder="cursor, code, zed, or /path/to/binary"
-              disabled={!canWriteConfig || useBuiltInEditor}
-            />
-          </Field>
+                {EXECUTABLE_CHOICE_KINDS.map((kind) => (
+                  <ExecutableSection
+                    key={kind}
+                    kind={kind}
+                    value={agentExecutable}
+                    onChange={setAgentExecutable}
+                    disabled={!canWriteConfig}
+                    reportVersion={executableReportVersion}
+                  />
+                ))}
 
-          {EXECUTABLE_CHOICE_KINDS.map((kind) => (
-            <ExecutableSection
-              key={kind}
-              kind={kind}
-              value={agentExecutable}
-              onChange={setAgentExecutable}
-              disabled={!canWriteConfig}
-              reportVersion={executableReportVersion}
-            />
-          ))}
+                {ACCOUNT_SWITCHING_KINDS.map((kind) => (
+                  <AccountSection key={kind} kind={kind} disabled={!canWriteConfig} />
+                ))}
+              </FieldGroup>
+            </TabsContent>
+            {!remoteDevice && canWriteConfig && (
+              <TabsContent value="network" keepMounted>
+                <FieldGroup>
+                  <NetworkAccessSection
+                    networkAccess={networkAccess}
+                    setNetworkAccess={setNetworkAccess}
+                    networkPassword={networkPassword}
+                    setNetworkPassword={setNetworkPassword}
+                    showNetworkPassword={showNetworkPassword}
+                    setShowNetworkPassword={setShowNetworkPassword}
+                    hasExistingPassword={hasExistingPassword}
+                    initialNetworkAccess={initialNetworkAccess}
+                    connectedDevices={connectedDevices}
+                    minPasswordLength={PASSWORD_MIN_LENGTH}
+                  />
+                </FieldGroup>
+              </TabsContent>
+            )}
+          </div>
+        </Tabs>
 
-          {ACCOUNT_SWITCHING_KINDS.map((kind) => (
-            <AccountSection key={kind} kind={kind} disabled={!canWriteConfig} />
-          ))}
-
-          {/* Network Access — hidden for remote devices: changing it through the
-              proxy would revoke the very sessions this hub depends on. Hidden
-              without configWrite: the section is pure editing surface. */}
-          {!remoteDevice && canWriteConfig && <NetworkAccessSection
-            networkAccess={networkAccess}
-            setNetworkAccess={setNetworkAccess}
-            networkPassword={networkPassword}
-            setNetworkPassword={setNetworkPassword}
-            showNetworkPassword={showNetworkPassword}
-            setShowNetworkPassword={setShowNetworkPassword}
-            hasExistingPassword={hasExistingPassword}
-            initialNetworkAccess={initialNetworkAccess}
-            connectedDevices={connectedDevices}
-            minPasswordLength={PASSWORD_MIN_LENGTH}
-          />}
-        </FieldGroup>
-
-        <DialogFooter>
+        {status === "invalid" && tab !== "agents" && error && (
+          <div role="alert" className="shrink-0 border-t px-5 py-3 text-sm text-destructive">
+            <p>{error}</p>
+            <Button variant="link" size="sm" className="px-0 text-destructive" onClick={() => setTab("agents")}>{t("Review agent settings")}</Button>
+          </div>
+        )}
+        <DialogFooter className="shrink-0 border-t px-5 py-4">
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {t("Cancel")}
           </Button>
           {canWriteConfig && (
             <Button disabled={!canSave || saving} onClick={handleSave}>
               {saving ? (
                 <>
                   <Loader2 data-icon="inline-start" className="size-4 animate-spin" />
-                  Saving...
-                </>
+                  {t("Saving...")}</>
               ) : (
-                "Save"
+                t("Save")
               )}
             </Button>
           )}

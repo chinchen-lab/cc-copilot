@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useEffect, useRef, useState } from "react"
 import { ChevronRight, ChevronDown, NotebookPen, CheckCircle, Clock, XCircle } from "lucide-react"
 import ReactMarkdown from "react-markdown"
@@ -30,6 +31,7 @@ export const PlanModeBlock = memo(function PlanModeBlock({
   isAgentActive,
   skillMetadata,
 }: Props) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(true)
   const hasPendingQuestion = toolCalls.some(
     (tc) => tc.name === "AskUserQuestion" && tc.result === null,
@@ -66,7 +68,7 @@ export const PlanModeBlock = memo(function PlanModeBlock({
       <CollapsibleTrigger render={<Button type="button" variant="ghost" className="h-auto w-full justify-start rounded-b-none p-2 text-left" />}>
         <Chev className="size-3.5 shrink-0 text-muted-foreground" data-icon="inline-start" />
         <NotebookPen className="size-4 text-muted-foreground" data-icon="inline-start" />
-        <span className="text-sm font-medium">Plan Mode</span>
+        <span className="text-sm font-medium">{t("Plan Mode")}</span>
         <Icon
           className={cn(
             "size-4",
@@ -97,7 +99,7 @@ export const PlanModeBlock = memo(function PlanModeBlock({
             <Collapsible open={callsOpen} onOpenChange={setCallsOverride} className="mt-2">
               <CollapsibleTrigger render={<Button type="button" variant="ghost" size="xs" className="-ml-2 text-muted-foreground" />}>
                 <CallsChev data-icon="inline-start" />
-                {toolCalls.length} call{toolCalls.length === 1 ? "" : "s"} during planning
+                {toolCalls.length} {t(" call")}{toolCalls.length === 1 ? "" : "s"} {t(" during planning")}
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="ml-4 mt-1 flex flex-col gap-1">

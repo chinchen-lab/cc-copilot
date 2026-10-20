@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo } from "react"
 import { useStreamingOverlay } from "@/contexts/StreamingOverlayContext"
 import { mainThreadMessages, type OverlayBlock } from "@/lib/streamingOverlay"
@@ -15,10 +16,11 @@ import { StreamingMarkdown } from "./StreamingMarkdown"
  */
 
 function StreamingBlock({ block, showCursor }: { block: OverlayBlock; showCursor: boolean }) {
+  const { t } = useTranslation()
   if (block.blockType === "tool_use") {
     return (
       <div className="text-xs text-muted-foreground italic py-1">
-        Preparing {block.toolName ?? "tool"}…
+        {t("Preparing ")}{block.toolName ?? "tool"}…
       </div>
     )
   }

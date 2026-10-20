@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useId, useMemo, useState } from "react"
 import { Check, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -189,6 +190,7 @@ export function ToolResultPanel({
   filePath?: string
   renderResult?: (visible: string) => React.ReactNode
 }): React.ReactElement {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const [copied, copyResult] = useCopyWithFeedback()
   const resultId = useId()
@@ -201,9 +203,9 @@ export function ToolResultPanel({
   const visible = expanded ? formatted : preview.text
 
   return (
-    <section className="mt-3 min-w-0" aria-label="Result">
+    <section className="mt-3 min-w-0" aria-label={t("Result")}>
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className={cn("text-xs text-muted-foreground", isError && "text-destructive")}>{isError ? "Error" : "Result"}</span>
+        <span className={cn("text-xs text-muted-foreground", isError && "text-destructive")}>{isError ? "Error" : t("Result")}</span>
         {result.trim() && (
           <Button
             type="button"
@@ -218,7 +220,7 @@ export function ToolResultPanel({
       </div>
       <div id={resultId}>
         {!result.trim() ? (
-          <p className="text-xs text-muted-foreground">No output</p>
+          <p className="text-xs text-muted-foreground">{t("No output")}</p>
         ) : renderResult ? renderResult(visible) : filePath && !isError ? (
           <ReadResultHighlighted result={visible} filePath={filePath} variant="unboxed" />
         ) : prettyJson !== null ? (
@@ -239,7 +241,7 @@ export function ToolResultPanel({
           aria-expanded={expanded}
           aria-controls={resultId}
         >
-          {expanded ? "Show less" : preview.hiddenLines > 0 ? `+${preview.hiddenLines} ${preview.hiddenLines === 1 ? "line" : "lines"}` : "Show more"}
+          {expanded ? t("Show less") : preview.hiddenLines > 0 ? `+${preview.hiddenLines} ${preview.hiddenLines === 1 ? "line" : "lines"}` : t("Show more")}
         </Button>
       )}
     </section>

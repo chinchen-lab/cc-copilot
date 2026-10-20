@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useEffect, useState } from "react"
 import { WifiOff, Loader2 } from "lucide-react"
 import App from "@/App"
@@ -98,6 +99,7 @@ function problemFromTest(result: TestResult): DeviceProblem | null {
  * sidebar and Mission Control share one poll, scoped to the active device.
  */
 export function DeviceRoot() {
+  const { t } = useTranslation()
   const [activeDeviceId, setActiveDeviceId] = useState(getActiveDeviceId)
   const [connectionRevision, setConnectionRevision] = useState(
     () => getDeviceConnectionRevision(getActiveDeviceId()),
@@ -243,7 +245,7 @@ export function DeviceRoot() {
                 disabled={retrying}
               >
                 {retrying && <Loader2 data-icon="inline-start" className="animate-spin" />}
-                {retrying ? "Retrying" : "Retry now"}
+                {retrying ? t("Retrying") : t("Retry now")}
               </Button>
             )}
             <Button
@@ -251,7 +253,7 @@ export function DeviceRoot() {
               size="xs"
               onClick={() => switchDevice(LOCAL_DEVICE_ID)}
             >
-              Switch to this machine
+              {t("Switch to this machine")}
             </Button>
           </div>
         </Alert>

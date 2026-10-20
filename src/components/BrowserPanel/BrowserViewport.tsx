@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import {
   useCallback,
   useEffect,
@@ -98,6 +99,7 @@ function paint(
 }
 
 export function BrowserViewport({ frame, send, onSizeChange, readOnly = false, className }: BrowserViewportProps) {
+  const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pendingMove = useRef<PendingMove | null>(null)
@@ -350,14 +352,14 @@ export function BrowserViewport({ frame, send, onSizeChange, readOnly = false, c
         <canvas
           ref={canvasRef}
           role="img"
-          aria-label="Browser viewport, view only"
+          aria-label={t("Browser viewport, view only")}
           className="block size-full cursor-default touch-none select-none"
         />
       ) : (
         <canvas
           ref={canvasRef}
           role="application"
-          aria-label="Browser viewport"
+          aria-label={t("Browser viewport")}
           tabIndex={0}
           className={cn(
             "block size-full cursor-default touch-none select-none outline-none",

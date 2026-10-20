@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Clock } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -56,6 +57,7 @@ function resetText(resetsAt: number | null): string | null {
  * through.
  */
 export function RateLimitBanner({ block, dirName, fileName, cwd, terminal }: RateLimitBannerProps) {
+  const { t } = useTranslation()
   const descriptor = descriptorForDirName(dirName)
   const command = getResumeCommand(descriptor.kind, sessionIdFromFileName(fileName), cwd ?? undefined)
   const reset = resetText(block.resetsAt)
@@ -69,19 +71,17 @@ export function RateLimitBanner({ block, dirName, fileName, cwd, terminal }: Rat
     <Alert role="status" className="rounded-none border-x-0 border-t-0 px-4 py-2">
       <Clock />
       <AlertTitle>
-        {descriptor.displayName} hit its {limitLabel(block.limit)} limit
+        {descriptor.displayName} {t(" hit its ")}{limitLabel(block.limit)} {t(" limit")}
       </AlertTitle>
       <AlertDescription className="flex flex-col items-start gap-2">
         <span>
-          {reset ? `Resets at ${reset}. ` : ""}
+          {reset ? t("Resets at {0}. ", { "0": reset }) : ""}
           {lowPriority ? (
             <>
-              It can keep this session going before then at lower priority, spending your
-              weekly allowance to do it — a mode that exists only in its own terminal.
-              Resume there with <code className="font-mono">{command}</code>.
+              {t("It can keep this session going before then at lower priority, spending your weekly allowance to do it — a mode that exists only in its own terminal. Resume there with ")}<code className="font-mono">{command}</code>.
             </>
           ) : (
-            <>Nothing here can lift this one; the session continues once the allowance refills.</>
+            <>{t("Nothing here can lift this one; the session continues once the allowance refills.")}</>
           )}
         </span>
         {canOpenTerminal && (
@@ -90,7 +90,7 @@ export function RateLimitBanner({ block, dirName, fileName, cwd, terminal }: Rat
             variant="outline"
             onClick={() => openProjectTerminal({ path: cwd ?? undefined, dirName, command })}
           >
-            Open in terminal
+            {t("Open in terminal")}
           </Button>
         )}
       </AlertDescription>

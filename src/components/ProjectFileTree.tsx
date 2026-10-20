@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AlertTriangle, ChevronRight, Folder, FolderOpen, FolderTree, type LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -83,6 +84,7 @@ function ancestorsOf(path: string): string[] {
 }
 
 export function ProjectFileTree({ cwd, selectedPath, onSelect, fileStatus, reloadToken }: ProjectFileTreeProps) {
+  const { t } = useTranslation()
   const [directories, setDirectories] = useState<Map<string, DirectoryState>>(() => new Map())
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const inFlightRef = useRef<Set<string>>(new Set())
@@ -142,7 +144,7 @@ export function ProjectFileTree({ cwd, selectedPath, onSelect, fileStatus, reloa
   const root = directories.get("")
   const placeholder = rootPlaceholder(root)
   return (
-    <div aria-label="Project file tree" className="flex flex-col py-1">
+    <div aria-label={t("Project file tree")} className="flex flex-col py-1">
       {placeholder ? (
         <Empty className="min-h-48 rounded-none p-4">
           <EmptyHeader>
@@ -166,7 +168,7 @@ export function ProjectFileTree({ cwd, selectedPath, onSelect, fileStatus, reloa
         />
       )}
       {root?.status === "ready" && root.scanLimited && (
-        <p className="px-3 py-2 text-xs text-muted-foreground">This project is too large to scan completely.</p>
+        <p className="px-3 py-2 text-xs text-muted-foreground">{t("This project is too large to scan completely.")}</p>
       )}
     </div>
   )
@@ -194,6 +196,7 @@ interface DirectoryChildrenProps {
 }
 
 function DirectoryChildren({ directory, depth, state, onLoad, ...rest }: DirectoryChildrenProps) {
+  const { t } = useTranslation()
   useEffect(() => {
     if (state === undefined && directory !== "") onLoad(directory)
   }, [directory, onLoad, state])
@@ -206,7 +209,7 @@ function DirectoryChildren({ directory, depth, state, onLoad, ...rest }: Directo
         style={indentStyle(depth, false)}
       >
         <Spinner className="size-3" />
-        {directory === "" && "Loading files…"}
+        {directory === "" && t("Loading files…")}
       </div>
     )
   }

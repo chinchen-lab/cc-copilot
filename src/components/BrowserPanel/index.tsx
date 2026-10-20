@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { TriangleAlert, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -39,6 +40,7 @@ const STILL_AFTER_MS = 3_000
 const NO_SESSIONS: BrowserSessionInfo[] = []
 
 export function BrowserPanel({ context, active, closePanel }: WorkspacePanelProps) {
+  const { t } = useTranslation()
   const [picked, setSelected] = useLocalStorage(deviceScopedKey(SESSION_KEY), DEFAULT_BROWSER)
   const [followAgent, setFollowAgent] = useLocalStorage(deviceScopedKey(FOLLOW_KEY), true)
   const [busy, setBusy] = useState(false)
@@ -228,7 +230,7 @@ export function BrowserPanel({ context, active, closePanel }: WorkspacePanelProp
             className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground"
           >
             <Spinner />
-            Connecting to {label}…
+            {t("Connecting to ")}{label}…
           </div>
         )}
       </div>
@@ -264,24 +266,26 @@ function useFrameStatus(lastFrameAt: number | null): "live" | "idle" {
 
 /** Said over the last frame, so a frozen page never passes for a live one. */
 function ReconnectingBanner() {
+  const { t } = useTranslation()
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center p-2">
       <span
         role="status"
         className="rounded-full bg-popover px-2.5 py-0.5 text-[0.6875rem] text-muted-foreground shadow-xs"
       >
-        Reconnecting…
+        {t("Reconnecting…")}
       </span>
     </div>
   )
 }
 
 function ProblemStrip({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  const { t } = useTranslation()
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-2 py-1 text-xs text-destructive">
       <TriangleAlert aria-hidden className="size-3.5 shrink-0" />
       <span className="min-w-0 flex-1 truncate">{message}</span>
-      <Button variant="ghost" size="icon-xs" aria-label="Dismiss" onClick={onDismiss}>
+      <Button variant="ghost" size="icon-xs" aria-label={t("Dismiss")} onClick={onDismiss}>
         <X data-icon="inline-start" />
       </Button>
     </div>

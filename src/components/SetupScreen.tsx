@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useState } from "react"
 import { CheckCircle, FolderOpen, Settings2, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -58,6 +59,7 @@ const detectedHomes = joinNames(detectedAgents.map((descriptor) => (
 const configuredHome = `~/${configuredAgent.cli.homeDirName}`
 
 export function SetupScreen({ onConfigured }: SetupScreenProps) {
+  const { t } = useTranslation()
   const [path, setPath] = useState("")
   const [saving, setSaving] = useState(false)
   const { status, error, debouncedValidate, save } = useConfigValidation()
@@ -91,11 +93,11 @@ export function SetupScreen({ onConfigured }: SetupScreenProps) {
             <div className="mb-2 flex size-9 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
               <Settings2 className="size-4" />
             </div>
-            <CardTitle>Connect your coding agent</CardTitle>
+            <CardTitle>{t("Connect your coding agent")}</CardTitle>
             <CardDescription>
-              Cogpit detects {detectedNames} automatically. Existing histories live in{" "}
+              {t("Cogpit detects ")}{detectedNames} {t(" automatically. Existing histories live in")}{" "}
               {detectedHomes}.{" "}
-              For {configuredAgent.displayName}, enter its data directory, usually{" "}
+              {t("For ")}{configuredAgent.displayName}{t(", enter its data directory, usually")}{" "}
               <Path>{configuredHome}</Path>.
             </CardDescription>
           </CardHeader>
@@ -104,7 +106,7 @@ export function SetupScreen({ onConfigured }: SetupScreenProps) {
             <FieldGroup>
               <Field data-invalid={status === "invalid"}>
                 <FieldLabel htmlFor="agent-data-directory">
-                  {configuredAgent.displayName} data directory
+                  {configuredAgent.displayName} {t(" data directory")}
                 </FieldLabel>
                 <InputGroup>
                   <InputGroupAddon>
@@ -130,13 +132,13 @@ export function SetupScreen({ onConfigured }: SetupScreenProps) {
                   {status === "validating" && (
                     <FieldDescription className="flex items-center gap-2">
                       <Spinner className="size-4" />
-                      Checking path...
+                      {t("Checking path...")}
                     </FieldDescription>
                   )}
                   {status === "valid" && (
                     <FieldDescription className="flex items-center gap-2 text-success">
                       <CheckCircle className="size-4" />
-                      {configuredAgent.displayName} history found
+                      {configuredAgent.displayName} {t(" history found")}
                     </FieldDescription>
                   )}
                   {status === "invalid" && error && (
@@ -157,7 +159,7 @@ export function SetupScreen({ onConfigured }: SetupScreenProps) {
               disabled={status !== "valid" || saving}
             >
               {saving && <Spinner data-icon="inline-start" />}
-              {saving ? "Saving..." : `Connect ${configuredAgent.displayName}`}
+              {saving ? t("Saving...") : t("Connect {0}", { "0": configuredAgent.displayName })}
             </Button>
           </CardFooter>
         </Card>

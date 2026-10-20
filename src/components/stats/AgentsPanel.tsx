@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useMemo, useEffect, useRef } from "react"
 import { ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -116,6 +117,7 @@ export function AgentsPanel({
   canStop,
   onLoadSession,
 }: AgentsPanelProps): React.JSX.Element | null {
+  const { t } = useTranslation()
   const streamingOverlay = useStreamingOverlay()
   // Detect if we're currently viewing a sub-agent
   const subAgentView = useMemo(() => {
@@ -198,7 +200,7 @@ export function AgentsPanel({
 
   return (
     <section>
-      <SectionHeading>Agents ({totalCount})</SectionHeading>
+      <SectionHeading>{t("Agents (")}{totalCount})</SectionHeading>
 
       {/* Back to Main button when viewing a sub-agent */}
       {subAgentView && onLoadSession && (
@@ -210,7 +212,7 @@ export function AgentsPanel({
           className="mb-2 w-full justify-start"
         >
           <ChevronRight data-icon="inline-start" className="rotate-180" />
-          Back to Main Agent
+          {t("Back to Main Agent")}
         </Button>
       )}
 

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useMemo, useState } from "react"
 import type { LucideIcon } from "lucide-react"
 import {
@@ -104,6 +105,7 @@ export const FloatingChrome = memo(function FloatingChrome({
   onLogout,
   onOpenMainView,
 }: FloatingChromeProps) {
+  const { t } = useTranslation()
   const { config: { networkUrl, defaultAgentKind } } = useAppContext()
   const { session, sessionSource, isLive, permissions, actions } = useSessionContext()
   const inventory = useSessionInventoryOptional()
@@ -163,7 +165,7 @@ export const FloatingChrome = memo(function FloatingChrome({
           {!showSidebar && (
             <PillIconButton
               icon={PanelLeftOpen}
-              label={`Show sidebar (${sidebarShortcut})`}
+              label={t("Show sidebar ({0})", { "0": sidebarShortcut })}
               onClick={onToggleSidebar}
             />
           )}
@@ -177,7 +179,7 @@ export const FloatingChrome = memo(function FloatingChrome({
               className={cn(FLOATING_PILL, "h-8 shrink-0 px-2.5 text-xs text-muted-foreground")}
             >
               <ChevronRight className="size-3 rotate-180" />
-              Main
+              {t("Main")}
             </Button>
           )}
 
@@ -209,8 +211,7 @@ export const FloatingChrome = memo(function FloatingChrome({
               onClick={onShowWorkflows}
             >
               <WorkflowIcon className="size-3" />
-              Workflows
-              <Badge variant="outline" className="h-4 min-w-4 justify-center px-1 text-[0.5625rem] font-semibold">
+              {t("Workflows")}<Badge variant="outline" className="h-4 min-w-4 justify-center px-1 text-[0.5625rem] font-semibold">
                 {workflowCount}
               </Badge>
             </Button>
@@ -253,7 +254,7 @@ export const FloatingChrome = memo(function FloatingChrome({
           <div className={cn(FLOATING_PILL, PILL_ROW)}>
             <DropdownMenu>
               <DropdownMenuTrigger
-                render={<Button variant="ghost" size="icon-sm" aria-label="More actions" />}
+                render={<Button variant="ghost" size="icon-sm" aria-label={t("More actions")} />}
               >
                 <MoreHorizontal data-icon="inline-start" />
               </DropdownMenuTrigger>
@@ -263,7 +264,7 @@ export const FloatingChrome = memo(function FloatingChrome({
                     <DropdownMenuGroup>
                       <DropdownMenuItem onClick={actions.handleProviderHandoff}>
                         <ArrowRightLeft />
-                        Continue with another provider…
+                        {t("Continue with another provider…")}
                       </DropdownMenuItem>
                     </DropdownMenuGroup>
                     <DropdownMenuSeparator />
@@ -273,18 +274,17 @@ export const FloatingChrome = memo(function FloatingChrome({
                   {canViewUsage && (
                     <DropdownMenuItem onClick={() => setUsageOpen(true)}>
                       <ChartColumn />
-                      Usage &amp; cost…
+                      {t("Usage & cost…")}
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem onClick={() => setMonitorOpen(true)}>
                     <Activity />
-                    Server monitor…
+                    {t("Server monitor…")}
                   </DropdownMenuItem>
                   {networkUrl && (
                     <DropdownMenuItem onClick={handleCopyNetworkUrl}>
                       <Globe className="text-success" />
-                      Copy network URL
-                      <span className="ml-auto truncate pl-2 font-mono text-[0.6875rem] text-muted-foreground">
+                      {t("Copy network URL")}<span className="ml-auto truncate pl-2 font-mono text-[0.6875rem] text-muted-foreground">
                         {networkUrl}
                       </span>
                     </DropdownMenuItem>
@@ -294,7 +294,7 @@ export const FloatingChrome = memo(function FloatingChrome({
                 <DropdownMenuGroup>
                   <DropdownMenuItem onClick={onOpenSettings}>
                     <Settings />
-                    Settings
+                    {t("Settings")}
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 {can("killAny") && (
@@ -307,7 +307,7 @@ export const FloatingChrome = memo(function FloatingChrome({
                         disabled={killing}
                       >
                         <Skull />
-                        {killing ? "Stopping processes…" : "Stop all agent processes"}
+                        {killing ? t("Stopping processes…") : t("Stop all agent processes")}
                       </DropdownMenuItem>
                     </DropdownMenuGroup>
                   </>

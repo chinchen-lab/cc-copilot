@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Virtualizer, type VirtualizerHandle } from "virtua"
 import { Loader2, Redo2 } from "lucide-react"
@@ -25,6 +26,7 @@ interface VirtualizedTimelineProps {
 // ── Redo section ─────────────────────────────────────────────────────────────
 
 function RedoSection() {
+  const { t } = useTranslation()
   const { session, isSubAgentView, undoRedo } = useSessionContext()
   const { canRedo, redoTurnCount, redoGhostTurns, requestRedoAll, requestRedoUpTo } = undoRedo
   const sessionTurnCount = session?.turns.length ?? 0
@@ -53,7 +55,7 @@ function RedoSection() {
                   className="absolute right-4 top-4 text-success opacity-0 transition-opacity group-hover/ghost:opacity-100"
                 >
                   <Redo2 data-icon="inline-start" />
-                  Redo to here
+                  {t("Redo to here")}
                 </Button>
               )}
             </div>
@@ -71,15 +73,16 @@ function RedoSection() {
  * paging state transitions can never shift the content below it.
  */
 function HistoryStatusSlot({ hasMore, isLoadingOlder }: { hasMore: boolean; isLoadingOlder: boolean }) {
+  const { t } = useTranslation()
   return (
     <div className="flex h-8 select-none items-center justify-center text-xs text-muted-foreground" data-testid="history-status">
       {isLoadingOlder ? (
         <span className="flex items-center gap-1.5">
           <Loader2 className="size-3 animate-spin" data-icon="inline-start" />
-          Loading older turns…
+          {t("Loading older turns…")}
         </span>
       ) : hasMore ? null : (
-        <span>Beginning of session</span>
+        <span>{t("Beginning of session")}</span>
       )}
     </div>
   )

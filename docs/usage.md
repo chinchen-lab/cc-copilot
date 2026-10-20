@@ -92,7 +92,7 @@ The Worktrees panel in the right rail lists active git worktrees, whether they h
 
 The [Browser panel](browser.md) shows the browser your agent is using. Select the same browser and tab to watch it work or interact with the page yourself. The shared default browser retains logins. Named browsers keep separate profiles, and subagents use private temporary browsers.
 
-On desktop, terminals and discovered project scripts share the bottom process panel. Select terminal output to add it to the chat composer. In light mode, terminals keep a dark gray background with contrasting text and selection colors; switching the surrounding interface to light mode does not turn the terminal white.
+On desktop, terminals and discovered project scripts share the bottom process panel. Select terminal output to add it to the chat composer. In light mode, terminals use a pale gray-blue background (`#E8EDF3`), dark text (`#263445`), a slate cursor (`#334155`), and darker ANSI colors so prompts and output stay readable. Terminal dividers use `#D7DEE7`.
 
 The project file editor reads and writes files within the project, checks modification times to avoid overwriting concurrent edits, and previews supported content. Use `@` in the composer to mention a file.
 
@@ -151,6 +151,13 @@ Claude Code sessions can be shared with a guest through a passphrase-protected l
 
 ## Configuration, integrations, and shortcuts
 
+**Settings** uses three category tabs: **General** for language, text size and
+preferred apps; **Agents** for configuration paths, executables and accounts; and
+**Network & sharing** for remote access, passwords and shared sessions. Switching
+tabs keeps unsaved edits, and **Save** applies changes across categories. Display
+preferences apply and save automatically in this browser. Network settings are
+hidden when viewing a remote device or without permission to change server settings.
+
 Browse and edit the installed CLIs' instruction files, settings, and skills at global and project scope. Commands, agents, themes, and MCP configuration appear for CLIs that support them. Cogpit writes changes to disk when you save.
 
 GitHub, ClickUp, Vercel, and Cloudflare panels are read-only integrations. GitHub uses your authenticated `gh` CLI for Actions, pull requests, and issues. ClickUp uses a personal API token and supports a linked list per project. Vercel uses CLI 50.5.1 or newer and the project linked at the exact session root. Cloudflare uses Wrangler 4.65.0 or newer and the nearest Wrangler configuration in the workspace. The [plugin guide](plugins.md) covers setup, installation from signed `.cogpit-plugin` files, and the SDK for building custom panels. Runtime plugins can be installed through Plugins → Install from file without rebuilding Cogpit.
@@ -166,3 +173,9 @@ are generally 12px, and terminals use 12px. The setting scales interface text,
 code and terminals together, applies immediately, and is saved automatically in
 this browser. Use the reset button to return to 100%. The preference stays the
 same when switching projects or devices, and does not change other browsers.
+
+Choose **Language → 繁體中文** in general settings or Appearance preferences to
+switch the interface to Traditional Chinese. **English** remains the default.
+The change applies immediately and is saved in this browser, without saving the
+server configuration or reloading the page. Prompts, conversation content, project
+names, filenames and model names keep their original text.

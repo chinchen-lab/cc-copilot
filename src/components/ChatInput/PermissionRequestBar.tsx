@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useEffectEvent } from "react"
 import { Shield, Terminal, PenLine, Eye, Search, Globe, Wrench, Check, X, Infinity as InfinityIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -67,6 +68,7 @@ function getToolDetail(toolName: string, input: Record<string, unknown>): string
 }
 
 export function PermissionRequestBar({ requests, responding, onRespond, onRespondAll }: PermissionRequestBarProps) {
+  const { t } = useTranslation()
   const current = requests[0]
   const remaining = requests.length
   const answerable = current !== undefined && onRespond !== undefined
@@ -147,7 +149,7 @@ export function PermissionRequestBar({ requests, responding, onRespond, onRespon
 
         {isMulti && (
           <Badge variant="outline" className="shrink-0 tabular-nums">
-            +{remaining - 1} more
+            +{remaining - 1} {t(" more")}
           </Badge>
         )}
 
@@ -161,11 +163,10 @@ export function PermissionRequestBar({ requests, responding, onRespond, onRespon
               className="text-destructive"
               disabled={isLoading}
               onClick={() => onRespond?.(current.requestId, "deny")}
-              title="Deny (D)"
+              title={t("Deny (D)")}
             >
               <X data-icon="inline-start" />
-              Deny
-              <kbd className="ml-0.5 font-mono text-xs text-muted-foreground">D</kbd>
+              {t("Deny")}<kbd className="ml-0.5 font-mono text-xs text-muted-foreground">D</kbd>
             </Button>
           )}
 
@@ -176,11 +177,11 @@ export function PermissionRequestBar({ requests, responding, onRespond, onRespon
               disabled={isLoading}
               onClick={() => onRespond?.(current.requestId, "allow_always")}
               title={hasScopedSuggestion
-                ? `Apply the suggested scoped permission rule${approvalShortcuts ? " (S)" : ""}`
-                : `Allow ${current.toolName} for this session${approvalShortcuts ? " (S)" : ""}`}
+                ? t("Apply the suggested scoped permission rule{0}", { "0": approvalShortcuts ? " (S)" : "" })
+                : t("Allow {0} for this session{1}", { "0": current.toolName, "1": approvalShortcuts ? " (S)" : "" })}
             >
               <InfinityIcon data-icon="inline-start" />
-              {hasScopedSuggestion ? "Remember rule" : "Session"}
+              {hasScopedSuggestion ? t("Remember rule") : t("Session")}
               {approvalShortcuts && <kbd className="ml-0.5 font-mono text-xs text-muted-foreground">S</kbd>}
             </Button>
           )}
@@ -191,10 +192,9 @@ export function PermissionRequestBar({ requests, responding, onRespond, onRespon
               size="sm"
               disabled={isLoading}
               onClick={() => onRespondAll?.("allow")}
-              title="Allow all pending (⇧A)"
+              title={t("Allow all pending (⇧A)")}
             >
-              Allow all
-              <kbd className="ml-0.5 font-mono text-xs text-muted-foreground">⇧A</kbd>
+              {t("Allow all")}<kbd className="ml-0.5 font-mono text-xs text-muted-foreground">⇧A</kbd>
             </Button>
           )}
 
@@ -203,17 +203,16 @@ export function PermissionRequestBar({ requests, responding, onRespond, onRespon
               size="sm"
               disabled={isLoading}
               onClick={() => onRespond?.(current.requestId, "allow")}
-              title={approvalShortcuts ? "Allow once (A)" : "Allow once"}
+              title={approvalShortcuts ? t("Allow once (A)") : t("Allow once")}
             >
               <Check data-icon="inline-start" />
-              Allow
-              {approvalShortcuts && <kbd className="ml-0.5 font-mono text-xs opacity-70">A</kbd>}
+              {t("Allow")}{approvalShortcuts && <kbd className="ml-0.5 font-mono text-xs opacity-70">A</kbd>}
             </Button>
           )}
 
           {answerable && !canAllow && !canAllowAlways && !canDeny && (
             <span className="text-xs text-muted-foreground">
-              Resolve this approval in Codex
+              {t("Resolve this approval in Codex")}
             </span>
           )}
         </div>

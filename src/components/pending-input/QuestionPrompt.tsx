@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 /**
  * The inline answer block for a session blocked on AskUserQuestion.
  *
@@ -49,6 +50,7 @@ export function QuestionPrompt({
   onAnswer,
   onOpenSession,
 }: QuestionPromptProps) {
+  const { t } = useTranslation()
   const questions = request.questions
   const [index, setIndex] = useState(0)
   const answersRef = useRef<UserQuestionAnswerMap>({})
@@ -66,8 +68,7 @@ export function QuestionPrompt({
           onClick={onOpenSession}
           className="mt-3"
         >
-          Open full question
-          <ChevronRight data-icon="inline-end" />
+          {t("Open full question")}<ChevronRight data-icon="inline-end" />
         </Button>
       </Shell>
     )
@@ -98,7 +99,7 @@ export function QuestionPrompt({
         )}
         {questions.length > 1 && (
           <span className="ml-auto shrink-0 font-mono text-xs text-muted-foreground">
-            {index + 1} of {questions.length}
+            {index + 1} {t(" of ")}{questions.length}
           </span>
         )}
       </div>
@@ -135,7 +136,7 @@ export function QuestionPrompt({
             disabled={responding || selected.size === 0}
             onClick={() => commit(joinMultiSelect(selected))}
           >
-            {index + 1 < questions.length ? "Next" : "Send"}
+            {index + 1 < questions.length ? t("Next") : t("Send")}
           </Button>
         )}
         <Button
@@ -144,14 +145,13 @@ export function QuestionPrompt({
           onClick={onOpenSession}
           className="ml-auto text-muted-foreground"
         >
-          Open session
-          <ChevronRight data-icon="inline-end" />
+          {t("Open session")}<ChevronRight data-icon="inline-end" />
         </Button>
       </div>
 
       {gone && (
         <p className="mt-2 text-xs text-warning">
-          This question may already be answered. Open the session to check.
+          {t("This question may already be answered. Open the session to check.")}
         </p>
       )}
     </Shell>
@@ -208,10 +208,11 @@ function OptionItem({
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation()
   return (
     <Alert className="border-info/40 bg-info/5">
       <MessageCircleQuestion className="text-info" />
-      <AlertTitle>Answer to continue</AlertTitle>
+      <AlertTitle>{t("Answer to continue")}</AlertTitle>
       <div className="col-start-2 mt-1 min-w-0">{children}</div>
     </Alert>
   )

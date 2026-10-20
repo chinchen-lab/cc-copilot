@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useState } from "react"
 import { ChevronDown, ChevronRight, History } from "lucide-react"
 import ReactMarkdown from "react-markdown"
@@ -20,6 +21,7 @@ interface Props {
  * future versions emit markdown-formatted summaries.
  */
 export const RecapBanner = memo(function RecapBanner({ content }: Props) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(true)
   const Chev = open ? ChevronDown : ChevronRight
 
@@ -28,7 +30,7 @@ export const RecapBanner = memo(function RecapBanner({ content }: Props) {
       <CollapsibleTrigger render={<Button type="button" variant="ghost" className="h-auto w-full justify-start rounded-b-none p-2 text-left" />}>
         <Chev className="size-3.5 shrink-0 text-muted-foreground" data-icon="inline-start" />
         <History className="size-4 text-muted-foreground" data-icon="inline-start" />
-        <span className="text-sm font-medium">Session recap</span>
+        <span className="text-sm font-medium">{t("Session recap")}</span>
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="prose prose-sm dark:prose-invert max-w-none border-t px-3 pb-2 pt-2">

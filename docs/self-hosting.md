@@ -47,7 +47,15 @@ theme list and chat width settings.
 code and terminals from 75% to 150%. It defaults to 100%, applies immediately, and
 is saved in the browser rather than the server configuration.
 
-Terminals keep a dark gray background and contrasting text in light mode. See
+**Settings** is grouped into **General**, **Agents**, and **Network & sharing**
+tabs. Switching tabs keeps unsaved edits; the footer saves changes across tabs.
+
+**Language** in Settings → General or Appearance preferences offers **English**
+and **繁體中文**. The selection applies immediately and survives reloads in the
+same browser; it does not change the server language or other users’ preferences.
+
+In light mode, terminals use a pale gray-blue background (`#E8EDF3`), dark text
+(`#263445`), and darker ANSI colors for readable prompts and output. See
 [the usage guide](usage.md#sessions-and-conversation-history) for automatic project
 focus, and [message controls](usage.md#messages-models-and-permissions) for Enter,
 new lines, and input-method candidate confirmation.

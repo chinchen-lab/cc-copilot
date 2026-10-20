@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useMemo } from "react"
 import { SectionHeading } from "@/components/stats/SectionHeading"
 import type { Turn } from "../../../shared/session/types"
@@ -31,13 +32,14 @@ interface ErrorLogProps {
 }
 
 export function ErrorLog({ turns, onJumpToTurn }: ErrorLogProps): React.JSX.Element | null {
+  const { t } = useTranslation()
   const errors = useMemo(() => collectErrors(turns), [turns])
 
   if (errors.length === 0) return null
 
   return (
     <section>
-      <SectionHeading>Errors ({errors.length})</SectionHeading>
+      <SectionHeading>{t("Errors (")}{errors.length})</SectionHeading>
       <div className="flex max-h-[300px] flex-col overflow-y-auto pr-1">
         {errors.map((err, i) => (
           <Button
@@ -49,7 +51,7 @@ export function ErrorLog({ turns, onJumpToTurn }: ErrorLogProps): React.JSX.Elem
           >
             <div className="flex items-center gap-1.5 text-xs">
               <span className="font-medium text-destructive">{err.toolName}</span>
-              <span className="text-muted-foreground">Turn {err.turnIndex + 1}</span>
+              <span className="text-muted-foreground">{t("Turn ")}{err.turnIndex + 1}</span>
             </div>
             <div className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
               {err.message}

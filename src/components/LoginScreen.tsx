@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useEffect, useState } from "react"
 import { AlertCircle, Eye, EyeOff, Info } from "lucide-react"
 import { BrandLogo } from "@/components/BrandLogo"
@@ -31,6 +32,7 @@ interface LoginScreenProps {
 }
 
 export function LoginScreen({ onAuthenticated, setupRequired = false }: LoginScreenProps) {
+  const { t } = useTranslation()
   const [signIn, setSignIn] = useState<SignInMode | null>(null)
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
@@ -103,9 +105,9 @@ export function LoginScreen({ onAuthenticated, setupRequired = false }: LoginScr
         <Card>
           <CardHeader>
             <BrandLogo className="mb-3" />
-            <CardTitle>Sign in</CardTitle>
+            <CardTitle>{t("Sign in")}</CardTitle>
             <CardDescription>
-              {usesAccounts ? "Sign in with your account to continue." : "Enter the server password to continue."}
+              {usesAccounts ? t("Sign in with your account to continue.") : t("Enter the server password to continue.")}
             </CardDescription>
           </CardHeader>
 
@@ -114,7 +116,7 @@ export function LoginScreen({ onAuthenticated, setupRequired = false }: LoginScr
               <div
                 className="flex min-h-24 items-center justify-center"
                 role="status"
-                aria-label="Checking server"
+                aria-label={t("Checking server")}
               >
                 <Spinner className="size-5 text-muted-foreground" />
               </div>
@@ -125,20 +127,20 @@ export function LoginScreen({ onAuthenticated, setupRequired = false }: LoginScr
                 {setupRequired && (
                   <Alert>
                     <Info aria-hidden="true" />
-                    <AlertDescription>This server has no accounts yet.</AlertDescription>
+                    <AlertDescription>{t("This server has no accounts yet.")}</AlertDescription>
                   </Alert>
                 )}
 
                 <FieldGroup>
                   {usesAccounts && (
                     <Field>
-                      <FieldLabel htmlFor="login-username">Username</FieldLabel>
+                      <FieldLabel htmlFor="login-username">{t("Username")}</FieldLabel>
                       <Input
                         id="login-username"
                         type="text"
                         value={username}
                         onChange={(event) => setUsername(event.target.value)}
-                        placeholder="Username"
+                        placeholder={t("Username")}
                         autoComplete="username"
                         autoFocus
                       />
@@ -146,14 +148,14 @@ export function LoginScreen({ onAuthenticated, setupRequired = false }: LoginScr
                   )}
 
                   <Field>
-                    <FieldLabel htmlFor="login-password">Password</FieldLabel>
+                    <FieldLabel htmlFor="login-password">{t("Password")}</FieldLabel>
                     <InputGroup>
                       <InputGroupInput
                         id="login-password"
                         type={showPassword ? "text" : "password"}
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
-                        placeholder="Password"
+                        placeholder={t("Password")}
                         autoComplete="current-password"
                         autoFocus={!usesAccounts}
                       />
@@ -161,7 +163,7 @@ export function LoginScreen({ onAuthenticated, setupRequired = false }: LoginScr
                         <InputGroupButton
                           size="icon-xs"
                           onClick={() => setShowPassword((visible) => !visible)}
-                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          aria-label={showPassword ? t("Hide password") : t("Show password")}
                         >
                           {showPassword ? <EyeOff /> : <Eye />}
                         </InputGroupButton>
@@ -175,7 +177,7 @@ export function LoginScreen({ onAuthenticated, setupRequired = false }: LoginScr
                 {error && (
                   <Alert variant="destructive">
                     <AlertCircle aria-hidden="true" />
-                    <AlertTitle>Sign in failed</AlertTitle>
+                    <AlertTitle>{t("Sign in failed")}</AlertTitle>
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
                 )}
@@ -184,7 +186,7 @@ export function LoginScreen({ onAuthenticated, setupRequired = false }: LoginScr
               <CardFooter>
                 <Button type="submit" className="w-full" disabled={submitDisabled}>
                   {loading && <Spinner data-icon="inline-start" />}
-                  Connect
+                  {t("Connect")}
                 </Button>
               </CardFooter>
             </>

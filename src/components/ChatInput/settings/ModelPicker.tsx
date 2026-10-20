@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { ContextWindowControl } from "./ContextWindowControl"
 import { useId, type ReactNode } from "react"
 import { Sparkles, Zap } from "lucide-react"
@@ -61,11 +62,13 @@ export function ModelPicker({
   onUltracodeEnabledChange,
   isNewSession,
 }: ModelPickerProps) {
+  const { t } = useTranslation()
   const capabilities = capabilitiesFor(agentKind)
   const provider = AGENT_OPTIONS.find((option) => option.value === agentKind)
   const ProviderIcon = provider?.Icon
   const providerLabel = provider?.label ?? agentKind
-  const modelLabel = modelOptions.find((option) => option.value === selectedModel)?.label ?? resolvedDefaultName
+  const rawModelLabel = modelOptions.find((option) => option.value === selectedModel)?.label ?? resolvedDefaultName
+  const modelLabel = selectedModel ? rawModelLabel : t(rawModelLabel)
   const selectedEffortOption = effortOptions.find((option) => option.value === selectedEffort)
   const providerLocked = !onAgentKindChange
 
@@ -83,10 +86,10 @@ export function ModelPicker({
 
   const effortCaption = selectedEffortOption?.description
 
-  const chipLabel = [providerLabel, modelLabel, selectedEffortOption?.label].filter(Boolean).join(" · ")
+  const chipLabel = [providerLabel, modelLabel, selectedEffortOption && t(selectedEffortOption.label)].filter(Boolean).join(" · ")
   const chipState = [
-    fastOn ? "Fast mode on" : null,
-    ultracodeOn ? "Ultracode on" : null,
+    fastOn ? t("Fast mode on") : null,
+    ultracodeOn ? t("Ultracode on") : null,
   ].filter(Boolean).join(", ")
 
   const providerLabelId = useId()
@@ -109,7 +112,7 @@ export function ModelPicker({
           {selectedEffortOption && (
             <>
               <span className="text-muted-foreground/60" aria-hidden>·</span>
-              <span className="shrink-0 text-muted-foreground">{selectedEffortOption.label}</span>
+              <span className="shrink-0 text-muted-foreground">{t(selectedEffortOption.label)}</span>
             </>
           )}
         </span>
@@ -120,12 +123,12 @@ export function ModelPicker({
       <PickerPanel
         side={pickerSideFor(isNewSession)}
         align="end"
-        aria-label="Model settings"
+        aria-label={t("Model settings")}
         className="w-[34rem] max-w-[calc(100vw-1.5rem)]"
       >
         <div className="grid min-h-0 flex-1 grid-cols-[10.5rem_minmax(0,1fr)] overflow-hidden">
           <div className="flex min-h-0 flex-col overflow-y-auto border-r bg-muted/30 p-1.5">
-            <PickerSectionLabel id={providerLabelId}>Provider</PickerSectionLabel>
+            <PickerSectionLabel id={providerLabelId}>{t("Provider")}</PickerSectionLabel>
             <PickerList
               value={agentKind}
               onValueChange={(next) => onAgentKindChange?.(next)}
@@ -143,14 +146,14 @@ export function ModelPicker({
             </PickerList>
             {providerLocked && !isNewSession && (
               <p className="mt-auto px-2 pb-1 pt-3 text-[0.6875rem] leading-4 text-muted-foreground">
-                Fixed for this session. Start a new one to switch.
+                {t("Fixed for this session. Start a new one to switch.")}
               </p>
             )}
           </div>
 
           <div className="flex min-h-0 flex-col p-1.5">
             <div className="flex items-center justify-between gap-2 pr-0.5">
-              <PickerSectionLabel id={modelLabelId}>Model</PickerSectionLabel>
+              <PickerSectionLabel id={modelLabelId}>{t("Model")}</PickerSectionLabel>
               <ModelCatalogRefresh />
               {(showContext || showFast || showUltracode) && (
                 <div className="flex items-center gap-1">
@@ -159,13 +162,13 @@ export function ModelPicker({
                   )}
                   {showFast && (
                     <ModeToggle
-                      label="Fast mode"
+                      label={t("Fast mode")}
                       pressed={fastOn}
                       onPressedChange={(next) => onFastModeEnabledChange?.(next)}
                       disabled={!fastAvailable}
                       title={fastAvailable
-                        ? `Fast mode · ${fastTier?.description ?? "Lower latency with increased usage"}`
-                        : `Fast mode isn't offered for ${modelLabel}`}
+                        ? t("Fast mode · {0}", { "0": fastTier?.description ?? "Lower latency with increased usage" })
+                        : t("Fast mode isn't offered for {0}", { "0": modelLabel })}
                     >
                       <Zap className={cn(fastOn && "fill-current")} />
                     </ModeToggle>
@@ -177,8 +180,8 @@ export function ModelPicker({
                       onPressedChange={(next) => onUltracodeEnabledChange?.(next)}
                       disabled={!ultracodeAvailable}
                       title={ultracodeAvailable
-                        ? "Ultracode · Standing multi-agent orchestration at any effort"
-                        : `Ultracode isn't available for ${modelLabel}`}
+                        ? t("Ultracode · Standing multi-agent orchestration at any effort")
+                        : t("Ultracode isn't available for {0}", { "0": modelLabel })}
                     >
                       <Sparkles className={cn(ultracodeOn && "fill-current")} />
                       Ultracode
@@ -197,7 +200,7 @@ export function ModelPicker({
                 <PickerOption
                   key={option.value}
                   value={option.value}
-                  title={option.menuLabel ?? option.label}
+                  title={option.value ? option.menuLabel ?? option.label : t(option.menuLabel ?? option.label)}
                   description={option.description}
                 />
               ))}
@@ -209,18 +212,17 @@ export function ModelPicker({
           <div className="shrink-0 border-t px-2 pb-1.5 pt-2">
             <div className="flex items-baseline justify-between gap-3 px-1.5">
               <PickerSectionLabel id={effortLabelId} className="flex items-baseline gap-1.5 p-0">
-                Reasoning
-                {selectedEffortOption && (
+                {t("Reasoning")}{selectedEffortOption && (
                   <span
                     key={selectedEffortOption.value}
                     className="text-xs font-medium normal-case tracking-normal text-foreground motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
                   >
-                    {selectedEffortOption.label}
+                    {t(selectedEffortOption.label)}
                   </span>
                 )}
               </PickerSectionLabel>
               {effortCaption && (
-                <span className="truncate text-[0.6875rem] leading-4 text-muted-foreground">{effortCaption}</span>
+                <span className="truncate text-[0.6875rem] leading-4 text-muted-foreground">{t(effortCaption)}</span>
               )}
             </div>
             {effortOptions.length > 0
@@ -234,7 +236,7 @@ export function ModelPicker({
               )
               : (
                 <p className="px-1.5 pb-1 text-xs leading-5 text-muted-foreground">
-                  Not adjustable for {modelLabel}.
+                  {t("Not adjustable for ")}{modelLabel}.
                 </p>
               )}
           </div>

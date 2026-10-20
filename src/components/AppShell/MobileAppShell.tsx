@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { lazy, Suspense, useState, type ReactNode } from "react"
 import { TerminalSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -165,6 +166,7 @@ interface MobileChatProps extends MobileAppShellProps {
 function MobileChat({
   navigation, sessionView, project, chrome, headerAccessory, searchOpen, onSearchOpenChange,
 }: MobileChatProps) {
+  const { t } = useTranslation()
   const { state, config } = useAppContext()
   const { session, isSubAgentView } = useSessionContext()
 
@@ -219,7 +221,7 @@ function MobileChat({
                   onClick={project.onOpenTerminal}
                 >
                   <TerminalSquare data-icon="inline-start" />
-                  Terminal
+                  {t("Terminal")}
                 </Button>
               )}
             </div>

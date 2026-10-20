@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useId, useState } from "react"
 import { Shield } from "lucide-react"
 import { Popover, PopoverTrigger } from "@/components/ui/popover"
@@ -21,6 +22,7 @@ export function PermissionPicker({
   autoAvailable = false,
   isNewSession,
 }: PermissionPickerProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const options = getPermissionModeOptions(agentKind, autoAvailable)
   const current = options.find((option) => option.value === mode) ?? options[0]
@@ -28,13 +30,13 @@ export function PermissionPicker({
 
   return (
     <Popover modal={false} open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<PickerChip aria-label={`Permissions: ${current.label}`} />}>
+      <PopoverTrigger render={<PickerChip aria-label={t("Permissions: {0}", { "0": t(current.label) })} />}>
         <Shield data-icon="inline-start" />
-        <span className="truncate">{current.label}</span>
+        <span className="truncate">{t(current.label)}</span>
       </PopoverTrigger>
-      <PickerPanel side={pickerSideFor(isNewSession)} aria-label="Permissions" className="w-80">
+      <PickerPanel side={pickerSideFor(isNewSession)} aria-label={t("Permissions")} className="w-80">
         <div className="p-1.5">
-          <PickerSectionLabel id={labelId}>Permissions</PickerSectionLabel>
+          <PickerSectionLabel id={labelId}>{t("Permissions")}</PickerSectionLabel>
           <PickerList
             value={mode}
             onValueChange={(next) => {
@@ -47,7 +49,7 @@ export function PermissionPicker({
               <PickerOption
                 key={option.value}
                 value={option.value}
-                title={option.label}
+                title={t(option.label)}
                 description={option.description}
               />
             ))}

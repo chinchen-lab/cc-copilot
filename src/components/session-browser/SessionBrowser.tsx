@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo } from "react"
 import { LiveSessions } from "@/components/LiveSessions"
 import { cn } from "@/lib/utils"
@@ -17,13 +18,14 @@ export const SessionBrowser = memo(function SessionBrowser({
   onPrefetchSession,
   header,
 }: SessionBrowserProps): React.ReactElement {
+  const { t } = useTranslation()
   return (
     <aside
       className={cn(
         "flex h-full shrink-0 flex-col bg-sidebar",
         isMobile ? "w-full" : "w-80",
       )}
-      aria-label="Session browser"
+      aria-label={t("Session browser")}
     >
       {header}
       <LiveSessions

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useMemo } from "react"
 import { ArrowUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -14,6 +15,7 @@ import { cn } from "@/lib/utils"
  * session nothing started.
  */
 export function CrewParentPill({ sessionId }: { sessionId: string }) {
+  const { t } = useTranslation()
   const inventory = useSessionInventoryOptional()
   const { names } = useSessionNames()
   const knownById = useMemo(
@@ -37,8 +39,8 @@ export function CrewParentPill({ sessionId }: { sessionId: string }) {
       size="xs"
       data-crew-parent
       onClick={open}
-      aria-label={`Reports to ${title}`}
-      title={`Open ${title}, which started this session`}
+      aria-label={t("Reports to {0}", { "0": title })}
+      title={t("Open {0}, which started this session", { "0": title })}
       className={cn(
         FLOATING_PILL,
         // Gives way before the session's own pill: capped, and quicker to shrink.
@@ -46,7 +48,7 @@ export function CrewParentPill({ sessionId }: { sessionId: string }) {
       )}
     >
       <ArrowUp className="size-3 shrink-0" aria-hidden="true" />
-      <span className="shrink-0 max-[1200px]:hidden">Reports to</span>
+      <span className="shrink-0 max-[1200px]:hidden">{t("Reports to")}</span>
       <span className="truncate font-medium text-foreground">{title}</span>
     </Button>
   )

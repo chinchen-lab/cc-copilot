@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useTokenUsage, type UsageData } from "@/hooks/useTokenUsage"
 import { agentShortName } from "@/lib/agents/presentation"
 import { cn } from "@/lib/utils"
@@ -31,6 +32,7 @@ const USAGE_TEXT_COLOR: Record<UsageLevel, string> = {
 }
 
 function TooltipBody({ usage }: { usage: UsageData }) {
+  const { t } = useTranslation()
   const rows: { label: string; pct: number; resetsAt?: string }[] = []
 
   if (usage.fiveHour) rows.push({ label: usage.fiveHour.label ?? "5-hour", pct: usage.fiveHour.utilization, resetsAt: usage.fiveHour.resetsAt })
@@ -41,7 +43,7 @@ function TooltipBody({ usage }: { usage: UsageData }) {
   return (
     <div className="flex min-w-[200px] flex-col gap-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-wide">{usage.agentKind ? agentShortName(usage.agentKind) : "Agent"} usage</span>
+        <span className="text-xs font-medium uppercase tracking-wide">{usage.agentKind ? agentShortName(usage.agentKind) : t("Agent")} {t(" usage")}</span>
         {usage.subscriptionType && (
           <Badge variant="secondary">
             {usage.subscriptionType}
@@ -64,7 +66,7 @@ function TooltipBody({ usage }: { usage: UsageData }) {
             </div>
             <Progress value={Math.min(r.pct, 100)} />
             {resetH != null && (
-              <div className="text-xs text-muted-foreground">Resets in {resetH}h</div>
+              <div className="text-xs text-muted-foreground">{t("Resets in ")}{resetH}h</div>
             )}
           </div>
         )
@@ -72,16 +74,16 @@ function TooltipBody({ usage }: { usage: UsageData }) {
       {usage.extraUsage?.isEnabled && usage.extraUsage.usedCredits != null && usage.extraUsage.monthlyLimit != null && (
         <div className="flex flex-col gap-1 pt-1 text-xs text-muted-foreground">
           <Separator />
-          Extra: ${usage.extraUsage.usedCredits.toFixed(2)} / ${usage.extraUsage.monthlyLimit.toFixed(2)}
+          {t("Extra: $")}{usage.extraUsage.usedCredits.toFixed(2)} / ${usage.extraUsage.monthlyLimit.toFixed(2)}
         </div>
       )}
       {(usage.lifetimeTokens != null || usage.creditBalance || usage.creditsUnlimited) && (
         <div className="flex flex-col gap-1 pt-1 text-xs text-muted-foreground">
           <Separator />
-          {usage.lifetimeTokens != null && <div>Lifetime: {formatTokenCount(usage.lifetimeTokens)} tokens</div>}
+          {usage.lifetimeTokens != null && <div>{t("Lifetime: ")}{formatTokenCount(usage.lifetimeTokens)} {t(" tokens")}</div>}
           {usage.creditsUnlimited
-            ? <div>Credits: Unlimited</div>
-            : usage.creditBalance ? <div>Credits: {usage.creditBalance}</div> : null}
+            ? <div>{t("Credits: Unlimited")}</div>
+            : usage.creditBalance ? <div>{t("Credits: ")}{usage.creditBalance}</div> : null}
         </div>
       )}
     </div>
@@ -94,6 +96,7 @@ function TooltipBody({ usage }: { usage: UsageData }) {
  * Renders nothing if usage is unavailable.
  */
 export function TokenUsageIndicator({ agentKind = DEFAULT_AGENT_KIND }: { agentKind?: AgentKind }) {
+  const { t } = useTranslation()
   const { usage, loading, available, refresh } = useTokenUsage(agentKind)
 
   if (!available || !usage) return null
@@ -104,7 +107,7 @@ export function TokenUsageIndicator({ agentKind = DEFAULT_AGENT_KIND }: { agentK
 
   return (
     <Tooltip>
-      <TooltipTrigger render={<Button type="button" variant="ghost" size="xs" aria-label={`Refresh ${usage.agentKind ? agentShortName(usage.agentKind) : "agent"} usage`} onClick={refresh} disabled={loading} className="mr-1 font-mono" />}>
+      <TooltipTrigger render={<Button type="button" variant="ghost" size="xs" aria-label={t("Refresh {0} usage", { "0": usage.agentKind ? agentShortName(usage.agentKind) : "agent" })} onClick={refresh} disabled={loading} className="mr-1 font-mono" />}>
           <span className={cn(
             "tabular-nums",
             USAGE_TEXT_COLOR[usageLevel(primary)],

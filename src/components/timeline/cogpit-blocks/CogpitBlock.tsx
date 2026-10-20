@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useContext, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react"
 import { Check, CircleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -41,6 +42,7 @@ function Frame({ label, children }: { label: string; children: ReactNode }) {
 const TONE: Record<string, string> = { warning: "text-warning", danger: "text-destructive", success: "text-success" }
 
 function StatusView({ block }: { block: StatusBlock }) {
+  const { t } = useTranslation()
   const { progress } = block
   const percent = progress ? Math.round((progress.done / progress.total) * 100) : null
   return (
@@ -59,7 +61,7 @@ function StatusView({ block }: { block: StatusBlock }) {
             <div className="h-full rounded-full bg-foreground" style={{ width: `${percent}%` }} />
           </div>
           <div className="mt-1.5 flex justify-between text-xs tabular-nums text-muted-foreground">
-            <span>{progress.done} of {progress.total} done</span>
+            <span>{progress.done} {t(" of ")}{progress.total} {t(" done")}</span>
             <span>{percent}%</span>
           </div>
         </div>
@@ -87,12 +89,13 @@ const CHECK: Record<ChecklistState, { mark: ReactNode; ring: string; text: strin
 }
 
 function ChecklistView({ block }: { block: ChecklistBlock }) {
+  const { t } = useTranslation()
   const done = block.items.filter((item) => item.state === "done").length
   return (
     <Frame label={block.title ?? "Checklist"}>
       <div className="mb-1.5 flex items-baseline gap-2">
         {block.title && <h4 className="text-[0.84375rem] font-medium">{block.title}</h4>}
-        <span className="text-xs tabular-nums text-muted-foreground">{done} of {block.items.length}</span>
+        <span className="text-xs tabular-nums text-muted-foreground">{done} {t(" of ")}{block.items.length}</span>
       </div>
       <ul className="flex flex-col">
         {block.items.map((item, index) => {
@@ -125,6 +128,7 @@ interface DecisionsState {
 }
 
 function DecisionsView({ block, source, occurrence }: { block: DecisionsBlock; source: string; occurrence: string }) {
+  const { t } = useTranslation()
   const session = useSessionContextOptional()
   const chat = useSessionChatContextOptional()
   const scope = useContext(CogpitBlockScope)
@@ -237,7 +241,7 @@ function DecisionsView({ block, source, occurrence }: { block: DecisionsBlock; s
                       onClick={inRow(() => choose(decision.id, option))}
                     >
                       {option}
-                      {option === decision.recommended && <span className="font-normal opacity-60">recommended</span>}
+                      {option === decision.recommended && <span className="font-normal opacity-60">{t("recommended")}</span>}
                     </Button>
                   ))}
                 </span>
@@ -256,7 +260,7 @@ function DecisionsView({ block, source, occurrence }: { block: DecisionsBlock; s
                         setCurrent(index)
                       })}
                     >
-                      Change
+                      {t("Change")}
                     </Button>
                   )}
                 </span>
@@ -268,9 +272,9 @@ function DecisionsView({ block, source, occurrence }: { block: DecisionsBlock; s
       {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
       {state.sentAt === null && (
         <div className="mt-1.5 flex flex-wrap items-center gap-2 border-t border-border/70 pt-2.5 text-xs text-muted-foreground">
-          <span className="tabular-nums">{answered} of {block.decisions.length} answered</span>
+          <span className="tabular-nums">{answered} {t(" of ")}{block.decisions.length} {t(" answered")}</span>
           <span className="flex-1" />
-          {canSend && <span className="hidden sm:inline">1–9 picks · Enter takes the recommended · ⌘Enter sends</span>}
+          {canSend && <span className="hidden sm:inline">{t("1–9 picks · Enter takes the recommended · ⌘Enter sends")}</span>}
           <Button type="button" size="xs" disabled={!canSend || answered === 0 || sending} onClick={() => void send()}>
             {answered === block.decisions.length ? "Send answers" : `Send ${answered} ${answered === 1 ? "answer" : "answers"}`}
           </Button>

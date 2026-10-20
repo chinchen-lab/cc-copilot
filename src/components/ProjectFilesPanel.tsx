@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AlertTriangle, ArrowLeft, FileCode2, FolderTree, GitBranch, MessageSquarePlus, RefreshCw, Save, Search, X } from "lucide-react"
 import ReactMarkdown from "react-markdown"
@@ -176,6 +177,7 @@ export function ProjectFilesPanel({
   onAddToPrompt,
   openRequest,
 }: ProjectFilesPanelProps) {
+  const { t } = useTranslation()
   const panelRef = useRef<HTMLElement>(null)
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const pendingFocusRef = useRef<{ text: string; line?: number } | null>(null)
@@ -582,16 +584,16 @@ export function ProjectFilesPanel({
   return (
     <aside
       ref={panelRef}
-      aria-label="Project files"
+      aria-label={t("Project files")}
       className="relative flex size-full min-h-0 flex-col bg-canvas"
     >
       <div className="flex h-10 shrink-0 items-center gap-2 px-3">
         <FolderTree data-icon="inline-start" aria-hidden="true" className="size-4 text-muted-foreground" />
-        <h2 className="text-sm font-medium">Project files</h2>
+        <h2 className="text-sm font-medium">{t("Project files")}</h2>
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground" title={cwd}>
           {cwd}
         </span>
-        <Button variant="ghost" size="icon-sm" onClick={closePanel} aria-label="Close project files">
+        <Button variant="ghost" size="icon-sm" onClick={closePanel} aria-label={t("Close project files")}>
           <X data-icon="inline-start" />
         </Button>
       </div>
@@ -602,21 +604,21 @@ export function ProjectFilesPanel({
         <>
           <div className="flex h-8 shrink-0 items-center gap-2 px-3 text-xs text-muted-foreground">
             <GitBranch data-icon="inline-start" aria-hidden="true" className="size-3.5" />
-            <span className="max-w-40 truncate font-mono text-foreground" title={gitStatus.branch ?? "Detached HEAD"}>
-              {gitStatus.branch ?? "detached HEAD"}
+            <span className="max-w-40 truncate font-mono text-foreground" title={gitStatus.branch ?? t("Detached HEAD")}>
+              {gitStatus.branch ?? t("detached HEAD")}
             </span>
-            {gitStatus.upstream && <span className="truncate">tracks {gitStatus.upstream}</span>}
+            {gitStatus.upstream && <span className="truncate">{t("tracks ")}{gitStatus.upstream}</span>}
             {(gitStatus.ahead ?? 0) > 0 && <Badge variant="outline">↑ {gitStatus.ahead}</Badge>}
             {(gitStatus.behind ?? 0) > 0 && <Badge variant="outline">↓ {gitStatus.behind}</Badge>}
             <span className="flex-1" />
-            <span>{gitStatus.files.length} changed</span>
+            <span>{gitStatus.files.length} {t(" changed")}</span>
           </div>
           <Separator />
         </>
       )}
 
       <div className="flex min-h-0 flex-1">
-        <section aria-label="File browser" className={cn("min-h-0 shrink-0 flex-col md:flex md:w-56", selectedPath && !mobileBrowse ? "hidden" : "flex w-full")}>
+        <section aria-label={t("File browser")} className={cn("min-h-0 shrink-0 flex-col md:flex md:w-56", selectedPath && !mobileBrowse ? "hidden" : "flex w-full")}>
           <div className="flex flex-col gap-2 p-2">
             <div className="flex items-center gap-1">
               <InputGroup className="min-w-0 flex-1">
@@ -624,10 +626,10 @@ export function ProjectFilesPanel({
                   <Search data-icon="inline-start" />
                 </InputGroupAddon>
                 <InputGroupInput
-                  aria-label="Search project files"
+                  aria-label={t("Search project files")}
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Filter files…"
+                  placeholder={t("Filter files…")}
                   spellCheck={false}
                 />
               </InputGroup>
@@ -636,15 +638,15 @@ export function ProjectFilesPanel({
                 size="icon-sm"
                 disabled={refreshing}
                 onClick={refreshAll}
-                aria-label="Refresh files and git status"
-                title="Refresh files and git status"
+                aria-label={t("Refresh files and git status")}
+                title={t("Refresh files and git status")}
               >
                 <RefreshCw data-icon="inline-start" className={refreshing ? "animate-spin" : undefined} />
               </Button>
             </div>
             {gitStatus?.isRepository && (
               <ToggleGroup
-                aria-label="File scope"
+                aria-label={t("File scope")}
                 value={[fileScope]}
                 onValueChange={(values) => {
                   const next = values[0]
@@ -655,8 +657,8 @@ export function ProjectFilesPanel({
                 spacing={0}
                 className="w-full"
               >
-                <ToggleGroupItem value="all" className="flex-1">All files</ToggleGroupItem>
-                <ToggleGroupItem value="changes" className="flex-1">Changes</ToggleGroupItem>
+                <ToggleGroupItem value="all" className="flex-1">{t("All files")}</ToggleGroupItem>
+                <ToggleGroupItem value="changes" className="flex-1">{t("Changes")}</ToggleGroupItem>
               </ToggleGroup>
             )}
           </div>
@@ -673,13 +675,13 @@ export function ProjectFilesPanel({
             ) : listLoading ? (
               <div className="flex items-center justify-center gap-2 p-6 text-xs text-muted-foreground" role="status">
                 <Spinner />
-                Loading files…
+                {t("Loading files…")}
               </div>
             ) : listError ? (
               <Empty className="min-h-48 rounded-none p-4">
                 <EmptyHeader>
                   <EmptyMedia variant="icon"><AlertTriangle /></EmptyMedia>
-                  <EmptyTitle>Could not load files</EmptyTitle>
+                  <EmptyTitle>{t("Could not load files")}</EmptyTitle>
                   <EmptyDescription>{listError}</EmptyDescription>
                 </EmptyHeader>
               </Empty>
@@ -687,9 +689,9 @@ export function ProjectFilesPanel({
               <Empty className="min-h-48 rounded-none p-4">
                 <EmptyHeader>
                   <EmptyMedia variant="icon"><FolderTree /></EmptyMedia>
-                  <EmptyTitle>{fileScope === "changes" ? "No working-tree changes" : "No matching files"}</EmptyTitle>
+                  <EmptyTitle>{fileScope === "changes" ? t("No working-tree changes") : t("No matching files")}</EmptyTitle>
                   <EmptyDescription>
-                    {fileScope === "changes" ? "This project has no changed files matching the filter." : "Try a different path or filename."}
+                    {fileScope === "changes" ? t("This project has no changed files matching the filter.") : t("Try a different path or filename.")}
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
@@ -725,8 +727,8 @@ export function ProjectFilesPanel({
                 {fileScope === "all" && (totalMatches > matchedFiles.length || scanLimited) && (
                   <p className="px-3 py-2 text-xs text-muted-foreground">
                     {totalMatches > matchedFiles.length
-                      && `Showing ${matchedFiles.length} of ${totalMatches} matches. Type to narrow the list. `}
-                    {scanLimited && "This project is too large to scan completely."}
+                      && t("Showing {0} of {1} matches. Type to narrow the list. ", { "0": matchedFiles.length, "1": totalMatches })}
+                    {scanLimited && t("This project is too large to scan completely.")}
                   </p>
                 )}
               </div>
@@ -736,11 +738,11 @@ export function ProjectFilesPanel({
 
         <Separator orientation="vertical" className="hidden md:block" />
 
-        <section aria-label="File editor" className={cn("min-h-0 min-w-0 flex-1 flex-col md:flex", selectedPath && !mobileBrowse ? "flex" : "hidden")}>
+        <section aria-label={t("File editor")} className={cn("min-h-0 min-w-0 flex-1 flex-col md:flex", selectedPath && !mobileBrowse ? "flex" : "hidden")}>
           {selectedPath ? (
             <>
               <div className="flex min-h-10 shrink-0 flex-wrap items-center gap-2 px-3 py-1 md:flex-nowrap">
-                <Button variant="ghost" size="icon-lg" className="md:hidden" onClick={() => setMobileBrowse(true)} aria-label="Back to file browser">
+                <Button variant="ghost" size="icon-lg" className="md:hidden" onClick={() => setMobileBrowse(true)} aria-label={t("Back to file browser")}>
                   <ArrowLeft data-icon="inline-start" />
                 </Button>
                 <div className="min-w-0 flex-1 basis-[calc(100%-3.25rem)] md:basis-auto">
@@ -749,7 +751,7 @@ export function ProjectFilesPanel({
                 </div>
                 {(selectedGitFile || viewMode === "diff" || selectedIsMarkdown) && (
                   <ToggleGroup
-                    aria-label="File view"
+                    aria-label={t("File view")}
                     value={[viewMode]}
                     onValueChange={(values) => {
                       if (values[0] === "diff") showDiff()
@@ -759,9 +761,9 @@ export function ProjectFilesPanel({
                     size="sm"
                     spacing={0}
                   >
-                    {(selectedGitFile || viewMode === "diff") && <ToggleGroupItem value="diff">Diff</ToggleGroupItem>}
-                    {selectedIsMarkdown && <ToggleGroupItem value="preview">Preview</ToggleGroupItem>}
-                    <ToggleGroupItem value="edit">Edit</ToggleGroupItem>
+                    {(selectedGitFile || viewMode === "diff") && <ToggleGroupItem value="diff">{t("Diff")}</ToggleGroupItem>}
+                    {selectedIsMarkdown && <ToggleGroupItem value="preview">{t("Preview")}</ToggleGroupItem>}
+                    <ToggleGroupItem value="edit">{t("Edit")}</ToggleGroupItem>
                   </ToggleGroup>
                 )}
                 {viewMode === "diff" && selectedGitFile && (
@@ -770,8 +772,8 @@ export function ProjectFilesPanel({
                   </Badge>
                 )}
                 {viewMode === "diff" && diffCounts && <LineCounts add={diffCounts.add} del={diffCounts.del} />}
-                {viewMode !== "diff" && dirty && <Badge variant="outline">Unsaved</Badge>}
-                {viewMode !== "diff" && !dirty && savedNotice && <Badge variant="secondary">Saved</Badge>}
+                {viewMode !== "diff" && dirty && <Badge variant="outline">{t("Unsaved")}</Badge>}
+                {viewMode !== "diff" && !dirty && savedNotice && <Badge variant="secondary">{t("Saved")}</Badge>}
                 {viewMode !== "diff" && mtimeMs !== null && (
                   <span className="hidden text-xs text-muted-foreground md:inline">{displayBytes(size)}</span>
                 )}
@@ -788,11 +790,11 @@ export function ProjectFilesPanel({
                         onAddToPrompt({ path: selectedPath })
                       }
                     }}
-                    aria-label={selectedExcerpt ? "Add selected lines to prompt" : "Reference file in prompt"}
-                    title={selectedExcerpt ? "Add selected lines to prompt" : "Reference file in prompt"}
+                    aria-label={selectedExcerpt ? t("Add selected lines to prompt") : t("Reference file in prompt")}
+                    title={selectedExcerpt ? t("Add selected lines to prompt") : t("Reference file in prompt")}
                   >
                     <MessageSquarePlus data-icon="inline-start" />
-                    {selectedExcerpt ? "Add selection" : "Reference"}
+                    {selectedExcerpt ? t("Add selection") : t("Reference")}
                   </Button>
                 )}
                 <Button
@@ -800,15 +802,15 @@ export function ProjectFilesPanel({
                   size="icon-sm"
                   disabled={viewMode === "diff" ? diffLoading : fileLoading || saving}
                   onClick={reloadSelected}
-                  aria-label={viewMode === "diff" ? "Reload diff" : "Reload file"}
-                  title={viewMode === "diff" ? "Reload diff" : "Reload file"}
+                  aria-label={viewMode === "diff" ? t("Reload diff") : t("Reload file")}
+                  title={viewMode === "diff" ? t("Reload diff") : t("Reload file")}
                 >
                   <RefreshCw data-icon="inline-start" />
                 </Button>
                 {viewMode !== "diff" && (
                   <Button size="sm" disabled={!dirty || fileLoading || saving || mtimeMs === null} onClick={() => void saveFile()}>
                     {saving ? <Spinner data-icon="inline-start" /> : <Save data-icon="inline-start" />}
-                    {saving ? "Saving…" : "Save"}
+                    {saving ? t("Saving…") : t("Save")}
                   </Button>
                 )}
               </div>
@@ -824,13 +826,13 @@ export function ProjectFilesPanel({
                   {diffLoading ? (
                     <div className="flex size-full items-center justify-center gap-2 text-xs text-muted-foreground" role="status">
                       <Spinner />
-                      Loading diff…
+                      {t("Loading diff…")}
                     </div>
                   ) : diffError ? (
                     <Empty className="rounded-none">
                       <EmptyHeader>
                         <EmptyMedia variant="icon"><AlertTriangle /></EmptyMedia>
-                        <EmptyTitle>Could not diff this file</EmptyTitle>
+                        <EmptyTitle>{t("Could not diff this file")}</EmptyTitle>
                         <EmptyDescription>{diffError}</EmptyDescription>
                       </EmptyHeader>
                     </Empty>
@@ -838,11 +840,11 @@ export function ProjectFilesPanel({
                     <Empty className="rounded-none">
                       <EmptyHeader>
                         <EmptyMedia variant="icon"><FileCode2 /></EmptyMedia>
-                        <EmptyTitle>{diff.binary ? "Binary file" : "File is too large to diff"}</EmptyTitle>
+                        <EmptyTitle>{diff.binary ? t("Binary file") : t("File is too large to diff")}</EmptyTitle>
                         <EmptyDescription>
                           {diff.binary
-                            ? "Git tracks this change, but there is no text diff to show."
-                            : "Review this change in your editor instead."}
+                            ? t("Git tracks this change, but there is no text diff to show.")
+                            : t("Review this change in your editor instead.")}
                         </EmptyDescription>
                       </EmptyHeader>
                     </Empty>
@@ -850,8 +852,8 @@ export function ProjectFilesPanel({
                     <Empty className="rounded-none">
                       <EmptyHeader>
                         <EmptyMedia variant="icon"><FileCode2 /></EmptyMedia>
-                        <EmptyTitle>No content changes</EmptyTitle>
-                        <EmptyDescription>This file matches the last commit — only its mode or index entry differs.</EmptyDescription>
+                        <EmptyTitle>{t("No content changes")}</EmptyTitle>
+                        <EmptyDescription>{t("This file matches the last commit — only its mode or index entry differs.")}</EmptyDescription>
                       </EmptyHeader>
                     </Empty>
                   ) : (
@@ -871,12 +873,12 @@ export function ProjectFilesPanel({
                 {fileLoading && (
                   <div className="flex size-full items-center justify-center gap-2 text-xs text-muted-foreground" role="status">
                     <Spinner />
-                    Opening file…
+                    {t("Opening file…")}
                   </div>
                 )}
                 {!fileLoading && mtimeMs !== null && (viewMode === "preview" ? (
                   <div
-                    aria-label={`Preview of ${selectedPath}`}
+                    aria-label={t("Preview of {0}", { "0": selectedPath })}
                     className="min-h-0 flex-1 overflow-auto break-words px-6 py-4 text-sm"
                   >
                     <ReactMarkdown components={previewComponents} remarkPlugins={markdownPlugins}>{content}</ReactMarkdown>
@@ -904,8 +906,8 @@ export function ProjectFilesPanel({
             <Empty className="rounded-none">
               <EmptyHeader>
                 <EmptyMedia variant="icon"><FileCode2 /></EmptyMedia>
-                <EmptyTitle>Select a file</EmptyTitle>
-                <EmptyDescription>Browse or filter project files, then open one to inspect and edit it.</EmptyDescription>
+                <EmptyTitle>{t("Select a file")}</EmptyTitle>
+                <EmptyDescription>{t("Browse or filter project files, then open one to inspect and edit it.")}</EmptyDescription>
               </EmptyHeader>
             </Empty>
           )}
@@ -920,9 +922,9 @@ export function ProjectFilesPanel({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Comment on selected lines</DialogTitle>
+            <DialogTitle>{t("Comment on selected lines")}</DialogTitle>
             <DialogDescription>
-              Add a review instruction for {selectedPath} lines {reviewDraft?.startLine}-{reviewDraft?.endLine}.
+              {t("Add a review instruction for ")}{selectedPath} {t(" lines ")}{reviewDraft?.startLine}-{reviewDraft?.endLine}.
             </DialogDescription>
           </DialogHeader>
           <form
@@ -938,10 +940,10 @@ export function ProjectFilesPanel({
           >
             <Textarea
               autoFocus
-              aria-label="Review comment"
+              aria-label={t("Review comment")}
               value={reviewComment}
               onChange={(event) => setReviewComment(event.target.value)}
-              placeholder="Describe the change you want…"
+              placeholder={t("Describe the change you want…")}
               onKeyDown={(event) => {
                 if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && reviewComment.trim()) {
                   event.preventDefault()
@@ -950,10 +952,10 @@ export function ProjectFilesPanel({
               }}
             />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setReviewDraft(null)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => setReviewDraft(null)}>{t("Cancel")}</Button>
               <Button type="submit" disabled={!reviewComment.trim()}>
                 <MessageSquarePlus data-icon="inline-start" />
-                Add to prompt
+                {t("Add to prompt")}
               </Button>
             </DialogFooter>
           </form>
@@ -968,17 +970,17 @@ export function ProjectFilesPanel({
       >
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogTitle>{t("Discard unsaved changes?")}</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDiscard?.type === "file"
-                ? `Your edits to ${selectedName ?? "this file"} will be lost when you open ${pendingDiscard.target.path}.`
-                : `Your edits to ${selectedName ?? "this file"} will be lost when you close the file workspace.`}
+                ? t("Your edits to {0} will be lost when you open {1}.", { "0": selectedName ?? "this file", "1": pendingDiscard.target.path })
+                : t("Your edits to {0} will be lost when you close the file workspace.", { "0": selectedName ?? "this file" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel size="sm">Keep editing</AlertDialogCancel>
+            <AlertDialogCancel size="sm">{t("Keep editing")}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" size="sm" onClick={confirmDiscard}>
-              Discard changes
+              {t("Discard changes")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

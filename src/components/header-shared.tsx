@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo } from "react"
 import type { HTMLAttributes } from "react"
 import type { LucideIcon } from "lucide-react"
@@ -68,6 +69,7 @@ export const HeaderIconButton = memo(function HeaderIconButton({
   iconClassName,
   size = "sm",
 }: HeaderIconButtonProps) {
+  const { t } = useTranslation()
   return (
     <Tooltip>
       <TooltipTrigger
@@ -78,13 +80,13 @@ export const HeaderIconButton = memo(function HeaderIconButton({
             className={className}
             onClick={onClick}
             disabled={disabled}
-            aria-label={label}
+            aria-label={t(label)}
           />
         }
       >
           <Icon data-icon="inline-start" className={iconClassName} />
       </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
+      <TooltipContent>{t(label)}</TooltipContent>
     </Tooltip>
   )
 })
@@ -123,6 +125,7 @@ export const ContextBadge = memo(function ContextBadge({
   showTooltip = false,
   warnOnly = false,
 }: ContextBadgeProps) {
+  const { t } = useTranslation()
   const ctx = getContextUsage(rawMessages)
   if (!ctx) return null
 
@@ -154,10 +157,10 @@ export const ContextBadge = memo(function ContextBadge({
     <Tooltip>
       <TooltipTrigger render={badge} />
       <TooltipContent className="flex flex-col gap-1 text-xs">
-        <div className="font-medium">Context before auto-compact</div>
-        <div>{formatTokenCount(remaining)} remaining ({pctLeft.toFixed(1)}%)</div>
+        <div className="font-medium">{t("Context before auto-compact")}</div>
+        <div>{formatTokenCount(remaining)} {t(" remaining (")}{pctLeft.toFixed(1)}%)</div>
         <div className="text-muted-foreground">
-          {formatTokenCount(ctx.used)} / {formatTokenCount(ctx.limit)} tokens used ({ctx.percentAbsolute.toFixed(1)}%)
+          {formatTokenCount(ctx.used)} / {formatTokenCount(ctx.limit)} {t(" tokens used (")}{ctx.percentAbsolute.toFixed(1)}%)
         </div>
       </TooltipContent>
     </Tooltip>

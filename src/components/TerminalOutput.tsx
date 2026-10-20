@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useRef, useCallback, useState } from "react"
 import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
@@ -16,6 +17,7 @@ export function TerminalOutput({ processId, autoFocus = false, onRequestNew, onR
   onRequestClose?: () => void
   onAddContext?: (text: string) => void
 }) {
+  const { t } = useTranslation()
   const pty = usePty()
   const [fontScale] = useFontScale()
 
@@ -163,7 +165,7 @@ export function TerminalOutput({ processId, autoFocus = false, onRequestNew, onR
         ref={containerRef}
         className="size-full p-1"
         role="region"
-        aria-label="Terminal output"
+        aria-label={t("Terminal output")}
         tabIndex={0}
         onClick={handleClick}
         onKeyDown={(event) => {
@@ -182,7 +184,7 @@ export function TerminalOutput({ processId, autoFocus = false, onRequestNew, onR
           }}
         >
           <Quote data-icon="inline-start" />
-          Add to prompt
+          {t("Add to prompt")}
         </Button>
       )}
     </div>

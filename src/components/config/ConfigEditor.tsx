@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useEffect, useCallback } from "react"
 import { Lock, Save, Undo2, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -34,6 +35,7 @@ export function ConfigEditor({
   onDeleted,
   readOnly = false,
 }: ConfigEditorProps) {
+  const { t } = useTranslation()
   const [content, setContent] = useState<string | null>(null)
   const [originalContent, setOriginalContent] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -134,11 +136,11 @@ export function ConfigEditor({
         <CliBadge cli={file.cli} variant="full" />
         {isReadOnly && (
           <Badge variant="outline" className="h-5 bg-muted text-xs text-muted-foreground">
-            <Lock data-icon="inline-start" className="size-3" /> read-only
+            <Lock data-icon="inline-start" className="size-3" /> {t(" read-only")}
           </Badge>
         )}
         {hasChanges && (
-          <span className="size-2 shrink-0 rounded-full bg-warning" title="Unsaved changes" />
+          <span className="size-2 shrink-0 rounded-full bg-warning" title={t("Unsaved changes")} />
         )}
         <div className="flex items-center gap-2 ml-auto min-w-0">
           <LinkIndicator linkTarget={file.linkTarget} variant="full" />
@@ -150,7 +152,7 @@ export function ConfigEditor({
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-          Loading...
+          {t("Loading...")}
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
@@ -178,23 +180,23 @@ export function ConfigEditor({
                 disabled={!hasChanges}
               >
                 <Undo2 data-icon="inline-start" />
-                Discard
+                {t("Discard")}
               </Button>
               <div className="flex-1" />
               <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <AlertDialogTrigger render={<Button variant="outline" size="xs" />}>
                   <Trash2 data-icon="inline-start" />
-                  Delete
+                  {t("Delete")}
                 </AlertDialogTrigger>
                 <AlertDialogContent size="sm">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete configuration file?</AlertDialogTitle>
+                    <AlertDialogTitle>{t("Delete configuration file?")}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Delete "{file.name}" permanently? This action cannot be undone.
+                      {t("Delete \"")}{file.name}{t("\" permanently? This action cannot be undone.")}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel size="sm" disabled={deleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel size="sm" disabled={deleting}>{t("Cancel")}</AlertDialogCancel>
                     <AlertDialogAction
                       variant="destructive"
                       size="sm"
@@ -202,7 +204,7 @@ export function ConfigEditor({
                       onClick={() => void handleDelete()}
                     >
                       {deleting && <Spinner data-icon="inline-start" />}
-                      {deleting ? "Deleting..." : "Delete file"}
+                      {deleting ? t("Deleting...") : t("Delete file")}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>

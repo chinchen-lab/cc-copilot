@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import { ChevronsUpDown } from "lucide-react"
 import { ProjectFavicon } from "@/components/ProjectFavicon"
@@ -28,6 +29,7 @@ export function NewSessionHeadline({
   projectPath: string | null
   switcher: HeadlineProjectSwitcher
 }) {
+  const { t } = useTranslation()
   const name = projectPath ? projectName(projectPath) : null
 
   return (
@@ -35,7 +37,7 @@ export function NewSessionHeadline({
       <h1 className="text-balance text-2xl font-semibold tracking-tight text-foreground">
         {name ? (
           <>
-            What should we build in{" "}
+            {t("What should we build in")}{" "}
             <ProjectNameSwitcher name={name} projectPath={projectPath} switcher={switcher} />
             ?
           </>
@@ -64,13 +66,14 @@ function ProjectNameSwitcher({
   projectPath: string | null
   switcher: HeadlineProjectSwitcher
 }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const projects = useProjectList(open)
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        title="Switch project"
+        title={t("Switch project")}
         className="group/project -mx-1 inline-flex max-w-full items-center gap-1.5 rounded-lg px-1.5 align-baseline outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-popup-open:bg-accent"
       >
         <ProjectFavicon projectPath={projectPath} fallback={null} className="size-5" />
@@ -97,7 +100,7 @@ function ProjectNameSwitcher({
           }}
         >
           <div className="flex items-center justify-between border-t px-3 py-2 text-[0.6875rem] text-muted-foreground">
-            <span>Switch where this session starts</span>
+            <span>{t("Switch where this session starts")}</span>
             <kbd className="font-mono">{shortcutLabel("newSession")}</kbd>
           </div>
         </ProjectSwitcherList>

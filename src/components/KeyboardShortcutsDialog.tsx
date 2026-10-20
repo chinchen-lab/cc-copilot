@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useState } from "react"
 import { Keyboard, RotateCcw, Search } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -45,6 +46,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange }: KeyboardShortcut
 }
 
 function KeyboardShortcutsDialogContent() {
+  const { t } = useTranslation()
   const [query, setQuery] = useState("")
   const [recording, setRecording] = useState<KeybindingCommand | null>(null)
   const [conflict, setConflict] = useState<string | null>(null)
@@ -83,7 +85,7 @@ function KeyboardShortcutsDialogContent() {
   const normalizedQuery = query.trim().toLowerCase()
   const filtered = normalizedQuery
     ? KEYBINDING_DEFINITIONS.filter((definition) =>
-        `${definition.label} ${definition.description} ${definition.group}`
+        `${t(definition.label)} ${t(definition.description)} ${definition.group}`
           .toLowerCase()
           .includes(normalizedQuery),
       )
@@ -96,10 +98,10 @@ function KeyboardShortcutsDialogContent() {
       <DialogHeader className="p-4 pb-3">
         <DialogTitle className="flex items-center gap-2">
           <Keyboard data-icon="inline-start" aria-hidden="true" className="size-4" />
-          Keyboard shortcuts
+          {t("Keyboard shortcuts")}
         </DialogTitle>
         <DialogDescription>
-          Click a shortcut, then press a new key combination. Changes are saved on this device.
+          {t("Click a shortcut, then press a new key combination. Changes are saved on this device.")}
         </DialogDescription>
       </DialogHeader>
 
@@ -111,10 +113,10 @@ function KeyboardShortcutsDialogContent() {
             <Search data-icon="inline-start" aria-hidden="true" />
           </InputGroupAddon>
           <InputGroupInput
-            aria-label="Search keyboard shortcuts"
+            aria-label={t("Search keyboard shortcuts")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search shortcuts…"
+            placeholder={t("Search shortcuts…")}
           />
         </InputGroup>
         <Button
@@ -127,14 +129,14 @@ function KeyboardShortcutsDialogContent() {
           }}
         >
           <RotateCcw data-icon="inline-start" />
-          Reset all
+          {t("Reset all")}
         </Button>
       </div>
 
       {conflict && (
         <Alert variant="destructive" className="mx-3 mb-2 w-auto">
           <AlertDescription>
-            {conflict} Press another shortcut or Esc to cancel.
+            {conflict} {t(" Press another shortcut or Esc to cancel.")}
           </AlertDescription>
         </Alert>
       )}
@@ -146,7 +148,7 @@ function KeyboardShortcutsDialogContent() {
             if (definitions.length === 0) return null
             return (
               <section key={group} className="flex flex-col gap-1">
-                <h3 className="px-2 py-1 text-xs font-medium text-muted-foreground">{group}</h3>
+                <h3 className="px-2 py-1 text-xs font-medium text-muted-foreground">{t(group)}</h3>
                 {definitions.map((definition) => {
                   const isRecording = recording === definition.command
                   return (
@@ -155,9 +157,9 @@ function KeyboardShortcutsDialogContent() {
                       className="flex min-h-12 items-center gap-3 rounded-md px-2 py-1.5 hover:bg-accent"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm">{definition.label}</p>
+                        <p className="truncate text-sm">{t(definition.label)}</p>
                         <p className="truncate text-xs text-muted-foreground">
-                          {definition.description}
+                          {t(definition.description)}
                         </p>
                       </div>
                       <Button
@@ -168,9 +170,9 @@ function KeyboardShortcutsDialogContent() {
                           setConflict(null)
                           setRecording(isRecording ? null : definition.command)
                         }}
-                        aria-label={`Change shortcut for ${definition.label}`}
+                        aria-label={t("Change shortcut for {0}", { "0": t(definition.label) })}
                       >
-                        {isRecording ? "Press keys…" : formatShortcut(bindings[definition.command])}
+                        {isRecording ? t("Press keys…") : formatShortcut(bindings[definition.command])}
                       </Button>
                       <Button
                         variant="ghost"
@@ -180,7 +182,7 @@ function KeyboardShortcutsDialogContent() {
                           setBindings(getResolvedKeybindings())
                           setConflict(null)
                         }}
-                        aria-label={`Reset shortcut for ${definition.label}`}
+                        aria-label={t("Reset shortcut for {0}", { "0": t(definition.label) })}
                       >
                         <RotateCcw data-icon="inline-start" />
                       </Button>

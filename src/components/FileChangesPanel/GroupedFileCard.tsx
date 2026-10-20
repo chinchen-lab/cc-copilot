@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useRef, useEffect, memo, useCallback, startTransition } from "react"
 import { useNearViewport } from "@/hooks/useNearViewport"
 import { ChevronDown, ChevronRight, Code2, GitCompareArrows } from "lucide-react"
@@ -22,6 +23,7 @@ interface GroupedFileCardProps {
 }
 
 export const GroupedFileCard = memo(function GroupedFileCard({ file, defaultOpen, isHighlighted, diffMode }: GroupedFileCardProps) {
+  const { t } = useTranslation()
   const { ref: nearRef, isNear } = useNearViewport()
   const [open, setOpen] = useState(defaultOpen)
   // Deferred open: the card header updates immediately, diff content renders
@@ -122,11 +124,11 @@ export const GroupedFileCard = memo(function GroupedFileCard({ file, defaultOpen
                   variant="ghost"
                   size="icon-xs"
                   onClick={() => openFile(file.filePath)}
-                  aria-label="Open file in editor"
+                  aria-label={t("Open file in editor")}
                 />}>
                   <Code2 data-icon="inline-start" />
               </TooltipTrigger>
-              <TooltipContent>Open in editor</TooltipContent>
+              <TooltipContent>{t("Open in editor")}</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger render={<Button
@@ -134,11 +136,11 @@ export const GroupedFileCard = memo(function GroupedFileCard({ file, defaultOpen
                   variant="ghost"
                   size="icon-xs"
                   onClick={() => openFile(file.filePath, { mode: "diff" })}
-                  aria-label="View git diff"
+                  aria-label={t("View git diff")}
                 />}>
                   <GitCompareArrows data-icon="inline-start" />
               </TooltipTrigger>
-              <TooltipContent>View git diff</TooltipContent>
+              <TooltipContent>{t("View git diff")}</TooltipContent>
             </Tooltip>
           </div>
           <LineCounts add={file.addCount} del={file.delCount} />
@@ -187,6 +189,7 @@ const DiffContent = memo(function DiffContent({
   edits: IndividualEdit[]
   netStartLine: number
 }): React.ReactElement | null {
+  const { t } = useTranslation()
   if (showDiff) {
     return (
       <div key={diffMode} ref={diffRef} className="motion-enter overflow-hidden rounded-b">
@@ -211,7 +214,7 @@ const DiffContent = memo(function DiffContent({
   if (open && !hasDiff) {
     return (
       <div className="motion-enter px-3 py-2 text-xs italic text-muted-foreground">
-        {diffMode === "per-edit" ? "No edits" : "No net changes (all edits cancelled out)"}
+        {diffMode === "per-edit" ? t("No edits") : t("No net changes (all edits cancelled out)")}
       </div>
     )
   }
@@ -222,6 +225,7 @@ const PER_EDIT_INITIAL = 3
 const PER_EDIT_BATCH = 5
 
 const PerEditDiffs = memo(function PerEditDiffs({ edits, filePath }: { edits: IndividualEdit[]; filePath: string }) {
+  const { t } = useTranslation()
   const total = edits.length
   const contentEdits = edits.filter((e) => Boolean(e.oldString || e.newString))
   const needsProgressive = contentEdits.length > PER_EDIT_INITIAL
@@ -267,7 +271,7 @@ const PerEditDiffs = memo(function PerEditDiffs({ edits, filePath }: { edits: In
       ))}
       {renderedCount < contentEdits.length && (
         <div className="py-1.5 text-center text-xs text-muted-foreground">
-          Loading {contentEdits.length - renderedCount} more edits…
+          {t("Loading ")}{contentEdits.length - renderedCount} {t(" more edits…")}
         </div>
       )}
     </div>

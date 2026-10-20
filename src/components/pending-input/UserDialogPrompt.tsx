@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 /**
  * The inline answer block for a session parked on a CLI dialog.
  *
@@ -22,13 +23,14 @@ interface UserDialogPromptProps {
 }
 
 export function UserDialogPrompt({ request, responding, onChoose }: UserDialogPromptProps) {
+  const { t } = useTranslation()
   return (
     <Alert className="border-warning/40 bg-warning/5">
       <ShieldAlert className="text-warning" />
-      <AlertTitle>The agent declined this request</AlertTitle>
+      <AlertTitle>{t("The agent declined this request")}</AlertTitle>
       <div className="col-start-2 mt-1 min-w-0">
         <p className="text-sm leading-relaxed text-foreground">
-          {request.originalModel} would not answer. Retrying on a fallback model may work.
+          {request.originalModel} {t(" would not answer. Retrying on a fallback model may work.")}
         </p>
         {request.guidanceText && (
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
@@ -43,7 +45,7 @@ export function UserDialogPrompt({ request, responding, onChoose }: UserDialogPr
               disabled={responding}
               onClick={() => onChoose(request.requestId, "retry_fallback")}
             >
-              Retry on {request.fallbackModel}
+              {t("Retry on ")}{request.fallbackModel}
             </Button>
             <Button
               variant="outline"
@@ -51,7 +53,7 @@ export function UserDialogPrompt({ request, responding, onChoose }: UserDialogPr
               disabled={responding}
               onClick={() => onChoose(request.requestId, "edit_prompt")}
             >
-              Edit prompt
+              {t("Edit prompt")}
             </Button>
             {/* Dismissing is a real answer: it tells the CLI to apply the
                 dialog's default rather than wait out its park deadline. */}
@@ -62,7 +64,7 @@ export function UserDialogPrompt({ request, responding, onChoose }: UserDialogPr
               className="ml-auto text-muted-foreground"
               onClick={() => onChoose(request.requestId, "cancelled")}
             >
-              Dismiss
+              {t("Dismiss")}
             </Button>
           </div>
         )}

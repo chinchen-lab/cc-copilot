@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useState } from "react"
 import {
   Bot,
@@ -70,6 +71,7 @@ export function WorkflowDetailView({
   confirming,
   onForceStop,
 }: WorkflowDetailViewProps) {
+  const { t } = useTranslation()
   const status = workflowStatusStyle(detail.status)
   const active = isWorkflowActive(detail.status)
   const groups = groupAgentsByPhase(detail)
@@ -84,9 +86,9 @@ export function WorkflowDetailView({
             <div className="mb-2 flex items-center gap-2">
               <Badge variant="outline" className={status.badge}>
                 {active && <span className={cn("size-1.5 rounded-full", status.dot)} />}
-                {status.label}
+                {t(status.label)}
               </Badge>
-              <span className="text-xs text-muted-foreground">Workflow run</span>
+              <span className="text-xs text-muted-foreground">{t("Workflow run")}</span>
             </div>
             <h2 className="text-xl font-semibold tracking-tight text-foreground" title={detail.workflowName}>
               {detail.workflowName}
@@ -107,24 +109,24 @@ export function WorkflowDetailView({
                 onClick={onForceStop}
               >
                 {stopping ? <Spinner data-icon="inline-start" /> : <Octagon data-icon="inline-start" />}
-                {confirming ? "Confirm stop" : "Stop workflow"}
+                {confirming ? t("Confirm stop") : t("Stop workflow")}
               </Button>
               {!canStop && (
-                <span className="text-xs text-muted-foreground">This run is not controlled by Cogpit</span>
+                <span className="text-xs text-muted-foreground">{t("This run is not controlled by Cogpit")}</span>
               )}
             </div>
           )}
         </div>
 
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-5">
-          <RunStat icon={Bot} value={`${detail.agentCounts.done + detail.agentCounts.error}/${detail.agentCount}`} label="Agents finished" />
-          <RunStat icon={Layers} value={String(detail.phaseCount)} label="Phases" />
-          <RunStat icon={Coins} value={formatTokenCount(detail.totalTokens)} label="Tokens" />
-          <RunStat icon={Wrench} value={String(detail.totalToolCalls)} label="Tool calls" />
+          <RunStat icon={Bot} value={`${detail.agentCounts.done + detail.agentCounts.error}/${detail.agentCount}`} label={t("Agents finished")} />
+          <RunStat icon={Layers} value={String(detail.phaseCount)} label={t("Phases")} />
+          <RunStat icon={Coins} value={formatTokenCount(detail.totalTokens)} label={t("Tokens")} />
+          <RunStat icon={Wrench} value={String(detail.totalToolCalls)} label={t("Tool calls")} />
           <RunStat
             icon={Clock}
             value={typeof detail.durationMs === "number" ? formatDuration(detail.durationMs) : "In progress"}
-            label="Duration"
+            label={t("Duration")}
             className="col-span-2 sm:col-span-1"
           />
         </div>
@@ -132,7 +134,7 @@ export function WorkflowDetailView({
         <div className="flex items-center gap-3">
           <Progress
             value={Math.round(progress * 100)}
-            aria-label="Workflow progress"
+            aria-label={t("Workflow progress")}
             className="flex-1"
           />
           <span className="w-9 text-right text-xs tabular-nums text-muted-foreground">
@@ -144,7 +146,7 @@ export function WorkflowDetailView({
       {detail.error && (
         <Alert variant="destructive">
           <Octagon />
-          <AlertTitle>Workflow error</AlertTitle>
+          <AlertTitle>{t("Workflow error")}</AlertTitle>
           <AlertDescription>
             <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-xs">
               {detail.error}
@@ -163,9 +165,9 @@ export function WorkflowDetailView({
       )}
 
       <div className="grid items-start gap-6 md:grid-cols-[180px_minmax(0,1fr)]">
-        <nav className="sticky top-0 hidden rounded-lg border bg-popover p-2 md:block" aria-label="Workflow phases">
+        <nav className="sticky top-0 hidden rounded-lg border bg-popover p-2 md:block" aria-label={t("Workflow phases")}>
           <p className="px-2 pb-2 pt-1 text-xs font-medium text-muted-foreground">
-            Run outline
+            {t("Run outline")}
           </p>
           <div className="flex flex-col gap-1">
             {groups.map((group) => (
@@ -238,6 +240,7 @@ function PhaseSection({
   sessionId: string
   runId: string
 }) {
+  const { t } = useTranslation()
   const completed = group.agents.filter((agent) => agent.state === "done" || agent.state === "skipped").length
 
   return (
@@ -250,7 +253,7 @@ function PhaseSection({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h3 className="text-base font-semibold text-foreground">{group.title}</h3>
             <span className="text-xs text-muted-foreground">
-              {completed}/{group.agents.length} complete
+              {completed}/{group.agents.length} {t(" complete")}
             </span>
           </div>
           {group.detail && <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{group.detail}</p>}
@@ -260,8 +263,8 @@ function PhaseSection({
       {group.agents.length === 0 ? (
         <Empty className="border py-6">
           <EmptyHeader>
-            <EmptyTitle>No agents yet</EmptyTitle>
-            <EmptyDescription>No agents have started this phase.</EmptyDescription>
+            <EmptyTitle>{t("No agents yet")}</EmptyTitle>
+            <EmptyDescription>{t("No agents have started this phase.")}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
@@ -292,6 +295,7 @@ function WorkflowOutcomeCard({
   sessionId: string
   runId: string
 }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(true)
   const [fullResult, setFullResult] = useState<unknown>()
   const [loading, setLoading] = useState(false)
@@ -329,8 +333,8 @@ function WorkflowOutcomeCard({
               <Sparkles className="size-4" />
             </span>
             <span className="min-w-0">
-              <CardTitle>Workflow outcome</CardTitle>
-              <CardDescription>The synthesized answer from this run</CardDescription>
+              <CardTitle>{t("Workflow outcome")}</CardTitle>
+              <CardDescription>{t("The synthesized answer from this run")}</CardDescription>
             </span>
             <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180 motion-reduce:transition-none" />
           </CollapsibleTrigger>
@@ -338,15 +342,15 @@ function WorkflowOutcomeCard({
             {previewIsShortened && fullResult === undefined && (
               <Button variant="outline" size="sm" disabled={loading} onClick={() => void loadFullResult()}>
                 {loading && <Spinner data-icon="inline-start" />}
-                {loadFailed ? "Retry full result" : "Load full result"}
+                {loadFailed ? t("Retry full result") : t("Load full result")}
               </Button>
             )}
             <Button
               variant="ghost"
               size="icon-sm"
               onClick={() => copy(serializeWorkflowResponse(result))}
-              aria-label={copied ? "Outcome copied" : "Copy outcome"}
-              title={copied ? "Copied" : "Copy outcome"}
+              aria-label={copied ? t("Outcome copied") : t("Copy outcome")}
+              title={copied ? t("Copied") : t("Copy outcome")}
             >
               {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
             </Button>
@@ -364,6 +368,7 @@ function WorkflowOutcomeCard({
 }
 
 function WorkflowScript({ script }: { script: string }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
   return (
@@ -372,7 +377,7 @@ function WorkflowScript({ script }: { script: string }) {
         <CardHeader className="px-0 py-0">
           <CollapsibleTrigger className="group flex w-full items-center gap-2 px-3 py-3 text-left text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-muted/40 hover:text-foreground">
             <Code2 className="size-4" />
-            <CardTitle>Orchestration script</CardTitle>
+            <CardTitle>{t("Orchestration script")}</CardTitle>
             <ChevronDown className="ml-auto size-4 transition-transform group-data-panel-open:rotate-180" />
           </CollapsibleTrigger>
         </CardHeader>

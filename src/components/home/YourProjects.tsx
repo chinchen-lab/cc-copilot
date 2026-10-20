@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import { ChevronRight, FolderOpen, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -7,6 +8,7 @@ import { projectName, shortPath } from "@/lib/format"
 
 /** The full project inventory, including projects outside the recent sessions. */
 export function YourProjects({ onSelectProject }: { onSelectProject: (dirName: string) => void }) {
+  const { t } = useTranslation()
   const projects = useProjectList(true)
   const { names } = useProjectNames()
   const [query, setQuery] = useState("")
@@ -20,18 +22,18 @@ export function YourProjects({ onSelectProject }: { onSelectProject: (dirName: s
     .sort((a, b) => (Date.parse(b.lastModified ?? "") || 0) - (Date.parse(a.lastModified ?? "") || 0) || label(a).localeCompare(label(b)))
 
   return (
-    <section aria-label="Your projects" className="min-w-0 shrink-0">
+    <section aria-label={t("Your projects")} className="min-w-0 shrink-0">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-medium">Your projects</h2>
+        <h2 className="text-sm font-medium">{t("Your projects")}</h2>
         <span className="text-xs tabular-nums text-muted-foreground">{words.length ? visible.length : projects.length}</span>
         <span className="flex-1" />
         <div className="relative w-full max-w-64">
           <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input type="search" aria-label="Search projects" placeholder="Search projects" value={query} onChange={(event) => setQuery(event.target.value)} className="h-7 pl-8 text-xs" />
+          <Input type="search" aria-label={t("Search projects")} placeholder={t("Search projects")} value={query} onChange={(event) => setQuery(event.target.value)} className="h-7 pl-8 text-xs" />
         </div>
       </div>
       {visible.length === 0 ? (
-        <p className="py-4 text-xs text-muted-foreground">{words.length ? `No project matches “${query.trim()}”.` : "Projects appear here after you start a session in them."}</p>
+        <p className="py-4 text-xs text-muted-foreground">{words.length ? t("No project matches “{0}”.", { "0": query.trim() }) : t("Projects appear here after you start a session in them.")}</p>
       ) : (
         <ul className="grid max-h-52 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
           {visible.map((project) => (
@@ -46,7 +48,7 @@ export function YourProjects({ onSelectProject }: { onSelectProject: (dirName: s
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{label(project)}</span>
                   <span className="block truncate text-xs text-muted-foreground">{shortPath(project.path)}</span>
-                  <span className="block text-xs text-muted-foreground">{project.sessionCount} {project.sessionCount === 1 ? "session" : "sessions"}</span>
+                  <span className="block text-xs text-muted-foreground">{project.sessionCount} {project.sessionCount === 1 ? t("session") : t("sessions")}</span>
                 </span>
                 <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
               </button>

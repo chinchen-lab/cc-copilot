@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Fragment, useMemo } from "react"
 import { ChevronRight, FolderOpen, FolderSearch, GitBranch, RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -55,6 +56,7 @@ export function ProjectsView({
   onSelectProject,
   onRefresh,
 }: ProjectsViewProps) {
+  const { t } = useTranslation()
   const activeCountByProject = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const session of activeSessions) {
@@ -84,33 +86,33 @@ export function ProjectsView({
       <main className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:pb-10 sm:pt-14">
         <header className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{t("Projects")}</h1>
             <Badge variant="secondary">{repositories.length}</Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            Open a project to browse and resume its sessions.
+            {t("Open a project to browse and resume its sessions.")}
           </p>
         </header>
 
-        <section className="flex flex-col gap-4" aria-label="Projects">
+        <section className="flex flex-col gap-4" aria-label={t("Projects")}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <SearchInput
               value={searchFilter}
               onChange={setSearchFilter}
-              placeholder="Filter projects..."
+              placeholder={t("Filter projects...")}
             />
             <Button
               variant="outline"
               size="sm"
               onClick={onRefresh}
               disabled={refreshing}
-              aria-label="Refresh projects"
+              aria-label={t("Refresh projects")}
             >
               <RefreshCw
                 data-icon="inline-start"
                 className={cn(refreshing && "animate-spin")}
               />
-              Refresh
+              {t("Refresh")}
             </Button>
           </div>
 
@@ -127,19 +129,19 @@ export function ProjectsView({
                   <FolderOpen />
                 </EmptyMedia>
                 <EmptyTitle>
-                  {searchFilter ? "No projects match your search" : "No projects yet"}
+                  {searchFilter ? t("No projects match your search") : t("No projects yet")}
                 </EmptyTitle>
                 <EmptyDescription>
                   {searchFilter
-                    ? "Try a project name or path."
-                    : "Start Claude Code, Codex, or Copilot and its project will appear here."}
+                    ? t("Try a project name or path.")
+                    : t("Start Claude Code, Codex, or Copilot and its project will appear here.")}
                 </EmptyDescription>
               </EmptyHeader>
               {!searchFilter && (
                 <EmptyContent>
                   <Button variant="outline" size="sm" onClick={() => openFolderBrowser()}>
                     <FolderSearch data-icon="inline-start" />
-                    Start in a folder
+                    {t("Start in a folder")}
                   </Button>
                 </EmptyContent>
               )}
@@ -186,7 +188,7 @@ export function ProjectsView({
                             <span className="block truncate text-xs text-muted-foreground">
                               {shortPath(project.path)}
                               {project.worktrees.length > 0 && (
-                                <> · {project.worktrees.length} {project.worktrees.length === 1 ? "worktree" : "worktrees"}</>
+                                <> · {project.worktrees.length} {project.worktrees.length === 1 ? t("worktree") : t("worktrees")}</>
                               )}
                             </span>
                           </span>
@@ -200,11 +202,11 @@ export function ProjectsView({
                                 data-icon="inline-start"
                                 className="size-1.5 rounded-full bg-success"
                               />
-                              {activeCount} active
+                              {activeCount} {t(" active")}
                             </Badge>
                           )}
                           <span className="whitespace-nowrap">
-                            {project.sessionCount} {project.sessionCount === 1 ? "session" : "sessions"}
+                            {project.sessionCount} {project.sessionCount === 1 ? t("session") : t("sessions")}
                           </span>
                           {project.lastModified && (
                             <span className="hidden w-24 whitespace-nowrap text-right md:inline">
@@ -247,6 +249,7 @@ function WorktreeRow({
   activeCount: number
   onSelect: () => void
 }) {
+  const { t } = useTranslation()
   const name = customName || parseWorktreePath(worktree.path)?.worktreeName || projectName(worktree.path)
   return (
     <button
@@ -261,11 +264,11 @@ function WorktreeRow({
         {activeCount > 0 && (
           <Badge variant="secondary">
             <span aria-hidden="true" data-icon="inline-start" className="size-1.5 rounded-full bg-success" />
-            {activeCount} active
+            {activeCount} {t(" active")}
           </Badge>
         )}
         <span className="whitespace-nowrap">
-          {worktree.sessionCount} {worktree.sessionCount === 1 ? "session" : "sessions"}
+          {worktree.sessionCount} {worktree.sessionCount === 1 ? t("session") : t("sessions")}
         </span>
         {worktree.lastModified && (
           <span className="hidden w-24 whitespace-nowrap text-right md:inline">

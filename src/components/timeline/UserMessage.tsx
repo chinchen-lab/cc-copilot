@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useMemo, useCallback, memo, type ReactNode } from "react"
 import { ChevronDown, ChevronRight, Eye, EyeOff, Hand, Maximize2, Terminal, Pencil, Users } from "lucide-react"
 import ReactMarkdown from "react-markdown"
@@ -34,17 +35,18 @@ import {
 // ── Expanded command content ─────────────────────────────────────────────
 
 function ExpandedCommandContent({ loading, content }: { loading: boolean; content: string | null }): ReactNode {
+  const { t } = useTranslation()
   let inner: ReactNode
   if (loading) {
     inner = (
       <span className="inline-flex items-center gap-1.5 text-muted-foreground/60 font-mono">
-        <ProcessingIcon className="w-3 h-3 text-muted-foreground/60" /> Loading...
+        <ProcessingIcon className="w-3 h-3 text-muted-foreground/60" /> {t(" Loading...")}
       </span>
     )
   } else if (content) {
     inner = <ReactMarkdown components={markdownComponents} remarkPlugins={markdownPlugins}>{content}</ReactMarkdown>
   } else {
-    inner = <span className="text-muted-foreground/60 font-mono">Could not load command content</span>
+    inner = <span className="text-muted-foreground/60 font-mono">{t("Could not load command content")}</span>
   }
 
   return (
@@ -65,6 +67,7 @@ interface UserMessageProps {
 }
 
 export const UserMessage = memo(function UserMessage({ content, timestamp, onEditCommand, onExpandCommand, compact = false }: UserMessageProps) {
+  const { t } = useTranslation()
   const imageGallery = useOptionalImageGallery()
   const [expanded, setExpanded] = useState(false)
   const [showRaw, setShowRaw] = useState(false)
@@ -161,12 +164,10 @@ export const UserMessage = memo(function UserMessage({ content, timestamp, onEdi
             >
               {showRaw ? (
                 <>
-                  <EyeOff data-icon="inline-start" /> Hide raw
-                </>
+                  <EyeOff data-icon="inline-start" /> {t(" Hide raw")}</>
               ) : (
                 <>
-                  <Eye data-icon="inline-start" /> Show raw
-                </>
+                  <Eye data-icon="inline-start" /> {t(" Show raw")}</>
               )}
             </Button>
           )}
@@ -176,7 +177,7 @@ export const UserMessage = memo(function UserMessage({ content, timestamp, onEdi
           <div className="mb-2">
             <Badge variant="outline" className="text-muted-foreground">
               <Terminal data-icon="inline-start" />
-              System event
+              {t("System event")}
             </Badge>
           </div>
         )}
@@ -216,7 +217,7 @@ export const UserMessage = memo(function UserMessage({ content, timestamp, onEdi
                   )}
                 >
                   {commandExpanded ? <ChevronDown data-icon="inline-start" /> : <ChevronRight data-icon="inline-start" />}
-                  {commandExpanded ? "Collapse" : "Expand"}
+                  {commandExpanded ? t("Collapse") : "Expand"}
                 </CollapsibleTrigger>
               )}
               {commandExpanded && onEditCommand && (
@@ -228,7 +229,7 @@ export const UserMessage = memo(function UserMessage({ content, timestamp, onEdi
                   className="text-muted-foreground"
                 >
                   <Pencil data-icon="inline-start" />
-                  Edit
+                  {t("Edit")}
                 </Button>
               )}
             </div>
@@ -316,12 +317,10 @@ export const UserMessage = memo(function UserMessage({ content, timestamp, onEdi
           >
             {expanded ? (
               <>
-                <ChevronDown data-icon="inline-start" /> Show less
-              </>
+                <ChevronDown data-icon="inline-start" /> {t(" Show less")}</>
             ) : (
               <>
-                <ChevronRight data-icon="inline-start" /> Show more
-              </>
+                <ChevronRight data-icon="inline-start" /> {t(" Show more")}</>
             )}
           </Button>
         )}

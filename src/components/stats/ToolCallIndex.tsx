@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useMemo } from "react"
 import { AlertTriangle, ChevronRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -78,6 +79,7 @@ interface ToolCallIndexProps {
 }
 
 export function ToolCallIndex({ turns, onJumpToTurn }: ToolCallIndexProps): React.JSX.Element | null {
+  const { t } = useTranslation()
   const rates = useModelRates()
   const turnCostShares = useMemo(() => computeTurnCostShares(turns, rates), [turns, rates])
 
@@ -90,7 +92,7 @@ export function ToolCallIndex({ turns, onJumpToTurn }: ToolCallIndexProps): Reac
 
   return (
     <section>
-      <SectionHeading>Tool Calls</SectionHeading>
+      <SectionHeading>{t("Tool Calls")}</SectionHeading>
       <div className="max-h-[320px] overflow-y-auto">
         <div className="flex flex-col gap-0.5 pr-2">
           {toolCallGroups.map(([name, group]) => {
@@ -143,7 +145,7 @@ export function ToolCallIndex({ turns, onJumpToTurn }: ToolCallIndexProps): Reac
                     })}
                     {group.calls.length > 50 && (
                       <div className="px-1.5 py-0.5 text-xs text-muted-foreground">
-                        +{group.calls.length - 50} more
+                        +{group.calls.length - 50} {t(" more")}
                       </div>
                     )}
                   </div>

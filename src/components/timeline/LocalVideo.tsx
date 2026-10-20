@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { useCapability } from "@/hooks/useCapability"
@@ -16,6 +17,7 @@ export function LocalVideo({
   alt?: string
   className?: string
 }): React.ReactElement | null {
+  const { t } = useTranslation()
   const canAccessHostFiles = useCapability("hostFiles")
   const [failedSrc, setFailedSrc] = useState<string | undefined>()
   const blocked = isLocalVideoPath(src) && !canAccessHostFiles
@@ -28,7 +30,7 @@ export function LocalVideo({
   if (failedSrc === resolved) {
     return (
       <span role="status" className="my-3 block text-xs text-muted-foreground">
-        Video unavailable{alt ? `: ${alt}` : ""}
+        {t("Video unavailable")}{alt ? `: ${alt}` : ""}
       </span>
     )
   }

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { Server, Square, TerminalSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -102,6 +103,7 @@ export function BackgroundServers({
   onToggleServer,
   onServersChanged,
 }: BackgroundServersProps): React.JSX.Element | null {
+  const { t } = useTranslation()
   const [tasks, setTasks] = useState<BgTask[]>([])
   const jsonlPorts = useJsonlPorts(turns)
 
@@ -199,7 +201,7 @@ export function BackgroundServers({
 
   return (
     <section>
-      <SectionHeading>Active Servers ({tasks.length})</SectionHeading>
+      <SectionHeading>{t("Active Servers (")}{tasks.length})</SectionHeading>
       <div className="flex flex-col gap-1.5">
         {tasks.map((task) => {
           const activePorts = task.ports.filter((p) => task.portStatus[p])
@@ -229,8 +231,8 @@ export function BackgroundServers({
                     variant="ghost"
                     size="icon-xs"
                     onClick={() => onToggleServer?.(task.id, task.outputPath!, title)}
-                    title="View server output"
-                    aria-label="View server output"
+                    title={t("View server output")}
+                    aria-label={t("View server output")}
                   >
                     <TerminalSquare data-icon="inline-start" />
                   </Button>
@@ -241,11 +243,11 @@ export function BackgroundServers({
                     size="xs"
                     className="text-destructive"
                     onClick={() => activePorts.forEach((p) => handleKillPort(p))}
-                    title="Stop server"
-                    aria-label="Stop server"
+                    title={t("Stop server")}
+                    aria-label={t("Stop server")}
                   >
                     <Square data-icon="inline-start" className="fill-current" />
-                    <span>Stop</span>
+                    <span>{t("Stop")}</span>
                   </Button>
                 )}
               </div>

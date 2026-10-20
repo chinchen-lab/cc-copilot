@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { ContextWindowControl } from "./ContextWindowControl"
 import type { ReactNode } from "react"
 import { GitBranch, RefreshCw, Settings2, X, Zap } from "lucide-react"
@@ -61,6 +62,7 @@ interface MobileSelectControlProps {
   value: string
   options: ReadonlyArray<{ value: string; label: string; menuLabel?: string }>
   onChange: (value: string) => void
+  localizeOptions?: boolean
 }
 
 function MobileSelectControl({
@@ -69,18 +71,21 @@ function MobileSelectControl({
   value,
   options,
   onChange,
+  localizeOptions = false,
 }: MobileSelectControlProps) {
+  const { t } = useTranslation()
+  const localizedOptions = options.map((option) => ({ ...option, label: localizeOptions || option.value === "" ? t(option.label) : option.label }))
   return (
     <MobileControl label={label}>
       <Select
-        items={options}
+        items={localizedOptions}
         value={value}
         onValueChange={(nextValue) => {
           if (nextValue !== null) onChange(nextValue)
         }}
       >
         <SelectTrigger
-          aria-label={ariaLabel}
+          aria-label={t(ariaLabel)}
           className="h-10 w-full"
         >
           <SelectValue />
@@ -89,7 +94,7 @@ function MobileSelectControl({
           <SelectGroup>
             {options.map((option) => (
               <SelectItem key={option.value || "default"} value={option.value}>
-                {option.menuLabel ?? option.label}
+                {localizeOptions || option.value === "" ? t(option.menuLabel ?? option.label) : option.menuLabel ?? option.label}
               </SelectItem>
             ))}
           </SelectGroup>
@@ -138,11 +143,12 @@ function MobileModelControls({
   onPermissionModeChange,
   changeAndApply,
 }: MobileModelControlsProps) {
+  const { t } = useTranslation()
   return (
     <section aria-labelledby="mobile-model-controls" className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <h3 id="mobile-model-controls" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Model and behavior
+          {t("Model and behavior")}
         </h3>
         <div className="flex items-center gap-1">
           <ModelCatalogRefresh />
@@ -154,7 +160,7 @@ function MobileModelControls({
       <div className="grid grid-cols-2 gap-2">
         {onAgentKindChange && (
           <MobileSelectControl
-            label="Agent"
+            label={t("Agent")}
             ariaLabel="Agent"
             value={agentKind}
             options={AGENT_OPTIONS}
@@ -163,7 +169,7 @@ function MobileModelControls({
         )}
 
         <MobileSelectControl
-          label="Model"
+          label={t("Model")}
           ariaLabel="Model"
           value={selectedModel}
           options={modelOptions}
@@ -172,16 +178,17 @@ function MobileModelControls({
 
         {effortOptions.length > 0 && (
           <MobileSelectControl
-            label="Reasoning"
+            label={t("Reasoning")}
             ariaLabel="Reasoning effort"
             value={selectedEffort}
             options={effortOptions}
+            localizeOptions
             onChange={onEffortChange}
           />
         )}
 
         {fastTier && onFastModeEnabledChange && (
-          <MobileControl label="Speed">
+          <MobileControl label={t("Speed")}>
             <Button
               type="button"
               variant={fastModeEnabled ? "secondary" : "ghost"}
@@ -191,17 +198,18 @@ function MobileModelControls({
               className="h-10 justify-start"
             >
               <Zap data-icon="inline-start" className={cn(fastModeEnabled && "fill-current")} />
-              {fastModeEnabled ? "Fast" : "Standard"}
+              {fastModeEnabled ? t("Fast") : t("Standard")}
             </Button>
           </MobileControl>
         )}
 
         {onPermissionModeChange && permissionMode && (
           <MobileSelectControl
-            label="Access"
+            label={t("Access")}
             ariaLabel="Access policy"
             value={permissionMode}
             options={permissionOptions}
+            localizeOptions
             onChange={(value) => onPermissionModeChange(value as PermissionMode)}
           />
         )}
@@ -241,6 +249,7 @@ function MobileAdvancedControls({
   onMcpAuth,
   changeAndApply,
 }: MobileAdvancedControlsProps) {
+  const { t } = useTranslation()
   const { worktrees: showWorktree, ultracode: showUltracode } = capabilitiesFor(agentKind)
   const showMcp = Boolean(
     onToggleMcpServer &&
@@ -260,11 +269,11 @@ function MobileAdvancedControls({
   return (
     <section aria-labelledby="mobile-advanced-controls" className="flex flex-col gap-2">
       <h3 id="mobile-advanced-controls" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Advanced
+        {t("Advanced")}
       </h3>
       <div className="grid grid-cols-2 gap-2">
         {showWorktree && isNewSession && onWorktreeEnabledChange && (
-          <MobileControl label="Isolation">
+          <MobileControl label={t("Isolation")}>
             <Button
               type="button"
               variant={worktreeEnabled ? "secondary" : "ghost"}
@@ -273,13 +282,13 @@ function MobileAdvancedControls({
               className="h-10 justify-start"
             >
               <GitBranch data-icon="inline-start" />
-              Worktree
+              {t("Worktree")}
             </Button>
           </MobileControl>
         )}
 
         {showUltracode && onUltracodeEnabledChange && (
-          <MobileControl label="Workflow">
+          <MobileControl label={t("Workflow")}>
             <Button
               type="button"
               variant={ultracodeEnabled ? "secondary" : "ghost"}
@@ -294,7 +303,7 @@ function MobileAdvancedControls({
         )}
 
         {showMcp && onToggleMcpServer && onRefreshMcpServers && onMcpAuth && (
-          <MobileControl label="Connections" wide>
+          <MobileControl label={t("Connections")} wide>
             <div className="flex flex-col gap-1">
               <Button
                 type="button"
@@ -303,7 +312,7 @@ function MobileAdvancedControls({
                 className="min-h-10 justify-start"
               >
                 <RefreshCw data-icon="inline-start" className={cn(mcpLoading && "animate-spin")} />
-                Refresh MCP status
+                {t("Refresh MCP status")}
               </Button>
               {(mcpServers ?? []).map((server) => {
                 const selected = selectedNames.has(server.name)
@@ -327,7 +336,7 @@ function MobileAdvancedControls({
                     )} />
                     <span className="min-w-0 flex-1 truncate">{server.name}</span>
                     <span className="text-xs text-muted-foreground">
-                      {connected ? (selected ? "On" : "Off") : "Connect"}
+                      {connected ? (selected ? t("On") : t("Off")) : t("Connect")}
                     </span>
                   </Button>
                 )
@@ -382,12 +391,13 @@ export function MobileChatInputSettings({
   mobileExtra,
   changeAndApply,
 }: MobileChatInputSettingsProps) {
+  const { t } = useTranslation()
   const permissionOptions = getPermissionModeOptions(agentKind, autoModeAvailable)
   const permissionLabel = permissionOptions.find((option) => option.value === permissionMode)?.label
   const summary = [
     selectedModel ? friendlyModelName(selectedModel, catalogOptions) : resolvedDefaultName,
-    effortOptions.find((option) => option.value === selectedEffort)?.label,
-    permissionLabel,
+    t(effortOptions.find((option) => option.value === selectedEffort)?.label ?? ""),
+    permissionLabel && t(permissionLabel),
   ].filter(Boolean).join(" · ")
 
   const changeMobilePermission = (nextMode: PermissionMode) => {
@@ -406,8 +416,8 @@ export function MobileChatInputSettings({
               variant="ghost"
               size="icon"
               className="ml-0.5 shrink-0 rounded-full text-muted-foreground"
-              aria-label="Session controls"
-              title="Session controls"
+              aria-label={t("Session controls")}
+              title={t("Session controls")}
             />
           )}
         >
@@ -419,7 +429,7 @@ export function MobileChatInputSettings({
           showCloseButton={false}
         >
           <SheetHeader className="gap-1 px-4 pb-3 pt-4">
-            <SheetTitle>Session controls</SheetTitle>
+            <SheetTitle>{t("Session controls")}</SheetTitle>
             <SheetDescription className="truncate text-xs">{summary}</SheetDescription>
             <SheetClose
               render={(
@@ -428,7 +438,7 @@ export function MobileChatInputSettings({
                   variant="ghost"
                   size="icon-lg"
                   className="absolute right-2 top-2"
-                  aria-label="Close session controls"
+                  aria-label={t("Close session controls")}
                 />
               )}
             >
@@ -477,7 +487,7 @@ export function MobileChatInputSettings({
               <section aria-labelledby="mobile-goal-controls" className="flex flex-col gap-2 pt-1">
                 <Separator className="mb-3" />
                 <h3 id="mobile-goal-controls" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Long-running goal
+                  {t("Long-running goal")}
                 </h3>
                 <div className="[&>*]:mx-0 [&>*]:mb-0 [&_button]:min-h-10">{mobileExtra}</div>
               </section>
@@ -486,8 +496,8 @@ export function MobileChatInputSettings({
             {!isNewSession && (
               <p className="text-xs text-muted-foreground">
                 {capabilitiesFor(agentKind).settingsApply === "live"
-                  ? "Changes apply live."
-                  : "Changes apply on the next turn."}
+                  ? t("Changes apply live.")
+                  : t("Changes apply on the next turn.")}
               </p>
             )}
           </div>

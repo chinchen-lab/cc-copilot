@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useId, useRef, useState } from "react"
 import { Globe, FolderCode, Save, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,7 @@ export function NewFileDialog({
   onCreated,
   onCancel,
 }: NewFileDialogProps) {
+  const { t } = useTranslation()
   const [name, setName] = useState("")
   const [scope, setScope] = useState<"global" | "project">(projectDir ? "project" : "global")
   const [creating, setCreating] = useState(false)
@@ -54,9 +56,9 @@ export function NewFileDialog({
     <FieldGroup className="gap-3 px-3 py-2">
       {hasBothScopes && (
         <Field>
-          <FieldLabel>Scope</FieldLabel>
+          <FieldLabel>{t("Scope")}</FieldLabel>
           <ToggleGroup
-            aria-label="File scope"
+            aria-label={t("File scope")}
             value={[scope]}
             onValueChange={(values) => {
               const nextScope = values[0]
@@ -71,18 +73,18 @@ export function NewFileDialog({
           >
             <ToggleGroupItem value="global" className="flex-1">
               <Globe data-icon="inline-start" />
-              Global
+              {t("Global")}
             </ToggleGroupItem>
             <ToggleGroupItem value="project" className="flex-1">
               <FolderCode data-icon="inline-start" />
-              Project
+              {t("Project")}
             </ToggleGroupItem>
           </ToggleGroup>
         </Field>
       )}
       <Field>
         <FieldLabel htmlFor={nameId}>
-          {fileType.charAt(0).toUpperCase() + fileType.slice(1)} name
+          {fileType.charAt(0).toUpperCase() + fileType.slice(1)} {t(" name")}
         </FieldLabel>
         <div className="flex items-center gap-1">
           <Input
@@ -95,20 +97,20 @@ export function NewFileDialog({
               if (event.key === "Enter") void handleCreate()
               if (event.key === "Escape") onCancel()
             }}
-            placeholder={`${fileType} name...`}
+            placeholder={t("{0} name...", { "0": fileType })}
             className="h-7 min-w-0 flex-1 text-xs"
             disabled={creating}
           />
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label={`Create ${fileType}`}
+            aria-label={t("Create {0}", { "0": fileType })}
             onClick={() => void handleCreate()}
             disabled={creating || !name.trim() || !targetDir}
           >
             <Save data-icon="inline-start" />
           </Button>
-          <Button variant="ghost" size="icon-xs" aria-label="Cancel create" onClick={onCancel}>
+          <Button variant="ghost" size="icon-xs" aria-label={t("Cancel create")} onClick={onCancel}>
             <X data-icon="inline-start" />
           </Button>
         </div>

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { lazy, Suspense, useCallback, useState } from "react"
 import { useOpenSessionCrew } from "@/hooks/useOpenSessionCrew"
 import { LayoutGrid, Puzzle, SlidersHorizontal } from "lucide-react"
@@ -18,6 +19,7 @@ const PluginsDialog = lazy(() => import("@/plugins/PluginsDialog").then((module)
 const ConfigBrowser = lazy(() => import("@/components/ConfigBrowser").then((module) => ({ default: module.ConfigBrowser })))
 
 export function MobileWorkspace({ navigation, sessionView, project, active }: MobileAppShellProps & { active: boolean }) {
+  const { t } = useTranslation()
   const { state } = useAppContext()
   const { session, sessionSource } = useSessionContext()
   const openCrew = useOpenSessionCrew(session?.sessionId ?? null)
@@ -101,7 +103,7 @@ export function MobileWorkspace({ navigation, sessionView, project, active }: Mo
         actionContent={selectedUtility === "mission" ? (
           <div className="flex h-full min-h-0 flex-col"><MissionControlView navigation={navigation} /></div>
         ) : selectedUtility === "config" && canConfigure ? (
-          <Suspense fallback={<LazyViewFallback label="Loading configuration…" />}>
+          <Suspense fallback={<LazyViewFallback label={t("Loading configuration…")} />}>
             <div className="flex h-full min-h-0"><ConfigBrowser projectPath={project.currentCwd ?? null} initialFilePath={state.configFilePath} /></div>
           </Suspense>
         ) : null}

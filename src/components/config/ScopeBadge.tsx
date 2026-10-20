@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Globe, FolderCode, Plug } from "lucide-react"
 
 interface ScopeBadgeProps {
@@ -6,6 +7,7 @@ interface ScopeBadgeProps {
 }
 
 export function ScopeBadge({ scope, pluginName }: ScopeBadgeProps) {
+  const { t } = useTranslation()
   if (scope === "plugin" && pluginName) {
     return (
       <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
@@ -18,14 +20,14 @@ export function ScopeBadge({ scope, pluginName }: ScopeBadgeProps) {
     return (
       <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
         <FolderCode data-icon="inline-start" className="size-3" />
-        project
+        {t("project")}
       </span>
     )
   }
   return (
     <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
       <Globe data-icon="inline-start" className="size-3" />
-      global
+      {t("global")}
     </span>
   )
 }

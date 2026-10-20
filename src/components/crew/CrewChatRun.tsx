@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react"
 import ReactMarkdown, { type Components, type Options } from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -51,6 +52,7 @@ export function CrewChatDay({ day }: { day: number }) {
 }
 
 export function CrewChatRunView({ run, members, handles, kinds, tints, rootId }: { run: CrewChatRun; members: ReadonlyMap<string, CrewChatMember>; handles: Handles; kinds: Kinds; tints: Tints; rootId: string }) {
+  const { t } = useTranslation()
   const author = run.messages[0]!.author
   const recipients = run.recipients.flatMap((id) => members.get(id)?.name ?? [])
   return (
@@ -58,7 +60,7 @@ export function CrewChatRunView({ run, members, handles, kinds, tints, rootId }:
       {run.messages.map((message, index) => (
         <article
           key={message.sequence}
-          aria-label={`Message from ${author.name}`}
+          aria-label={t("Message from {0}", { "0": author.name })}
           className="group/message grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-2.5"
         >
           {index === 0 ? (
@@ -67,9 +69,9 @@ export function CrewChatRunView({ run, members, handles, kinds, tints, rootId }:
               <header className="flex min-w-0 items-baseline gap-1.5 leading-6">
                 <span className="truncate text-[0.8125rem] font-medium">{author.name}</span>
                 {recipients.length > 0 && (
-                  <span className="flex min-w-0 items-baseline gap-1 text-xs text-muted-foreground" title={`To ${recipients.join(", ")}`}>
+                  <span className="flex min-w-0 items-baseline gap-1 text-xs text-muted-foreground" title={t("To {0}", { "0": recipients.join(", ") })}>
                     <ArrowRight aria-hidden="true" className="size-3 shrink-0 translate-y-0.5" />
-                    <span className="sr-only">To</span>
+                    <span className="sr-only">{t("To")}</span>
                     <span className="truncate">{recipients.join(", ")}</span>
                   </span>
                 )}
@@ -111,6 +113,7 @@ const CrewChatBody = memo(function CrewChatBody({ message, handles, tints, rootI
 
 /** Long reports start folded so the conversation stays scannable. */
 function Clamp({ children }: { children: ReactNode }) {
+  const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
   const [overflowing, setOverflowing] = useState(false)
   const [open, setOpen] = useState(false)
@@ -138,7 +141,7 @@ function Clamp({ children }: { children: ReactNode }) {
           className="mt-1 inline-flex items-center gap-1 rounded-sm text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Icon aria-hidden="true" className="size-3" />
-          {open ? "Show less" : "Show more"}
+          {open ? t("Show less") : t("Show more")}
         </button>
       )}
     </>

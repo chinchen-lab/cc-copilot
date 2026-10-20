@@ -1,8 +1,10 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import type { ToolCall } from "../../../shared/session/types"
 import { formatToolFileDiff } from "../../../shared/session/toolResults"
 import { MarkdownCodeBlock } from "./MarkdownCodeBlock"
 
 export function ToolFileDiffs({ fileDiffs, additionalFileDiffs }: Pick<ToolCall, "fileDiffs" | "additionalFileDiffs">) {
+  const { t } = useTranslation()
   return <>
     {fileDiffs?.map((file) => (
       <section key={file.filePath} aria-label={`File diff: ${file.filePath}`} className="mt-3 min-w-0">
@@ -10,6 +12,6 @@ export function ToolFileDiffs({ fileDiffs, additionalFileDiffs }: Pick<ToolCall,
         <MarkdownCodeBlock className="language-diff">{formatToolFileDiff(file)}</MarkdownCodeBlock>
       </section>
     ))}
-    {Boolean(additionalFileDiffs) && <p className="mt-2 text-xs text-muted-foreground">{additionalFileDiffs} additional file diffs omitted by the agent.</p>}
+    {Boolean(additionalFileDiffs) && <p className="mt-2 text-xs text-muted-foreground">{additionalFileDiffs} {t(" additional file diffs omitted by the agent.")}</p>}
   </>
 }

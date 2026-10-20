@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useState } from "react"
 import { Flame } from "lucide-react"
 
@@ -19,6 +20,7 @@ const CLEARED_VISIBLE_MS = 60_000
  * at zero for a minute after the last leak clears so a kill confirms itself.
  */
 export function LeakIndicator() {
+  const { t } = useTranslation()
   const { leaks, killing, killLeaks, refresh } = useLeakMonitor()
   const [pinned, setPinned] = useState(false)
 
@@ -43,8 +45,8 @@ export function LeakIndicator() {
           variant={hasLeaks ? "destructive" : "ghost"}
           size="xs"
           aria-label={hasLeaks
-            ? `Kill ${leaks.length} leaked agent ${leaks.length === 1 ? "process" : "processes"}`
-            : "Leak monitor. No leaked agent processes"}
+            ? t("Kill {0} leaked agent {1}", { "0": leaks.length, "1": leaks.length === 1 ? "process" : "processes" })
+            : t("Leak monitor. No leaked agent processes")}
           onClick={() => void (hasLeaks ? killLeaks(leaks.map((leak) => leak.pid)) : refresh())}
           disabled={killing}
           className={cn("mr-1 font-mono", !hasLeaks && "text-muted-foreground")}
@@ -57,7 +59,7 @@ export function LeakIndicator() {
         {hasLeaks ? (
           <div className="flex min-w-56 flex-col gap-2">
             <div className="text-xs font-medium">
-              Leaked agent processes · {totalCpu.toFixed(0)}% CPU
+              {t("Leaked agent processes · ")}{totalCpu.toFixed(0)}% CPU
             </div>
             {leaks.slice(0, 6).map((leak) => (
               <div key={leak.pid} className="flex items-center justify-between gap-3 text-xs">
@@ -66,18 +68,18 @@ export function LeakIndicator() {
               </div>
             ))}
             {leaks.length > 6 && (
-              <div className="text-xs text-muted-foreground">+{leaks.length - 6} more</div>
+              <div className="text-xs text-muted-foreground">+{leaks.length - 6} {t(" more")}</div>
             )}
             <Separator />
             <div className="text-xs text-muted-foreground">
-              Click to kill {leaks.length === 1 ? "it" : "all of them"}
+              {t("Click to kill ")}{leaks.length === 1 ? t("it") : t("all of them")}
             </div>
           </div>
         ) : (
           <div className="flex min-w-48 flex-col gap-1">
-            <div className="text-xs font-medium">Leak monitor</div>
+            <div className="text-xs font-medium">{t("Leak monitor")}</div>
             <div className="text-xs text-muted-foreground">
-              No leaked agent processes. Click to scan again.
+              {t("No leaked agent processes. Click to scan again.")}
             </div>
           </div>
         )}

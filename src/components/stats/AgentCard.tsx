@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { CheckCircle2, Circle, Clock3, Loader2, Wrench, X, XCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatAgentLabel } from "@/components/timeline/agent-utils"
@@ -35,6 +36,7 @@ export function AgentCard({
   onClick,
   onStop,
 }: AgentCardProps) {
+  const { t } = useTranslation()
   const label = agentName || formatAgentLabel(agentId, subagentType)
   const duration = durationMs == null
     ? null
@@ -64,22 +66,22 @@ export function AgentCard({
           <Badge variant="outline">
             {label}
           </Badge>
-          {isBackground && <Badge variant="outline">Background</Badge>}
-          {isViewing && <Badge>Viewing</Badge>}
+          {isBackground && <Badge variant="outline">{t("Background")}</Badge>}
+          {isViewing && <Badge>{t("Viewing")}</Badge>}
           <span className="ml-auto text-xs uppercase tracking-wide text-muted-foreground">
-            {status === "running" ? "active" : status}
+            {status === "running" ? t("active") : status}
           </span>
         </div>
         {preview && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{preview}</p>}
         {(duration || toolUseCount != null) && (
           <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
             {duration && <span className="inline-flex items-center gap-0.5"><Clock3 className="size-2.5" data-icon="inline-start" />{duration}</span>}
-            {toolUseCount != null && <span className="inline-flex items-center gap-0.5"><Wrench className="size-2.5" data-icon="inline-start" />{toolUseCount} tools</span>}
+            {toolUseCount != null && <span className="inline-flex items-center gap-0.5"><Wrench className="size-2.5" data-icon="inline-start" />{toolUseCount} {t(" tools")}</span>}
           </div>
         )}
       </Button>
       {onStop && (
-        <Button type="button" variant="ghost" size="icon-sm" className="m-1" onClick={onStop} aria-label={`Stop ${label}`}>
+        <Button type="button" variant="ghost" size="icon-sm" className="m-1" onClick={onStop} aria-label={t("Stop {0}", { "0": label })}>
           <X data-icon="inline-start" />
         </Button>
       )}

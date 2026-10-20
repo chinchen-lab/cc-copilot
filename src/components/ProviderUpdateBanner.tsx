@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect } from "react"
 import { AlertTriangle, ArrowUpCircle, CheckCircle, Loader2, XCircle } from "lucide-react"
 
@@ -32,6 +33,7 @@ function describe(info: ProviderUpdateInfo): string {
  * config sees the prompt.
  */
 export function ProviderUpdateBanner() {
+  const { t } = useTranslation()
   const { pending, updating, outcome, update, dismiss, clearOutcome } = useProviderUpdates()
   const canRunUpdates = can("configWrite")
   const succeeded = outcome?.status === "succeeded"
@@ -48,17 +50,17 @@ export function ProviderUpdateBanner() {
         <CheckCircle />
         <AlertTitle>{outcome.message}</AlertTitle>
         <AlertDescription className="text-success/80">
-          New sessions will use the updated CLI.
+          {t("New sessions will use the updated CLI.")}
         </AlertDescription>
       </Alert>
     ) : (
       <Alert className={bannerClasses("destructive")}>
         <XCircle />
-        <AlertTitle>Update did not complete</AlertTitle>
+        <AlertTitle>{t("Update did not complete")}</AlertTitle>
         <AlertDescription className="text-destructive/80">{outcome.message}</AlertDescription>
         <AlertAction className="static col-start-3 row-span-2 row-start-1 self-center">
           <Button variant="ghost" size="xs" onClick={clearOutcome}>
-            Dismiss
+            {t("Dismiss")}
           </Button>
         </AlertAction>
       </Alert>
@@ -76,14 +78,14 @@ export function ProviderUpdateBanner() {
       <AlertTitle>
         {pending.length === 1
           ? describe(first)
-          : `${pending.map((info) => info.displayName).join(" and ")} are out of date`}
+          : t("{0} are out of date", { "0": pending.map((info) => info.displayName).join(" and ") })}
       </AlertTitle>
       <AlertDescription className="text-warning/80">
         {pending.length > 1
           ? pending.map(describe).join(" · ")
           : first.updateCommand
-            ? `Cogpit can run \`${first.updateCommand}\` for you.`
-            : "Update it with whatever installed it — Cogpit could not tell."}
+            ? t("Cogpit can run `{0}` for you.", { "0": first.updateCommand })
+            : t("Update it with whatever installed it — Cogpit could not tell.")}
       </AlertDescription>
       <AlertAction className="static col-start-3 row-span-2 row-start-1 flex items-center gap-2 self-center">
         {runnable.map((info) => (
@@ -96,10 +98,10 @@ export function ProviderUpdateBanner() {
           >
             <ArrowUpCircle data-icon="inline-start" />
             {updating === info.provider
-              ? "Updating…"
+              ? t("Updating…")
               : pending.length === 1
-                ? "Update"
-                : `Update ${info.displayName}`}
+                ? t("Update")
+                : t("Update {0}", { "0": info.displayName })}
           </Button>
         ))}
         <Button
@@ -109,7 +111,7 @@ export function ProviderUpdateBanner() {
           onClick={() => pending.forEach(dismiss)}
           className="whitespace-nowrap text-muted-foreground"
         >
-          Don't show again
+          {t("Don't show again")}
         </Button>
       </AlertAction>
     </Alert>

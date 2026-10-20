@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useMemo, memo, useId } from "react"
 import {
   ChevronRight,
@@ -83,10 +84,11 @@ function CrewCallHeadline({ call, className }: { call: CrewCall; className: stri
 
 /** The sessions a crew call acted on, each a link to open it. */
 function CrewCallSessions({ call }: { call: CrewCall }) {
+  const { t } = useTranslation()
   const nameOf = useSessionNamer()
   if (call.sessionIds.length === 0) return null
   return (
-    <div className="mb-2 flex flex-wrap items-center gap-1.5" aria-label="Sessions this call acted on">
+    <div className="mb-2 flex flex-wrap items-center gap-1.5" aria-label={t("Sessions this call acted on")}>
       {call.sessionIds.map((sessionId, index) => (
         <Button
           key={sessionId}
@@ -118,6 +120,7 @@ export const ToolCallCard = memo(function ToolCallCard({
   isAgentActive,
   skillMetadata,
 }: ToolCallCardProps) {
+  const { t } = useTranslation()
   const { session, pendingInteraction, permissions } = useSessionContext()
   const [panelOpen, setPanelOpen] = useState(false)
   const [inputOpen, setInputOpen] = useState(false)
@@ -225,8 +228,8 @@ export const ToolCallCard = memo(function ToolCallCard({
         </span>
         <span id={statusId} className="flex shrink-0 flex-col items-end gap-1">
           <ToolCallStatus toolCall={toolCall} failed={failed} isAgentActive={isAgentActive} />
-          {Boolean(toolCall.hookDurationMs && toolCall.hookDurationMs > 0) && <span className="text-xs tabular-nums text-muted-foreground" title="PostToolUse hook duration">{toolCall.hookDurationMs}ms</span>}
-          {toolCall.outputReplacedByHook && <span className="text-xs text-info" title="Output replaced by hook">hook</span>}
+          {Boolean(toolCall.hookDurationMs && toolCall.hookDurationMs > 0) && <span className="text-xs tabular-nums text-muted-foreground" title={t("PostToolUse hook duration")}>{toolCall.hookDurationMs}ms</span>}
+          {toolCall.outputReplacedByHook && <span className="text-xs text-info" title={t("Output replaced by hook")}>{t("hook")}</span>}
         </span>
         <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", showPanel && "rotate-90")} aria-hidden="true" />
         {timeLabel && <time className="sr-only" dateTime={timeIso}>{timeLabel}</time>}
@@ -255,7 +258,7 @@ export const ToolCallCard = memo(function ToolCallCard({
 
       {skillMeta && (
         <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 font-mono text-xs text-muted-foreground">
-          <span>source: {skillMeta.source}</span>
+          <span>{t("source: ")}{skillMeta.source}</span>
           {skillFilePath && (!isRemoteDeviceActive() || isBuiltInEditorEnabled()) && (
             <Button
               type="button"
@@ -265,7 +268,7 @@ export const ToolCallCard = memo(function ToolCallCard({
               title={skillFilePath}
             >
               <ExternalLink data-icon="inline-start" />
-              Open SKILL.md
+              {t("Open SKILL.md")}
             </Button>
           )}
         </div>
@@ -305,7 +308,7 @@ export const ToolCallCard = memo(function ToolCallCard({
                 onClick={() => setInputOpen((open) => !open)}
               >
                 <ChevronRight data-icon="inline-start" className={cn(inputOpen && "rotate-90")} />
-                Raw input
+                {t("Raw input")}
               </Button>
               <CollapsibleContent id={inputId}>
                 <JsonResultHighlighted

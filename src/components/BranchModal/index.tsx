@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useCallback, useEffect, useMemo } from "react"
 import { ChevronLeft, ChevronRight, RotateCcw, GitFork } from "lucide-react"
 import {
@@ -60,6 +61,7 @@ export function BranchModal({
   onRedoToTurn,
   onRedoEntireBranch,
 }: BranchModalProps) {
+  const { t } = useTranslation()
   // Build unified list: current branch (1) + archived branches (2, 3, ...)
   const displayBranches = useMemo<DisplayBranch[]>(() => {
     const list: DisplayBranch[] = []
@@ -139,11 +141,11 @@ export function BranchModal({
           <div className="flex items-center justify-between gap-3">
             <DialogTitle className="flex items-center gap-2">
               <GitFork className="size-4" />
-              Branches from Turn {branchPointTurnIndex + 1}
+              {t("Branches from Turn ")}{branchPointTurnIndex + 1}
             </DialogTitle>
           </div>
           <DialogDescription>
-            Compare alternate continuations and resume from an earlier point.
+            {t("Compare alternate continuations and resume from an earlier point.")}
           </DialogDescription>
 
           <div className="flex items-center gap-3 pt-3">
@@ -152,7 +154,7 @@ export function BranchModal({
               size="icon-sm"
               onClick={goPrev}
               disabled={totalCount <= 1}
-              aria-label="Previous branch"
+              aria-label={t("Previous branch")}
             >
               <ChevronLeft data-icon="inline-start" />
             </Button>
@@ -161,12 +163,12 @@ export function BranchModal({
                 {current.label}
                 {isCurrent && (
                   <Badge variant="secondary" className="ml-2">
-                    Active
+                    {t("Active")}
                   </Badge>
                 )}
               </div>
               <div className="text-xs text-muted-foreground">
-                Branch {currentIndex + 1} of {totalCount}
+                {t("Branch ")}{currentIndex + 1} {t(" of ")}{totalCount}
                 {!isCurrent && (
                   <> &middot; {new Date(current.createdAt).toLocaleString()}</>
                 )}
@@ -177,7 +179,7 @@ export function BranchModal({
               size="icon-sm"
               onClick={goNext}
               disabled={totalCount <= 1}
-              aria-label="Next branch"
+              aria-label={t("Next branch")}
             >
               <ChevronRight data-icon="inline-start" />
             </Button>
@@ -201,8 +203,8 @@ export function BranchModal({
             {turnCount === 0 ? (
               <Empty className="min-h-40">
                 <EmptyHeader>
-                  <EmptyTitle>No turns in this branch</EmptyTitle>
-                  <EmptyDescription>This continuation has no saved turns.</EmptyDescription>
+                  <EmptyTitle>{t("No turns in this branch")}</EmptyTitle>
+                  <EmptyDescription>{t("This continuation has no saved turns.")}</EmptyDescription>
                 </EmptyHeader>
               </Empty>
             ) : current.fullTurns
@@ -232,7 +234,7 @@ export function BranchModal({
 
         <div className="flex shrink-0 items-center justify-between p-4">
           <span className="text-xs text-muted-foreground">
-            {turnCount} turn{turnCount !== 1 ? "s" : ""} in this branch
+            {turnCount} {t(" turn")}{turnCount !== 1 ? "s" : ""} {t(" in this branch")}
           </span>
           {!isCurrent && (
             <Button
@@ -240,7 +242,7 @@ export function BranchModal({
               onClick={() => onRedoEntireBranch(current.id)}
             >
               <RotateCcw data-icon="inline-start" className="scale-x-[-1]" />
-              Redo entire branch
+              {t("Redo entire branch")}
             </Button>
           )}
         </div>

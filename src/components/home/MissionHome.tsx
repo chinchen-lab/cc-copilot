@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react"
 import { ChevronLeft, ChevronRight, FolderOpen, Pencil, Search, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -67,6 +68,7 @@ function isShortcutTarget(event: globalThis.KeyboardEvent): boolean {
  * column only while something is waiting.
  */
 export function MissionHome({ onOpenSession, onBrowseProjects, onSelectProject, start }: MissionHomeProps) {
+  const { t } = useTranslation()
   const inventory = useSessionInventory()
   const input = usePendingHumanInput()
   const { names, rename } = useSessionNames()
@@ -130,9 +132,9 @@ export function MissionHome({ onOpenSession, onBrowseProjects, onSelectProject, 
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <div className="flex flex-col gap-3">
             <BrandLogo />
-            <h1 className="text-sm font-medium text-muted-foreground">Mission Control</h1>
+            <h1 className="text-sm font-medium text-muted-foreground">{t("Mission Control")}</h1>
           </div>
-          {running > 0 && <p className="text-xs text-muted-foreground">{running} {running === 1 ? "agent" : "agents"} running on this machine</p>}
+          {running > 0 && <p className="text-xs text-muted-foreground">{running} {running === 1 ? t("agent") : t("agents")} {t(" running on this machine")}</p>}
         </div>
         {start && <HomeComposer recent={recent} start={start} />}
       </div>
@@ -148,7 +150,7 @@ export function MissionHome({ onOpenSession, onBrowseProjects, onSelectProject, 
           ) : (
             <p className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
               <span className="size-1.5 rounded-full bg-success/40" aria-hidden="true" />
-              Nothing is waiting on you.
+              {t("Nothing is waiting on you.")}
             </p>
           )}
           <div className="flex min-w-0 flex-col gap-6">
@@ -214,6 +216,7 @@ function NeedsYouQueue({
   onOpen: (sessionId: string) => void
   canAnswer: (sessionId: string) => boolean
 }) {
+  const { t } = useTranslation()
   const [index, setIndex] = useState(0)
   const answering = useRef(new Set<string>())
   const at = Math.min(index, queue.length - 1)
@@ -239,15 +242,15 @@ function NeedsYouQueue({
   }
 
   return (
-    <section aria-label="Needs you" tabIndex={0} onKeyDown={onKeyDown} className="min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      <SectionHeading title="Needs you" count={queue.length}>
+    <section aria-label={t("Needs you")} tabIndex={0} onKeyDown={onKeyDown} className="min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <SectionHeading title={t("Needs you")} count={queue.length}>
         {queue.length > 1 && (
           <span className="flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
-            {at + 1} of {queue.length}
-            <Button variant="ghost" size="icon-xs" aria-label="Previous request" disabled={at === 0} onClick={() => setIndex(at - 1)}>
+            {at + 1} {t(" of ")}{queue.length}
+            <Button variant="ghost" size="icon-xs" aria-label={t("Previous request")} disabled={at === 0} onClick={() => setIndex(at - 1)}>
               <ChevronLeft data-icon="inline-start" />
             </Button>
-            <Button variant="ghost" size="icon-xs" aria-label="Next request" disabled={at === queue.length - 1} onClick={() => setIndex(at + 1)}>
+            <Button variant="ghost" size="icon-xs" aria-label={t("Next request")} disabled={at === queue.length - 1} onClick={() => setIndex(at + 1)}>
               <ChevronRight data-icon="inline-start" />
             </Button>
           </span>
@@ -257,18 +260,18 @@ function NeedsYouQueue({
         <div className="flex items-center gap-2 px-0.5 text-[0.8125rem]">
           <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden="true" />
           <button type="button" onClick={() => onOpen(request.sessionId)} className="min-w-0 truncate rounded-sm font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
-            {nameOf(request.sessionId) ?? "A session"}
+            {nameOf(request.sessionId) ?? t("A session")}
           </button>
           {lineage && <span className="min-w-0 truncate text-muted-foreground">· {lineage}</span>}
           <span className="ml-auto shrink-0 text-xs tabular-nums text-warning">
-            waiting {formatRelativeTime(new Date(request.since).toISOString())}
+            {t("waiting ")}{formatRelativeTime(new Date(request.since).toISOString())}
           </span>
         </div>
-        <p className="px-0.5 text-xs text-muted-foreground">{KIND_LABEL[request.kind]}</p>
+        <p className="px-0.5 text-xs text-muted-foreground">{t(KIND_LABEL[request.kind])}</p>
         <HomeRequestPrompt key={homeRequestId(request)} request={request} input={input} canAnswer={canAnswer(request.sessionId)} onOpen={() => onOpen(request.sessionId)} />
       </div>
       {queue.length > 1 && (
-        <ol className="mt-3 flex flex-col" aria-label="Also waiting">
+        <ol className="mt-3 flex flex-col" aria-label={t("Also waiting")}>
           {queue.map((other, position) => position === at ? null : (
             <li key={homeRequestId(other)}>
               <button
@@ -279,12 +282,12 @@ function NeedsYouQueue({
                 <span className="text-right text-[0.6875rem] tabular-nums text-muted-foreground/80">{position + 1}</span>
                 <span className="flex min-w-0 flex-col">
                   <span className="truncate font-medium">
-                    {nameOf(other.sessionId) ?? "A session"}
+                    {nameOf(other.sessionId) ?? t("A session")}
                     {lineageLabel(byId.get(other.sessionId), nameOf) && (
                       <span className="font-normal text-muted-foreground"> · {lineageLabel(byId.get(other.sessionId), nameOf)}</span>
                     )}
                   </span>
-                  <span className="truncate text-[0.71875rem] text-muted-foreground">{KIND_LABEL[other.kind]}</span>
+                  <span className="truncate text-[0.71875rem] text-muted-foreground">{t(KIND_LABEL[other.kind])}</span>
                 </span>
                 <span className="text-[0.6875rem] tabular-nums text-warning">{formatRelativeTime(new Date(other.since).toISOString())}</span>
               </button>
@@ -292,7 +295,7 @@ function NeedsYouQueue({
           ))}
         </ol>
       )}
-      <p className="mt-2 px-0.5 text-[0.6875rem] text-muted-foreground/80">J / K move · Enter answers · D denies · O opens</p>
+      <p className="mt-2 px-0.5 text-[0.6875rem] text-muted-foreground/80">{t("J / K move · Enter answers · D denies · O opens")}</p>
     </section>
   )
 }
@@ -327,28 +330,29 @@ function YourSessions({
   onRename: (sessionId: string, name: string) => void
   onBrowseProjects?: () => void
 }) {
+  const { t } = useTranslation()
   const searching = query.trim().length > 0
   const clear = () => {
     onQueryChange("")
     searchRef.current?.focus()
   }
   return (
-    <section aria-label="Your sessions" className="flex min-w-0 flex-col">
-      <SectionHeading title="Your sessions" count={searching ? sessions.length : total}>
+    <section aria-label={t("Your sessions")} className="flex min-w-0 flex-col">
+      <SectionHeading title={t("Your sessions")} count={searching ? sessions.length : total}>
         <div className="relative w-full max-w-64">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
             ref={searchRef}
             type="search"
-            aria-label="Search sessions"
-            placeholder="Search sessions"
+            aria-label={t("Search sessions")}
+            placeholder={t("Search sessions")}
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); clear(); searchRef.current?.blur() } }}
             className="h-7 pl-8 pr-7 text-xs [&::-webkit-search-cancel-button]:hidden"
           />
           {searching ? (
-            <button type="button" aria-label="Clear search" onClick={clear} className="absolute right-1.5 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+            <button type="button" aria-label={t("Clear search")} onClick={clear} className="absolute right-1.5 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
               <X className="size-3" />
             </button>
           ) : (
@@ -358,7 +362,7 @@ function YourSessions({
         {onBrowseProjects && (
           <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={onBrowseProjects}>
             <FolderOpen data-icon="inline-start" />
-            All projects
+            {t("All projects")}
           </Button>
         )}
       </SectionHeading>
@@ -366,7 +370,7 @@ function YourSessions({
         <Empty>
           <EmptyHeader>
             <EmptyDescription>
-              {searching ? `No session matches “${query.trim()}”.` : "Start a session and it shows up here, with every session it starts."}
+              {searching ? t("No session matches “{0}”.", { "0": query.trim() }) : t("Start a session and it shows up here, with every session it starts.")}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -395,9 +399,10 @@ function SessionRow({
   onOpen: (sessionId: string) => void
   onRename: (sessionId: string, name: string) => void
 }) {
+  const { t } = useTranslation()
   const [draft, setDraft] = useState<string | null>(null)
   const { session } = entry
-  const title = nameOf(session.sessionId) ?? "Untitled session"
+  const title = nameOf(session.sessionId) ?? t("Untitled session")
   const ownTitle = sessionTitle(session)
   const dot = rowDot(entry)
   const commit = () => {
@@ -412,12 +417,12 @@ function SessionRow({
       <span className="flex items-center gap-3 text-xs text-muted-foreground">
         {entry.counts ? (
           <>
-            {entry.counts.working > 0 && <span><span className="font-medium text-foreground tabular-nums">{entry.counts.working}</span> working</span>}
-            {entry.counts.needsYou > 0 && <span className="text-warning"><span className="font-medium tabular-nums">{entry.counts.needsYou}</span> need you</span>}
-            <span><span className="font-medium text-foreground tabular-nums">{entry.counts.size}</span> in crew</span>
+            {entry.counts.working > 0 && <span><span className="font-medium text-foreground tabular-nums">{entry.counts.working}</span> {t(" working")}</span>}
+            {entry.counts.needsYou > 0 && <span className="text-warning"><span className="font-medium tabular-nums">{entry.counts.needsYou}</span> {t(" need you")}</span>}
+            <span><span className="font-medium text-foreground tabular-nums">{entry.counts.size}</span> {t(" in crew")}</span>
           </>
         ) : (
-          session.isActive && <span>working</span>
+          session.isActive && <span>{t("working")}</span>
         )}
       </span>
       <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
@@ -429,7 +434,7 @@ function SessionRow({
         </span>
       </span>
       <span className="text-[0.6875rem] tabular-nums text-muted-foreground/80">
-        {entry.counts ? `crew active ${formatRelativeTime(entry.activityAt)}` : formatRelativeTime(entry.activityAt)}
+        {entry.counts ? t("crew active {0}", { "0": formatRelativeTime(entry.activityAt) }) : formatRelativeTime(entry.activityAt)}
       </span>
     </>
   )
@@ -438,12 +443,12 @@ function SessionRow({
   return (
     <li className="group/row relative border-t border-border/70 first:border-t-0">
       {entry.members.length > 0 && (
-        <div role="group" aria-label={`${title} crew`} className="flex flex-wrap gap-1 px-3 pt-3">
+        <div role="group" aria-label={t("{0} crew", { "0": title })} className="flex flex-wrap gap-1 px-3 pt-3">
           {entry.members.map((member, cellIndex) => (
             <button
               key={member.sessionId}
               type="button"
-              aria-label={`Open ${nameOf(member.sessionId) ?? "crew member"}`}
+              aria-label={t("Open {0}", { "0": nameOf(member.sessionId) ?? "crew member" })}
               title={`${nameOf(member.sessionId)}: ${entry.cells[cellIndex]}`}
               onClick={() => onOpen(member.sessionId)}
               className="flex size-5 items-center justify-center rounded-sm outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
@@ -472,7 +477,7 @@ function SessionRow({
             {dot && <span className={cn("size-1.5 shrink-0 rounded-full", dot)} aria-hidden="true" />}
             <Input
               autoFocus
-              aria-label="Session name"
+              aria-label={t("Session name")}
               value={draft}
               placeholder={ownTitle}
               onChange={(event) => setDraft(event.target.value)}
@@ -493,8 +498,8 @@ function SessionRow({
         <Button
           variant="ghost"
           size="icon-xs"
-          aria-label={`Rename ${title}`}
-          title="Rename"
+          aria-label={t("Rename {0}", { "0": title })}
+          title={t("Rename")}
           onClick={() => setDraft(title)}
           className={cn(
             "absolute right-2 text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100 focus-visible:opacity-100",

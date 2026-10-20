@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { type ComponentProps } from "react"
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
 import { XIcon } from "lucide-react"
@@ -42,6 +43,7 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
 }) {
+  const { t } = useTranslation()
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -64,7 +66,7 @@ function SheetContent({
         {showCloseButton && (
           <SheetPrimitive.Close className="absolute top-4 right-4 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-[color,background-color,transform,scale] duration-100 ease-out hover:bg-accent hover:text-foreground active:scale-90 focus-visible:ring-[3px] focus-visible:ring-ring/20 disabled:pointer-events-none motion-reduce:transition-none motion-reduce:active:scale-100">
             <XIcon data-icon="inline-start" className="size-4" />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{t("Close")}</span>
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Popup>

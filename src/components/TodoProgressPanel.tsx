@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useState } from "react"
 import { ChevronDown, ChevronUp, Circle, CircleCheck, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -21,6 +22,7 @@ export const TodoProgressPanel = memo(function TodoProgressPanel({
   expanded: controlledExpanded,
   onExpandedChange,
 }: TodoProgressPanelProps) {
+  const { t } = useTranslation()
   const [internalExpanded, setInternalExpanded] = useState(false)
   const expanded = controlledExpanded ?? internalExpanded
 
@@ -44,11 +46,11 @@ export const TodoProgressPanel = memo(function TodoProgressPanel({
         ) : (
           <ChevronUp data-icon="inline-start" />
         )}
-        <span className="text-sm font-medium">Tasks</span>
+        <span className="text-sm font-medium">{t("Tasks")}</span>
         <span className="font-mono text-xs tabular-nums text-muted-foreground">
           {completed}/{total}
         </span>
-        <Progress value={pct} className="max-w-[200px] flex-1" aria-label={`${pct.toFixed(0)}% of tasks complete`} />
+        <Progress value={pct} className="max-w-[200px] flex-1" aria-label={t("{0}% of tasks complete", { "0": pct.toFixed(0) })} />
         {progress.inProgress && (
           <span className="flex min-w-0 items-center gap-1 truncate text-xs text-info">
             <Loader2 className="size-3 shrink-0 animate-spin" />

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Check, Flag, Pause, Pencil, Play, Trash2, X } from "lucide-react"
 import { authFetch } from "@/lib/auth"
@@ -46,6 +47,7 @@ export function ThreadGoalProvider({
   threadId,
   children,
 }: { agentKind: AgentKind; threadId: string; children: ReactNode }) {
+  const { t } = useTranslation()
   const agentName = agentShortName(agentKind)
   const [goal, setGoal] = useState<ThreadGoal | null>(null)
   const [available, setAvailable] = useState(true)
@@ -169,22 +171,22 @@ export function ThreadGoalProvider({
       >
         <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-foreground">
           <Flag className="size-3.5" data-icon="inline-start" />
-          {goal ? "Edit long-running goal" : "Set a long-running goal"}
+          {goal ? t("Edit long-running goal") : t("Set a long-running goal")}
         </div>
         <FieldGroup className="gap-2">
           <Field>
-            <FieldLabel className="sr-only" htmlFor="goal-objective">Goal objective</FieldLabel>
+            <FieldLabel className="sr-only" htmlFor="goal-objective">{t("Goal objective")}</FieldLabel>
             <Textarea
               id="goal-objective"
               value={objective}
               onChange={(event) => setObjective(event.target.value)}
-              placeholder={`What should ${agentName} keep working toward?`}
+              placeholder={t("What should {0} keep working toward?", { "0": agentName })}
               rows={2}
               autoFocus
             />
           </Field>
           <Field orientation="horizontal" data-invalid={Boolean(error)}>
-            <FieldLabel className="text-xs text-muted-foreground" htmlFor="goal-budget">Token budget</FieldLabel>
+            <FieldLabel className="text-xs text-muted-foreground" htmlFor="goal-budget">{t("Token budget")}</FieldLabel>
             <Input
               id="goal-budget"
               type="number"
@@ -192,7 +194,7 @@ export function ThreadGoalProvider({
               step={1}
               value={tokenBudget}
               onChange={(event) => setTokenBudget(event.target.value)}
-              placeholder="Optional"
+              placeholder={t("Optional")}
               className="ml-auto h-8 w-28"
               aria-invalid={Boolean(error)}
             />
@@ -202,11 +204,11 @@ export function ThreadGoalProvider({
         <div className="mt-2 flex items-center justify-end gap-1">
           <Button type="button" variant="ghost" size="xs" onClick={() => setEditing(false)}>
             <X data-icon="inline-start" />
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button type="submit" size="xs" disabled={saving || !objective.trim()}>
             <Check data-icon="inline-start" />
-            Save goal
+            {t("Save goal")}
           </Button>
         </div>
       </form>
@@ -215,7 +217,7 @@ export function ThreadGoalProvider({
     const isPaused = goal.status === "paused"
     const isComplete = goal.status === "complete"
     section = (
-      <section className={GOAL_PANEL_CLASS} aria-label={`${agentName} goal`}>
+      <section className={GOAL_PANEL_CLASS} aria-label={t("{0} goal", { "0": agentName })}>
         <div className="flex items-center gap-2">
           <Flag className="size-3.5 shrink-0 text-muted-foreground" data-icon="inline-start" />
           <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground" title={goal.objective}>
@@ -236,7 +238,7 @@ export function ThreadGoalProvider({
                 size="icon-xs"
                 onClick={() => void updateStatus("active")}
                 disabled={saving}
-                aria-label="Resume goal"
+                aria-label={t("Resume goal")}
               >
                 <Play data-icon="icon" />
               </Button>
@@ -248,7 +250,7 @@ export function ThreadGoalProvider({
                 size="icon-xs"
                 onClick={() => void updateStatus("paused")}
                 disabled={saving}
-                aria-label="Pause goal"
+                aria-label={t("Pause goal")}
               >
                 <Pause data-icon="icon" />
               </Button>
@@ -260,12 +262,12 @@ export function ThreadGoalProvider({
                 size="icon-xs"
                 onClick={() => void updateStatus("complete")}
                 disabled={saving}
-                aria-label="Mark goal complete"
+                aria-label={t("Mark goal complete")}
               >
                 <Check data-icon="icon" />
               </Button>
             )}
-            <Button type="button" variant="ghost" size="icon-xs" onClick={beginEditing} aria-label="Edit goal">
+            <Button type="button" variant="ghost" size="icon-xs" onClick={beginEditing} aria-label={t("Edit goal")}>
               <Pencil data-icon="icon" />
             </Button>
             <Button
@@ -275,14 +277,14 @@ export function ThreadGoalProvider({
               onClick={() => void clearGoal()}
               disabled={saving}
               className="text-destructive"
-              aria-label="Clear goal"
+              aria-label={t("Clear goal")}
             >
               <Trash2 data-icon="icon" />
             </Button>
           </div>
         </div>
         {percent !== null && (
-          <Progress className="mt-1 mb-0.5" value={percent} aria-label={`${percent.toFixed(0)}% of goal token budget used`} />
+          <Progress className="mt-1 mb-0.5" value={percent} aria-label={t("{0}% of goal token budget used", { "0": percent.toFixed(0) })} />
         )}
       </section>
     )

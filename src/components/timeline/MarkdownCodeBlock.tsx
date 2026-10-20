@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { lazy, Suspense, useContext, useState, type HTMLAttributes } from "react"
 import type { ExtraProps } from "react-markdown"
 import { Check, Copy, ChevronDown, ChevronRight } from "lucide-react"
@@ -49,6 +50,7 @@ function parseLang(className: string | undefined): string | null {
 // ── Copy button ─────────────────────────────────────────────────────────────
 
 function CopyButton({ text }: { text: string }): React.ReactElement {
+  const { t } = useTranslation()
   const [copied, copy] = useCopyWithFeedback()
 
   return (
@@ -58,13 +60,13 @@ function CopyButton({ text }: { text: string }): React.ReactElement {
       size="xs"
       onClick={() => copy(text)}
       className="text-muted-foreground"
-      title="Copy code"
-      aria-label={copied ? "Copied" : "Copy code"}
+      title={t("Copy code")}
+      aria-label={copied ? t("Copied") : t("Copy code")}
     >
       {copied ? (
         <>
           <Check className="text-success" data-icon="inline-start" />
-          <span className="text-success">Copied</span>
+          <span className="text-success">{t("Copied")}</span>
         </>
       ) : (
         <Copy data-icon="icon" />
@@ -129,6 +131,7 @@ function HighlightedCodeBlock({
   code: string
   lang: string | null
 } & Omit<HTMLAttributes<HTMLElement>, "lang">): React.ReactElement {
+  const { t } = useTranslation()
   const isDark = useIsDarkMode()
   const tokens = useHighlightedTokens(code, lang, isDark)
   const [collapsed, setCollapsed] = useState(false)
@@ -161,7 +164,7 @@ function HighlightedCodeBlock({
           )}
           {isLong && (
             <span className="text-xs text-muted-foreground">
-              {lineCount} lines
+              {lineCount} {t(" lines")}
             </span>
           )}
         </div>
@@ -202,7 +205,7 @@ function HighlightedCodeBlock({
           className="h-auto w-full justify-start rounded-none px-3 py-2 text-xs text-muted-foreground"
           aria-label={`Expand ${lineCount} lines of code`}
         >
-          Show {lineCount} lines...
+          {t("Show ")}{lineCount} {t(" lines...")}
         </Button>
       )}
     </div>

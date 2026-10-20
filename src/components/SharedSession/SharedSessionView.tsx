@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useRef } from "react"
 import { AlertCircle, Users } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -21,6 +22,7 @@ interface SharedSessionViewProps {
  * no guest render path can reach a component that assumes host access.
  */
 export function SharedSessionView({ info }: SharedSessionViewProps) {
+  const { t } = useTranslation()
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   return (
@@ -30,16 +32,16 @@ export function SharedSessionView({ info }: SharedSessionViewProps) {
           <header className="flex shrink-0 items-center gap-2 border-b px-4 py-2">
             <Users className="size-4 text-muted-foreground" aria-hidden="true" />
             <h1 className="truncate text-sm font-medium text-foreground">{info.title}</h1>
-            <span className="ml-auto shrink-0 text-xs text-muted-foreground">Guest view</span>
+            <span className="ml-auto shrink-0 text-xs text-muted-foreground">{t("Guest view")}</span>
           </header>
 
           {view.loadState === "failed" ? (
             <div className="flex flex-1 items-center justify-center p-6">
               <Alert variant="destructive" className="max-w-sm">
                 <AlertCircle aria-hidden="true" />
-                <AlertTitle>Session unavailable</AlertTitle>
+                <AlertTitle>{t("Session unavailable")}</AlertTitle>
                 <AlertDescription>
-                  This conversation could not be loaded. It may have been deleted on the host.
+                  {t("This conversation could not be loaded. It may have been deleted on the host.")}
                 </AlertDescription>
               </Alert>
             </div>
@@ -47,7 +49,7 @@ export function SharedSessionView({ info }: SharedSessionViewProps) {
             <div
               className="flex flex-1 items-center justify-center"
               role="status"
-              aria-label="Loading shared session"
+              aria-label={t("Loading shared session")}
             >
               <Spinner className="size-5 text-muted-foreground" />
             </div>

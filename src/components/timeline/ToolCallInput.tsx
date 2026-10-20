@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useId, useState } from "react"
 import { Check, Circle, CircleDot } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,7 @@ function fieldValue(key: string, value: unknown): string {
 }
 
 function InputText({ value }: { value: string }): React.ReactElement {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const id = useId()
   const readable = readableToolText(value)
@@ -37,7 +39,7 @@ function InputText({ value }: { value: string }): React.ReactElement {
       </div>
       {long && (
         <Button type="button" variant="ghost" size="xs" aria-expanded={expanded} aria-controls={id} onClick={() => setExpanded((open) => !open)}>
-          {expanded ? "Show less" : "Show more"}
+          {expanded ? t("Show less") : t("Show more")}
         </Button>
       )}
     </>
@@ -58,8 +60,9 @@ function planSteps(input: Record<string, unknown>): PlanStep[] {
 }
 
 function PlanInput({ steps }: { steps: PlanStep[] }): React.ReactElement {
+  const { t } = useTranslation()
   return (
-    <section className="mt-2 min-w-0" aria-label="Plan">
+    <section className="mt-2 min-w-0" aria-label={t("Plan")}>
       <ol className="flex flex-col gap-2">
         {steps.map((step, index) => {
           const complete = step.status === "completed"
@@ -80,8 +83,9 @@ function PlanInput({ steps }: { steps: PlanStep[] }): React.ReactElement {
 }
 
 function QuestionInput({ questions }: { questions: Record<string, unknown>[] }): React.ReactElement {
+  const { t } = useTranslation()
   return (
-    <section className="mt-2 flex min-w-0 flex-col gap-3" aria-label="Questions">
+    <section className="mt-2 flex min-w-0 flex-col gap-3" aria-label={t("Questions")}>
       {questions.map((question, index) => (
         <div key={index} className="min-w-0 text-xs">
           <InputText value={String(question.question ?? question.title)} />
@@ -108,6 +112,7 @@ function QuestionInput({ questions }: { questions: Record<string, unknown>[] }):
 }
 
 export function ToolCallInput({ input }: { input: Record<string, unknown> }): React.ReactElement | null {
+  const { t } = useTranslation()
   const steps = planSteps(input)
   const questions = Array.isArray(input.questions)
     ? input.questions.filter((question): question is Record<string, unknown> =>
@@ -125,7 +130,7 @@ export function ToolCallInput({ input }: { input: Record<string, unknown> }): Re
       {steps.length > 0 && <PlanInput steps={steps} />}
       {questions.length > 0 && <QuestionInput questions={questions} />}
       {fields.length > 0 && (
-        <dl className="mt-2 flex min-w-0 flex-col gap-2" aria-label="Call details">
+        <dl className="mt-2 flex min-w-0 flex-col gap-2" aria-label={t("Call details")}>
           {fields.map(([key, value]) => (
             <div key={key} className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-x-3 text-xs">
               <dt className="max-w-32 break-words text-muted-foreground">{fieldLabel(key)}</dt>

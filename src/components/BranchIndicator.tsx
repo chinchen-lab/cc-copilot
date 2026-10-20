@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { GitFork } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
@@ -8,6 +9,7 @@ interface BranchIndicatorProps {
 }
 
 export function BranchIndicator({ branchCount, onClick }: BranchIndicatorProps) {
+  const { t } = useTranslation()
   if (branchCount === 0) return null
 
   return (
@@ -24,7 +26,7 @@ export function BranchIndicator({ branchCount, onClick }: BranchIndicatorProps) 
           <span className="font-mono text-xs">{branchCount}</span>
       </TooltipTrigger>
       <TooltipContent>
-        {branchCount} branch{branchCount !== 1 ? "es" : ""} from this turn
+        {branchCount} {t(" branch")}{branchCount !== 1 ? "es" : ""} {t(" from this turn")}
       </TooltipContent>
     </Tooltip>
   )

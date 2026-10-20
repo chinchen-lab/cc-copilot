@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useEffect, useMemo, type ReactNode } from "react"
 import { FolderOpen, FolderPlus, FolderSearch } from "lucide-react"
 import {
@@ -80,6 +81,7 @@ export function ProjectSwitcherList({
   initialView = "projects",
   children,
 }: ProjectSwitcherListProps) {
+  const { t } = useTranslation()
   const [view, setView] = useState(initialView)
   const [filter, setFilter] = useState("")
   const [highlighted, setHighlighted] = useState<string | null>(null)
@@ -138,7 +140,7 @@ export function ProjectSwitcherList({
     >
       <CommandInput
         autoFocus
-        placeholder="Search projects, paste a folder path, or browse"
+        placeholder={t("Search projects, paste a folder path, or browse")}
         value={filter}
         onValueChange={setFilter}
       />
@@ -147,8 +149,8 @@ export function ProjectSwitcherList({
           <Empty className="border-0 py-8">
             <EmptyHeader>
               <EmptyMedia variant="icon"><FolderOpen /></EmptyMedia>
-              <EmptyTitle>No projects found</EmptyTitle>
-              <EmptyDescription>Try another name, paste an absolute path, or browse the folders.</EmptyDescription>
+              <EmptyTitle>{t("No projects found")}</EmptyTitle>
+              <EmptyDescription>{t("Try another name, paste an absolute path, or browse the folders.")}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}
@@ -161,7 +163,7 @@ export function ProjectSwitcherList({
             >
               <FolderPlus data-icon="inline-start" className="size-4 shrink-0 text-foreground" />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">Start in this folder</div>
+                <div className="text-sm font-medium">{t("Start in this folder")}</div>
                 <div className="truncate text-xs text-muted-foreground">
                   {folderPath} · {agentSwitcherName(defaultAgentKind)}
                 </div>
@@ -188,7 +190,7 @@ export function ProjectSwitcherList({
                   <div className="truncate text-sm font-medium">{customName || path}</div>
                   <div className="text-xs text-muted-foreground">
                     {customName && <span className="mr-1.5">{path}</span>}
-                    {project.sessionCount} session{project.sessionCount !== 1 ? "s" : ""}
+                    {project.sessionCount} {t(" session")}{project.sessionCount !== 1 ? "s" : ""}
                     {project.lastModified && (
                       <> &middot; {new Date(project.lastModified).toLocaleDateString()}</>
                     )}
@@ -207,7 +209,7 @@ export function ProjectSwitcherList({
           >
             <FolderSearch data-icon="inline-start" className="size-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate text-sm font-medium">
-              {hostName ? `Browse folders on ${hostName}…` : "Browse folders…"}
+              {hostName ? t("Browse folders on {0}…", { "0": hostName }) : t("Browse folders…")}
             </span>
           </CommandItem>
         </CommandGroup>

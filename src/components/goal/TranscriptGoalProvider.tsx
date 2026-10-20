@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useMemo, useState, type ReactNode } from "react"
 import { Check, Flag, Pencil, Trash2, X } from "lucide-react"
 import type { ParsedSession } from "../../../shared/session/types"
@@ -41,6 +42,7 @@ interface TranscriptGoalProviderProps {
  * transcript and set with a `/goal` slash command.
  */
 export function TranscriptGoalProvider({ agentKind, session, onSendCommand, children }: TranscriptGoalProviderProps) {
+  const { t } = useTranslation()
   const agentName = agentShortName(agentKind)
   const parsedGoal = useMemo(
     () => extractTranscriptGoalState(session.rawMessages),
@@ -106,18 +108,18 @@ export function TranscriptGoalProvider({ agentKind, session, onSendCommand, chil
 
   if (editing) {
     section = (
-      <section className={GOAL_EDITOR_CLASS} aria-label={`${agentName} goal editor`}>
+      <section className={GOAL_EDITOR_CLASS} aria-label={t("{0} goal editor", { "0": agentName })}>
         <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
           <Flag className="size-3.5" data-icon="inline-start" />
-          {goal ? "Replace goal" : "Set a long-running goal"}
+          {goal ? t("Replace goal") : t("Set a long-running goal")}
         </div>
         <Field data-invalid={Boolean(error)}>
-          <FieldLabel className="sr-only" htmlFor="goal-condition">Goal condition</FieldLabel>
+          <FieldLabel className="sr-only" htmlFor="goal-condition">{t("Goal condition")}</FieldLabel>
           <Textarea
             id="goal-condition"
             value={condition}
             onChange={(event) => setCondition(event.target.value)}
-            placeholder={`A measurable condition ${agentName} should keep working toward…`}
+            placeholder={t("A measurable condition {0} should keep working toward…", { "0": agentName })}
             rows={2}
             maxLength={4_000}
             aria-invalid={Boolean(error)}
@@ -128,18 +130,18 @@ export function TranscriptGoalProvider({ agentKind, session, onSendCommand, chil
         <div className="mt-2 flex items-center justify-end gap-1">
           <Button type="button" variant="ghost" size="xs" onClick={() => setEditing(false)}>
             <X data-icon="inline-start" />
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button type="button" size="xs" onClick={() => void save()} disabled={!condition.trim()}>
             <Check data-icon="inline-start" />
-            Start goal
+            {t("Start goal")}
           </Button>
         </div>
       </section>
     )
   } else if (goal) {
     section = (
-      <section className={GOAL_PANEL_CLASS} aria-label={`${agentName} goal`}>
+      <section className={GOAL_PANEL_CLASS} aria-label={t("{0} goal", { "0": agentName })}>
         <div className="flex items-center gap-2">
           <Flag className="size-3.5 shrink-0 text-primary" data-icon="inline-start" />
           <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground" title={goal.condition}>
@@ -147,17 +149,17 @@ export function TranscriptGoalProvider({ agentKind, session, onSendCommand, chil
           </span>
           <Badge variant={statusVariant(goal.status)}>{statusLabel(goal.status)}</Badge>
           <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-            {goal.iterations} turn{goal.iterations === 1 ? "" : "s"}
+            {goal.iterations} {t(" turn")}{goal.iterations === 1 ? "" : "s"}
             {" · "}
             {formatTokenCount(goal.tokens)}
             {" · "}
             {Math.max(0, Math.round(goal.durationMs / 60_000))}m
           </span>
           <div className="flex shrink-0 items-center gap-0.5">
-            <Button type="button" variant="ghost" size="icon-xs" onClick={beginEditing} aria-label="Replace goal">
+            <Button type="button" variant="ghost" size="icon-xs" onClick={beginEditing} aria-label={t("Replace goal")}>
               <Pencil data-icon="icon" />
             </Button>
-            <Button type="button" variant="ghost" size="icon-xs" onClick={clear} aria-label="Clear goal">
+            <Button type="button" variant="ghost" size="icon-xs" onClick={clear} aria-label={t("Clear goal")}>
               <Trash2 data-icon="icon" />
             </Button>
           </div>

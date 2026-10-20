@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useEffect, useCallback } from "react"
 import { Palette, Check } from "lucide-react"
 import {
@@ -14,6 +15,7 @@ import {
 import { type ThemeId, themes } from "@/lib/themes"
 import { chatWidths, useChatWidth } from "@/lib/chatWidth"
 import { FontScaleSettings } from "@/components/FontScaleSettings"
+import { LanguageSettings } from "@/components/LanguageSettings"
 
 interface ThemeSelectorModalProps {
   open: boolean
@@ -30,6 +32,7 @@ export function ThemeSelectorModal({
   onSelectTheme,
   onPreviewTheme,
 }: ThemeSelectorModalProps) {
+  const { t } = useTranslation()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [chatWidth, setChatWidth] = useChatWidth()
 
@@ -69,13 +72,13 @@ export function ThemeSelectorModal({
         <DialogHeader className="border-b p-4 pr-12">
           <DialogTitle className="flex items-center gap-2 text-sm">
             <Palette data-icon="inline-start" className="size-4 text-muted-foreground" />
-            Appearance
+            {t("Appearance")}
           </DialogTitle>
-          <DialogDescription>Choose a theme, text size and chat width.</DialogDescription>
+          <DialogDescription>{t("Choose a theme, language, text size and chat width.")}</DialogDescription>
         </DialogHeader>
 
         <ToggleGroup
-          aria-label="Theme"
+          aria-label={t("Theme")}
           orientation="vertical"
           value={[themes[selectedIndex].id]}
           className="w-full items-stretch p-1"
@@ -99,7 +102,7 @@ export function ThemeSelectorModal({
                 ))}
               </div>
 
-              <span className="flex-1 text-sm font-medium">{theme.name}</span>
+              <span className="flex-1 text-sm font-medium">{t(theme.name, undefined, "theme")}</span>
 
               {currentTheme === theme.id && (
                 <Check data-icon="inline-end" className="size-4 shrink-0 text-foreground" />
@@ -108,12 +111,12 @@ export function ThemeSelectorModal({
           ))}
         </ToggleGroup>
 
-        <div className="border-t p-3"><FontScaleSettings /></div>
+        <div className="space-y-5 border-t p-3"><LanguageSettings /><FontScaleSettings /></div>
 
         <div className="border-t p-3">
-          <div className="px-1 pb-2 text-xs font-medium text-muted-foreground">Chat width</div>
+          <div className="px-1 pb-2 text-xs font-medium text-muted-foreground">{t("Chat width")}</div>
           <ToggleGroup
-            aria-label="Chat width"
+            aria-label={t("Chat width")}
             value={[chatWidth]}
             className="w-full items-stretch gap-1"
           >
@@ -124,7 +127,7 @@ export function ThemeSelectorModal({
                 className="flex-1 text-xs text-muted-foreground data-pressed:bg-accent data-pressed:text-accent-foreground"
                 onClick={() => setChatWidth(width.id)}
               >
-                {width.name}
+                {t(width.name, undefined, "width")}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>

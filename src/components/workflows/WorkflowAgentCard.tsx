@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useState } from "react"
 import {
   Check,
@@ -57,6 +58,7 @@ function readableAgentName(label: string): string {
 }
 
 export function WorkflowAgentCard({ agent, dirName, sessionId, runId }: WorkflowAgentCardProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
   const [resultState, setResultState] = useState<ResultState>({ status: "idle" })
@@ -105,7 +107,7 @@ export function WorkflowAgentCard({ agent, dirName, sessionId, runId }: Workflow
                 </CardTitle>
                 {agent.attempt && agent.attempt > 1 && (
                   <Badge variant="outline" className="text-muted-foreground">
-                    Attempt {agent.attempt}
+                    {t("Attempt ")}{agent.attempt}
                   </Badge>
                 )}
               </div>
@@ -115,17 +117,17 @@ export function WorkflowAgentCard({ agent, dirName, sessionId, runId }: Workflow
                 </p>
               ) : running && agent.lastToolName ? (
                 <p className="mt-1 truncate text-xs text-muted-foreground">
-                  Working in {agent.lastToolName}
+                  {t("Working in ")}{agent.lastToolName}
                   {agent.lastToolSummary ? `: ${agent.lastToolSummary}` : ""}
                 </p>
               ) : null}
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 {agent.model && <span>{cleanModelName(agent.model)}</span>}
                 {typeof agent.tokens === "number" && agent.tokens > 0 && (
-                  <Metric icon={Coins}>{formatTokenCount(agent.tokens)} tokens</Metric>
+                  <Metric icon={Coins}>{formatTokenCount(agent.tokens)} {t(" tokens")}</Metric>
                 )}
                 {typeof agent.toolCalls === "number" && agent.toolCalls > 0 && (
-                  <Metric icon={Wrench}>{agent.toolCalls} tools</Metric>
+                  <Metric icon={Wrench}>{agent.toolCalls} {t(" tools")}</Metric>
                 )}
                 {typeof agent.durationMs === "number" && (
                   <Metric icon={Clock}>{formatDuration(agent.durationMs)}</Metric>
@@ -147,16 +149,16 @@ export function WorkflowAgentCard({ agent, dirName, sessionId, runId }: Workflow
           <CardContent className="flex flex-col gap-4 px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h5 className="text-sm font-semibold text-foreground">Response</h5>
+                <h5 className="text-sm font-semibold text-foreground">{t("Response")}</h5>
                 <p className="text-xs text-muted-foreground">
-                  {resultState.status === "loaded" ? "Complete agent response" : "Saved response preview"}
+                  {resultState.status === "loaded" ? t("Complete agent response") : t("Saved response preview")}
                 </p>
               </div>
               <div className="flex items-center gap-1">
                 {canRetry && (
                   <Button variant="ghost" size="sm" onClick={() => void loadFullResult()}>
                     <RotateCcw data-icon="inline-start" />
-                    Retry
+                    {t("Retry")}
                   </Button>
                 )}
                 {visibleResult !== undefined && (
@@ -164,8 +166,8 @@ export function WorkflowAgentCard({ agent, dirName, sessionId, runId }: Workflow
                     variant="ghost"
                     size="icon-sm"
                     onClick={() => copy(serializeWorkflowResponse(visibleResult))}
-                    aria-label={copied ? "Response copied" : "Copy response"}
-                    title={copied ? "Copied" : "Copy response"}
+                    aria-label={copied ? t("Response copied") : t("Copy response")}
+                    title={copied ? t("Copied") : t("Copy response")}
                   >
                     {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
                   </Button>
@@ -176,13 +178,13 @@ export function WorkflowAgentCard({ agent, dirName, sessionId, runId }: Workflow
             {resultState.status === "loading" ? (
               <div className="flex items-center gap-2 py-5 text-sm text-muted-foreground">
                 <Spinner />
-                Loading the complete response…
+                {t("Loading the complete response…")}
               </div>
             ) : visibleResult !== undefined ? (
               <WorkflowResponse value={visibleResult} />
             ) : (
               <p className="text-sm text-muted-foreground">
-                {running ? "This agent has not returned a response yet." : "No response was saved for this agent."}
+                {running ? t("This agent has not returned a response yet.") : t("No response was saved for this agent.")}
               </p>
             )}
 
@@ -192,8 +194,7 @@ export function WorkflowAgentCard({ agent, dirName, sessionId, runId }: Workflow
                   render={<Button variant="ghost" size="sm" className="w-full justify-start" />}
                 >
                   <FileText data-icon="inline-start" />
-                  Agent prompt
-                  <ChevronDown data-icon="inline-end" className={cn("ml-auto transition-transform", promptOpen && "rotate-180")} />
+                  {t("Agent prompt")}<ChevronDown data-icon="inline-end" className={cn("ml-auto transition-transform", promptOpen && "rotate-180")} />
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pt-2">
                   <div className="rounded-md border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">

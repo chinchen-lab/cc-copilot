@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { type RefObject, memo, useRef, useEffect, useCallback } from "react"
 import {
   Search,
@@ -46,6 +47,7 @@ export const ChatArea = memo(function ChatArea({
   mobileSearchOpen = false,
   onMobileSearchClose,
 }: ChatAreaProps) {
+  const { t } = useTranslation()
   const { state, dispatch, isMobile } = useAppContext()
   const { session, sessionSource, rateLimit, permissions, isSubAgentView } = useSessionContext()
   const canUseTerminal = useCapability("terminal")
@@ -99,8 +101,8 @@ export const ChatArea = memo(function ChatArea({
               ref={searchInputRef}
               value={searchQuery}
               onChange={(e) => dispatch({ type: "SET_SEARCH_QUERY", value: e.target.value })}
-              placeholder="Search conversation..."
-              aria-label="Search conversation"
+              placeholder={t("Search conversation...")}
+              aria-label={t("Search conversation")}
             />
             <InputGroupAddon align="inline-start">
               <Search />
@@ -110,7 +112,7 @@ export const ChatArea = memo(function ChatArea({
             variant="ghost"
             size="icon-sm"
             onClick={closeMobileSearch}
-            aria-label="Close conversation search"
+            aria-label={t("Close conversation search")}
           >
             <X data-icon="inline-start" />
           </Button>
@@ -179,7 +181,7 @@ export const ChatArea = memo(function ChatArea({
             isMobile ? "right-3 bottom-3" : "right-5 bottom-5",
           )}
           onClick={scrollToBottomInstant}
-          aria-label="Scroll to bottom"
+          aria-label={t("Scroll to bottom")}
         >
           <ArrowDown data-icon="inline-start" />
         </Button>

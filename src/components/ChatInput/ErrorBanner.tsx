@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import { Copy, Check, AlertCircle } from "lucide-react"
 import {
@@ -16,6 +17,7 @@ import { Button } from "@/components/ui/button"
  * diagnosed instead of just reading "Claude Code process exited with code 1".
  */
 export function ErrorBanner({ error }: { error: string }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -39,12 +41,12 @@ export function ErrorBanner({ error }: { error: string }) {
         variant="ghost"
         size="sm"
         onClick={() => setOpen(true)}
-        title="Click to view the full error"
+        title={t("Click to view the full error")}
         className="motion-enter mt-1 w-full justify-start text-destructive"
       >
         <AlertCircle data-icon="inline-start" />
         <span className="truncate">{firstLine}</span>
-        {hasMore && <span className="shrink-0 opacity-60">(details)</span>}
+        {hasMore && <span className="shrink-0 opacity-60">{t("(details)")}</span>}
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -52,11 +54,10 @@ export function ErrorBanner({ error }: { error: string }) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertCircle className="size-4" />
-              Error details
+              {t("Error details")}
             </DialogTitle>
             <DialogDescription>
-              The full output from the failed request, including the underlying
-              process stderr.
+              {t("The full output from the failed request, including the underlying process stderr.")}
             </DialogDescription>
           </DialogHeader>
 
@@ -72,7 +73,7 @@ export function ErrorBanner({ error }: { error: string }) {
               onClick={handleCopy}
             >
               {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
-              {copied ? "Copied" : "Copy"}
+              {copied ? t("Copied") : t("Copy")}
             </Button>
           </div>
         </DialogContent>

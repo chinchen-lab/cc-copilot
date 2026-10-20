@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useRef } from "react"
 import { Archive, Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -42,6 +43,7 @@ export function ProjectContextMenu({
   archivableCount = 0,
   onArchiveIdle,
 }: ProjectContextMenuProps) {
+  const { t } = useTranslation()
   const [showRename, setShowRename] = useState(false)
   const [renameValue, setRenameValue] = useState("")
   const renameInputRef = useRef<HTMLInputElement>(null)
@@ -62,7 +64,7 @@ export function ProjectContextMenu({
           <ContextMenuGroup>
             <ContextMenuItem onClick={openRename}>
               <Pencil data-icon="inline-start" />
-              Rename project
+              {t("Rename project")}
             </ContextMenuItem>
           </ContextMenuGroup>
           {onArchiveIdle && (
@@ -72,8 +74,8 @@ export function ProjectContextMenu({
                 <ContextMenuItem onClick={onArchiveIdle} disabled={archivableCount === 0}>
                   <Archive data-icon="inline-start" />
                   {archivableCount > 0
-                    ? `Archive ${archivableCount} idle ${archivableCount === 1 ? "session" : "sessions"}`
-                    : "Archive idle sessions"}
+                    ? t("Archive {0} idle {1}", { "0": archivableCount, "1": archivableCount === 1 ? "session" : "sessions" })
+                    : t("Archive idle sessions")}
                 </ContextMenuItem>
               </ContextMenuGroup>
             </>
@@ -84,9 +86,9 @@ export function ProjectContextMenu({
       <Dialog open={showRename} onOpenChange={setShowRename}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Rename project</DialogTitle>
+            <DialogTitle className="text-foreground">{t("Rename project")}</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Give this project a custom name. Clear to reset to default.
+              {t("Give this project a custom name. Clear to reset to default.")}
             </DialogDescription>
           </DialogHeader>
           <form className="flex flex-col gap-4"
@@ -97,7 +99,7 @@ export function ProjectContextMenu({
             }}
           >
             <Field>
-              <FieldLabel htmlFor="project-rename">Project name</FieldLabel>
+              <FieldLabel htmlFor="project-rename">{t("Project name")}</FieldLabel>
               <Input
                 id="project-rename"
                 ref={renameInputRef}
@@ -113,10 +115,10 @@ export function ProjectContextMenu({
                 size="sm"
                 onClick={() => setShowRename(false)}
               >
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button type="submit" size="sm">
-                Save
+                {t("Save")}
               </Button>
             </DialogFooter>
           </form>

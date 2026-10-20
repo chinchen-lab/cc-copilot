@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { Lock, Plus, Save, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -58,6 +59,7 @@ export function CategorySection({
   onCreated,
   onCancelCreate,
 }: CategorySectionProps) {
+  const { t } = useTranslation()
   const meta = CATEGORY_META[category]
   const Icon = meta.icon
 
@@ -75,12 +77,12 @@ export function CategorySection({
                 variant="ghost"
                 size="icon-xs"
                 className="opacity-0 transition-opacity group-hover:opacity-100"
-                aria-label={`New ${category.slice(0, -1)}`}
+                aria-label={t("New {0}", { "0": category.slice(0, -1) })}
                 onClick={onNewFile}
               />}>
                 <Plus data-icon="inline-start" />
             </TooltipTrigger>
-            <TooltipContent>New {category.slice(0, -1)}</TooltipContent>
+            <TooltipContent>{t("New ")}{category.slice(0, -1)}</TooltipContent>
           </Tooltip>
         )}
       </div>
@@ -103,10 +105,10 @@ export function CategorySection({
                 autoFocus
                 className="h-7 min-w-0 flex-1 text-xs"
               />
-              <Button variant="ghost" size="icon-xs" aria-label="Save name" onClick={onRenameSubmit} disabled={!renameValue.trim()}>
+              <Button variant="ghost" size="icon-xs" aria-label={t("Save name")} onClick={onRenameSubmit} disabled={!renameValue.trim()}>
                 <Save data-icon="inline-start" />
               </Button>
-              <Button variant="ghost" size="icon-xs" aria-label="Cancel rename" onClick={onRenameCancel}>
+              <Button variant="ghost" size="icon-xs" aria-label={t("Cancel rename")} onClick={onRenameCancel}>
                 <X data-icon="inline-start" />
               </Button>
             </div>
@@ -166,13 +168,13 @@ export function CategorySection({
             <ContextMenuContent className="min-w-36">
               {item.readOnly ? (
                 <ContextMenuGroup>
-                  <ContextMenuLabel>Read-only file</ContextMenuLabel>
+                  <ContextMenuLabel>{t("Read-only file")}</ContextMenuLabel>
                 </ContextMenuGroup>
               ) : (
                 <>
                   <ContextMenuGroup>
                     <ContextMenuItem onClick={() => onRenameItem(item)}>
-                      Rename
+                      {t("Rename")}
                     </ContextMenuItem>
                   </ContextMenuGroup>
                   <ContextMenuSeparator />
@@ -181,7 +183,7 @@ export function CategorySection({
                       variant="destructive"
                       onClick={() => onDeleteItem(item)}
                     >
-                      Delete
+                      {t("Delete")}
                     </ContextMenuItem>
                   </ContextMenuGroup>
                 </>
@@ -192,7 +194,7 @@ export function CategorySection({
       })}
 
       {items.length === 0 && !creatingInCategory && (
-        <p className="px-3 py-1 text-xs text-muted-foreground">None configured</p>
+        <p className="px-3 py-1 text-xs text-muted-foreground">{t("None configured")}</p>
       )}
 
       {creatingInCategory && (

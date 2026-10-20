@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useMemo, useState, type CSSProperties } from "react"
 import { ArrowDownLeft, ChevronDown, ChevronRight } from "lucide-react"
 import ReactMarkdown from "react-markdown"
@@ -137,6 +138,7 @@ export const AgentMessageCard = memo(function AgentMessageCard({
   reply,
   isLive,
 }: Props) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   // turnBuilder already unwraps the envelope; this is the last thing between a
   // body that escaped it and the reader.
@@ -190,7 +192,7 @@ export const AgentMessageCard = memo(function AgentMessageCard({
               variant="outline"
               className="h-4 border-warning/30 bg-warning/10 px-1.5 text-[0.625rem] tracking-wide text-warning uppercase"
             >
-              Needs you
+              {t("Needs you")}
             </Badge>
           )}
           {time && <span className="text-xs text-muted-foreground">{time}</span>}
@@ -254,11 +256,10 @@ export const AgentMessageCard = memo(function AgentMessageCard({
         >
           {expanded ? (
             <>
-              <ChevronDown data-icon="inline-start" /> Collapse
-            </>
+              <ChevronDown data-icon="inline-start" /> {t(" Collapse")}</>
           ) : (
             <>
-              <ChevronRight data-icon="inline-start" /> Expand ·{" "}
+              <ChevronRight data-icon="inline-start" /> {t(" Expand ·")}{" "}
               {body.length.toLocaleString("en-US")} {body.length === 1 ? "char" : "chars"}
             </>
           )}

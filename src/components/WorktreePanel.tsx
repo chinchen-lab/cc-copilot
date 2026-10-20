@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState } from "react"
 import {
   GitBranch,
@@ -82,6 +83,7 @@ export function WorktreePanel({
   onOpenSession,
   onClose,
 }: WorktreePanelProps) {
+  const { t } = useTranslation()
   const canManageHostFiles = useCapability("hostFiles")
   const [deleting, setDeleting] = useState<string | null>(null)
   const [creatingPr, setCreatingPr] = useState<string | null>(null)
@@ -209,10 +211,10 @@ export function WorktreePanel({
 
   return (
     <>
-      <aside aria-label="Worktrees" className="flex size-full min-h-0 flex-col bg-canvas">
+      <aside aria-label={t("Worktrees")} className="flex size-full min-h-0 flex-col bg-canvas">
         <div className="flex h-10 shrink-0 items-center gap-2 px-3">
           <GitBranch data-icon="inline-start" aria-hidden="true" className="size-4 text-muted-foreground" />
-          <h2 className="text-sm font-medium">Worktrees</h2>
+          <h2 className="text-sm font-medium">{t("Worktrees")}</h2>
           <div className="flex-1" />
           {canManageHostFiles && (
             <Button
@@ -220,7 +222,7 @@ export function WorktreePanel({
               size="icon-sm"
               onClick={handleCleanup}
               disabled={cleaningUp}
-              aria-label="Cleanup stale worktrees"
+              aria-label={t("Cleanup stale worktrees")}
             >
               <Sparkles data-icon="inline-start" />
             </Button>
@@ -230,11 +232,11 @@ export function WorktreePanel({
             size="icon-sm"
             onClick={onRefetch}
             disabled={loading}
-            aria-label="Refresh worktrees"
+            aria-label={t("Refresh worktrees")}
           >
             <RefreshCw data-icon="inline-start" className={cn(loading && "animate-spin")} />
           </Button>
-          <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close worktrees">
+          <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label={t("Close worktrees")}>
             <X data-icon="inline-start" />
           </Button>
         </div>
@@ -244,7 +246,7 @@ export function WorktreePanel({
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
           {!dirName && (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-              Select a project to view worktrees
+              {t("Select a project to view worktrees")}
             </div>
           )}
 
@@ -252,9 +254,9 @@ export function WorktreePanel({
             <Empty className="border-0 py-16">
               <EmptyHeader>
                 <EmptyMedia variant="icon"><GitBranch /></EmptyMedia>
-                <EmptyTitle>No worktrees</EmptyTitle>
+                <EmptyTitle>{t("No worktrees")}</EmptyTitle>
                 <EmptyDescription>
-                Create a new session with &ldquo;Isolate in worktree&rdquo; enabled
+                {t("Create a new session with “Isolate in worktree” enabled")}
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -274,11 +276,11 @@ export function WorktreePanel({
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate text-sm font-medium text-foreground">{wt.name}</span>
                     {wt.isDirty && (
-                      <span className="flex size-2 shrink-0 rounded-full bg-warning" title="Uncommitted changes" />
+                      <span className="flex size-2 shrink-0 rounded-full bg-warning" title={t("Uncommitted changes")} />
                     )}
                     {wt.commitsAhead > 0 && (
                       <Badge variant="outline" className="h-5 shrink-0 px-1.5 text-xs">
-                        {wt.commitsAhead} ahead
+                        {wt.commitsAhead} {t(" ahead")}
                       </Badge>
                     )}
                   </div>
@@ -288,7 +290,7 @@ export function WorktreePanel({
                         variant="ghost"
                         size="icon-xs"
                         onClick={() => onOpenSession(wt.linkedSessions[0])}
-                        aria-label="Open session"
+                        aria-label={t("Open session")}
                       >
                         <ExternalLink data-icon="inline-start" />
                       </Button>
@@ -300,7 +302,7 @@ export function WorktreePanel({
                           size="icon-xs"
                           onClick={() => handleCreatePr(wt)}
                           disabled={creatingPr === wt.name || wt.commitsAhead === 0}
-                          aria-label="Create PR"
+                          aria-label={t("Create PR")}
                         >
                           <GitPullRequest data-icon="inline-start" />
                         </Button>
@@ -310,7 +312,7 @@ export function WorktreePanel({
                           onClick={() => handleDelete(wt)}
                           disabled={deleting === wt.name}
                           className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          aria-label="Delete worktree"
+                          aria-label={t("Delete worktree")}
                         >
                           <Trash2 data-icon="inline-start" />
                         </Button>
@@ -329,7 +331,7 @@ export function WorktreePanel({
                     {!isGeneratedWorktreeBranch(wt.name, wt.branch) && (
                       <span className="flex min-w-0 items-center gap-1">
                         <GitBranch className="size-3 shrink-0" aria-hidden="true" />
-                        <span className="truncate">{wt.branch || "detached"}</span>
+                        <span className="truncate">{wt.branch || t("detached")}</span>
                       </span>
                     )}
                     {wt.createdAt && <span className="shrink-0">{formatRelativeTime(wt.createdAt)}</span>}
@@ -342,7 +344,7 @@ export function WorktreePanel({
                       <ChevronRight data-icon="inline-start" className="size-3 transition-transform group-data-panel-open:rotate-90 motion-reduce:transition-none" />
                       <FileCode2 data-icon="inline-start" className="size-3" />
                       <span>
-                        {fileCount} file{fileCount !== 1 ? "s" : ""} changed
+                        {fileCount} {t(" file")}{fileCount !== 1 ? "s" : ""} {t(" changed")}
                       </span>
                       <LineCounts add={totalAdded} del={totalDeleted} className="ml-1" />
                     </CollapsibleTrigger>
@@ -380,22 +382,22 @@ export function WorktreePanel({
             </AlertDialogMedia>
             <AlertDialogTitle>
               {deleteConfirmation?.reason === "dirty"
-                ? "Delete worktree with uncommitted changes?"
-                : "Delete worktree with unpushed commits?"}
+                ? t("Delete worktree with uncommitted changes?")
+                : t("Delete worktree with unpushed commits?")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {deleteConfirmation?.reason === "dirty"
-                ? `"${deleteConfirmation.worktree.name}" has uncommitted changes.`
-                : `"${deleteConfirmation?.worktree.name}" has ${deleteConfirmation?.worktree.commitsAhead} unpushed commit(s).`} {" "}
-              Deleting it cannot be undone.
+                ? t("\"{0}\" has uncommitted changes.", { "0": deleteConfirmation.worktree.name })
+                : t("\"{0}\" has {1} unpushed commit(s).", { "0": deleteConfirmation?.worktree.name, "1": deleteConfirmation?.worktree.commitsAhead })} {" "}
+              {t("Deleting it cannot be undone.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel size="sm">Cancel</AlertDialogCancel>
+            <AlertDialogCancel size="sm">{t("Cancel")}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" size="sm" onClick={confirmDelete}>
               {deleteConfirmation?.reason === "dirty" && losesCommits(deleteConfirmation.worktree)
-                ? "Continue"
-                : "Delete worktree"}
+                ? t("Continue")
+                : t("Delete worktree")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -409,15 +411,15 @@ export function WorktreePanel({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove stale worktrees?</AlertDialogTitle>
+            <AlertDialogTitle>{t("Remove stale worktrees?")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {cleanupCandidates?.length} stale worktree{cleanupCandidates?.length === 1 ? "" : "s"} will be removed: {cleanupCandidates?.join(", ")}.
+              {cleanupCandidates?.length} {t(" stale worktree")}{cleanupCandidates?.length === 1 ? "" : "s"} {t(" will be removed: ")}{cleanupCandidates?.join(", ")}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel size="sm">Cancel</AlertDialogCancel>
+            <AlertDialogCancel size="sm">{t("Cancel")}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" size="sm" onClick={() => void confirmCleanup()}>
-              Remove worktrees
+              {t("Remove worktrees")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

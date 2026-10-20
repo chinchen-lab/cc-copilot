@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { ChevronRight } from "lucide-react"
 import type { TaskWakeup } from "../../../shared/contracts/taskWakeup"
 import { useSessionInventoryOptional } from "@/contexts/SessionInventoryContext"
@@ -24,6 +25,7 @@ function describeResult(result: unknown): { reply: string; raw: string } {
 
 /** The prompt that wakes this session when a delegated session finishes, shown as that session's result. */
 export function DelegatedResultCard({ wakeup }: { wakeup: TaskWakeup }) {
+  const { t } = useTranslation()
   const child = inventorySession(useSessionInventoryOptional(), wakeup.childSessionId)
   const { reply, raw } = describeResult(wakeup.result)
   return (
@@ -39,8 +41,7 @@ export function DelegatedResultCard({ wakeup }: { wakeup: TaskWakeup }) {
       }}
       action={(
         <Button variant="ghost" size="xs" onClick={() => child ? child.open() : void revealSessionById(wakeup.childSessionId)}>
-          Open
-          <ChevronRight data-icon="inline-end" />
+          {t("Open")}<ChevronRight data-icon="inline-end" />
         </Button>
       )}
     />

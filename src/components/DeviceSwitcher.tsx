@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useState } from "react"
 import { Check, ChevronDown, Laptop, Plus, Server, Settings2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -48,6 +49,7 @@ function SlotHint({ slot }: { slot: number }) {
 }
 
 export function DeviceSwitcher({ compact = false }: { compact?: boolean }) {
+  const { t } = useTranslation()
   const { devices, activeDeviceId, activeDevice, refresh, testDevice } = useDevices()
   const [dialogMode, setDialogMode] = useState<null | "add" | "manage">(null)
 
@@ -80,7 +82,7 @@ export function DeviceSwitcher({ compact = false }: { compact?: boolean }) {
             <Button
               variant="ghost"
               size={compact ? "sm" : "xs"}
-              aria-label="Switch device"
+              aria-label={t("Switch device")}
               className={cn(
                 "max-w-40 justify-start",
                 compact && "h-10",
@@ -95,11 +97,11 @@ export function DeviceSwitcher({ compact = false }: { compact?: boolean }) {
 
         <DropdownMenuContent align="end" sideOffset={6} className="w-64">
           <DropdownMenuGroup>
-            <DropdownMenuLabel>Devices</DropdownMenuLabel>
+            <DropdownMenuLabel>{t("Devices")}</DropdownMenuLabel>
 
             <DropdownMenuItem onClick={() => switchDevice(LOCAL_DEVICE_ID)}>
               <Laptop />
-              <span className="flex-1 truncate">This machine</span>
+              <span className="flex-1 truncate">{t("This machine")}</span>
               <SlotHint slot={1} />
               {!activeIsRemote && <Check className="ml-auto text-success" />}
             </DropdownMenuItem>
@@ -121,7 +123,7 @@ export function DeviceSwitcher({ compact = false }: { compact?: boolean }) {
                       {skewed && (
                         <span
                           className="shrink-0 font-mono text-xs text-warning"
-                          title={`Device runs v${version}; hub runs v${HUB_VERSION}`}
+                          title={t("Device runs v{0}; hub runs v{1}", { "0": version, "1": HUB_VERSION })}
                         >
                           v{version}
                         </span>
@@ -129,7 +131,7 @@ export function DeviceSwitcher({ compact = false }: { compact?: boolean }) {
                     </span>
                     <span className="truncate text-xs text-muted-foreground">
                       {device.host}:{device.port}
-                      {device.auth === "none" && " · unauthenticated"}
+                      {device.auth === "none" && t(" · unauthenticated")}
                     </span>
                   </div>
                   <SlotHint slot={index + 2} />
@@ -145,12 +147,12 @@ export function DeviceSwitcher({ compact = false }: { compact?: boolean }) {
               <DropdownMenuGroup>
                 <DropdownMenuItem onClick={() => setDialogMode("add")}>
                   <Plus />
-                  <span>Add device…</span>
+                  <span>{t("Add device…")}</span>
                 </DropdownMenuItem>
                 {devices.length > 0 && (
                   <DropdownMenuItem onClick={() => setDialogMode("manage")}>
                     <Settings2 />
-                    <span>Manage devices…</span>
+                    <span>{t("Manage devices…")}</span>
                   </DropdownMenuItem>
                 )}
               </DropdownMenuGroup>

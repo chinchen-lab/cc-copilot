@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, memo } from "react"
 import { ChevronRight, ChevronDown, Minimize2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
@@ -27,6 +28,7 @@ function describe(meta?: CompactionMeta): string | null {
  * summary the compacting model wrote.
  */
 export const CompactionMarker = memo(function CompactionMarker({ summary, meta }: Props) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const detail = describe(meta)
   const body = summary?.trim()
@@ -37,7 +39,7 @@ export const CompactionMarker = memo(function CompactionMarker({ summary, meta }
         ? <ChevronDown className="size-3" data-icon="inline-start" />
         : <ChevronRight className="size-3" data-icon="inline-start" />)}
       <Minimize2 className="size-3" data-icon="inline-start" />
-      <span className="font-medium">Compacted</span>
+      <span className="font-medium">{t("Compacted")}</span>
       {detail && (
         <>
           <span>&middot;</span>

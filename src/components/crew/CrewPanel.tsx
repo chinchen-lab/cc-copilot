@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, MailCheck, Network, Square, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -53,6 +54,7 @@ const CELL: Record<CrewCellState, string> = {
  * one at a time, and every member in the order it was started.
  */
 export function CrewPanel({ context, closePanel }: WorkspacePanelProps) {
+  const { t } = useTranslation()
   const sessionId = context.session?.sessionId ?? null
   const { crew, error, busy, respond, markRead, stop } = useSessionCrew(sessionId)
   const { names } = useSessionNames()
@@ -68,24 +70,24 @@ export function CrewPanel({ context, closePanel }: WorkspacePanelProps) {
   }
 
   return (
-    <aside aria-label="Crew" className="flex size-full min-h-0 flex-col bg-canvas">
+    <aside aria-label={t("Crew")} className="flex size-full min-h-0 flex-col bg-canvas">
       <div className="flex h-10 shrink-0 items-center gap-2 px-3">
         <Network aria-hidden="true" className="size-4 text-muted-foreground" />
-        <h2 className="text-sm font-medium">Crew</h2>
+        <h2 className="text-sm font-medium">{t("Crew")}</h2>
         <div className="flex-1" />
-        <Button variant="ghost" size="icon-sm" onClick={closePanel} aria-label="Close crew">
+        <Button variant="ghost" size="icon-sm" onClick={closePanel} aria-label={t("Close crew")}>
           <X data-icon="inline-start" />
         </Button>
       </div>
       {error && <p role="alert" className="px-3 pb-2 text-xs text-destructive">{error}</p>}
       {!crew ? (
-        !error && <p className="px-3 py-6 text-center text-sm text-muted-foreground">Loading the crew…</p>
+        !error && <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t("Loading the crew…")}</p>
       ) : (
         <Tabs value={tab} onValueChange={setTab} className="min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)]">
           <TabsList variant="line" className="mx-3 mb-1">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="map">Map</TabsTrigger>
-            <TabsTrigger value="chat">Chat</TabsTrigger>
+            <TabsTrigger value="overview">{t("Overview")}</TabsTrigger>
+            <TabsTrigger value="map">{t("Map")}</TabsTrigger>
+            <TabsTrigger value="chat">{t("Chat")}</TabsTrigger>
           </TabsList>
           <TabsContent value="overview" className="min-h-0">
             <ScrollArea className="h-full min-h-0">
@@ -121,12 +123,13 @@ interface CrewSectionProps {
 }
 
 function CrewRoll({ crew, hereId, nameOf, onOpen }: CrewSectionProps & { hereId: string | null }) {
+  const { t } = useTranslation()
   const root = crew.members.find((member) => member.sessionId === crew.rootId)
   const members = crew.members.filter((member) => member.parentId !== null)
   const tally = crewTally(crew)
   const since = members[0]?.startedAt
   return (
-    <section aria-label="Crew summary" className="border-b px-3 pb-3 pt-1">
+    <section aria-label={t("Crew summary")} className="border-b px-3 pb-3 pt-1">
       <div className="flex items-baseline gap-2">
         {root && (
           <button
@@ -139,12 +142,12 @@ function CrewRoll({ crew, hereId, nameOf, onOpen }: CrewSectionProps & { hereId:
           </button>
         )}
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-          {tally.size} {tally.size === 1 ? "session" : "sessions"}
-          {since ? ` · since ${startedLabel(since)}` : ""}
+          {tally.size} {tally.size === 1 ? t("session") : t("sessions")}
+          {since ? t(" · since {0}", { "0": startedLabel(since) }) : ""}
         </span>
       </div>
       {members.length > 0 && (
-        <div data-crew-strip className="mt-2.5 flex gap-[3px]" role="list" aria-label="One cell per session, in the order they were started">
+        <div data-crew-strip className="mt-2.5 flex gap-[3px]" role="list" aria-label={t("One cell per session, in the order they were started")}>
           {members.map((member) => {
             const state = memberCellState(member)
             return (
@@ -167,14 +170,14 @@ function CrewRoll({ crew, hereId, nameOf, onOpen }: CrewSectionProps & { hereId:
         </div>
       )}
       <div className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-muted-foreground">
-        {tally.working > 0 && <Count dot={CREW_DOT.working} value={tally.working} label="working" />}
-        {tally.needsYou > 0 && <Count dot={CREW_DOT["needs-you"]} value={tally.needsYou} label={tally.needsYou === 1 ? "needs you" : "need you"} />}
-        {tally.done > 0 && <Count dot={CREW_DOT.done} value={tally.done} label="done" />}
-        {tally.failed > 0 && <Count dot={CREW_DOT.failed} value={tally.failed} label="failed" />}
-        {tally.unreachable > 0 && <Count dot={CREW_DOT.unreachable} value={tally.unreachable} label="away" />}
+        {tally.working > 0 && <Count dot={CREW_DOT.working} value={tally.working} label={t("working")} />}
+        {tally.needsYou > 0 && <Count dot={CREW_DOT["needs-you"]} value={tally.needsYou} label={tally.needsYou === 1 ? t("needs you") : t("need you")} />}
+        {tally.done > 0 && <Count dot={CREW_DOT.done} value={tally.done} label={t("done")} />}
+        {tally.failed > 0 && <Count dot={CREW_DOT.failed} value={tally.failed} label={t("failed")} />}
+        {tally.unreachable > 0 && <Count dot={CREW_DOT.unreachable} value={tally.unreachable} label={t("away")} />}
         {tally.unreadResults > 0 && (
           <span className="ml-auto text-warning">
-            <span className="font-medium tabular-nums">{tally.unreadResults}</span> {tally.unreadResults === 1 ? "result" : "results"} unread
+            <span className="font-medium tabular-nums">{tally.unreadResults}</span> {tally.unreadResults === 1 ? t("result") : t("results")} {t(" unread")}
           </span>
         )}
       </div>
@@ -201,6 +204,7 @@ function NeedsYou({
   busy: ReadonlySet<string>
   onRespond: ReturnType<typeof useSessionCrew>["respond"]
 }) {
+  const { t } = useTranslation()
   const requests = crewRequests(crew)
   const [index, setIndex] = useState(0)
   if (requests.length === 0) return null
@@ -208,18 +212,18 @@ function NeedsYou({
   const { member, pending } = requests[at]!
   const next = requests[at + 1]
   return (
-    <section aria-label="Needs you" className="border-b px-3 py-2.5">
+    <section aria-label={t("Needs you")} className="border-b px-3 py-2.5">
       <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-        <h3 className="text-sm font-medium text-foreground">Needs you</h3>
+        <h3 className="text-sm font-medium text-foreground">{t("Needs you")}</h3>
         <span className="tabular-nums">{requests.length}</span>
         <span className="flex-1" />
         {requests.length > 1 && (
           <>
-            <span className="tabular-nums">{at + 1} of {requests.length}</span>
-            <Button variant="ghost" size="icon-xs" aria-label="Previous request" disabled={at === 0} onClick={() => setIndex(at - 1)}>
+            <span className="tabular-nums">{at + 1} {t(" of ")}{requests.length}</span>
+            <Button variant="ghost" size="icon-xs" aria-label={t("Previous request")} disabled={at === 0} onClick={() => setIndex(at - 1)}>
               <ChevronLeft data-icon="inline-start" />
             </Button>
-            <Button variant="ghost" size="icon-xs" aria-label="Next request" disabled={at === requests.length - 1} onClick={() => setIndex(at + 1)}>
+            <Button variant="ghost" size="icon-xs" aria-label={t("Next request")} disabled={at === requests.length - 1} onClick={() => setIndex(at + 1)}>
               <ChevronRight data-icon="inline-start" />
             </Button>
           </>
@@ -231,7 +235,7 @@ function NeedsYou({
           <span className="min-w-0 truncate font-medium text-foreground">{nameOf(member)}</span>
           {member.device && <Badge variant="outline">{member.device.name}</Badge>}
           <span className="ml-auto shrink-0 tabular-nums text-warning">
-            {pending.askedAt ? `waiting ${formatRelativeTime(new Date(pending.askedAt).toISOString())}` : "waiting"}
+            {pending.askedAt ? t("waiting {0}", { "0": formatRelativeTime(new Date(pending.askedAt).toISOString()) }) : t("waiting")}
           </span>
         </div>
         <PendingInputPrompt
@@ -244,13 +248,12 @@ function NeedsYou({
           onOpen={() => onOpen(member)}
         />
         <Button variant="ghost" size="xs" className="self-end text-muted-foreground" onClick={() => onOpen(member)}>
-          Open session
-          <ChevronRight data-icon="inline-end" />
+          {t("Open session")}<ChevronRight data-icon="inline-end" />
         </Button>
       </div>
       {next && (
         <p className="mt-2 truncate text-xs text-muted-foreground">
-          Next: <span className="font-medium text-foreground">{nameOf(next.member)}</span> {memberActivity(next.member).toLowerCase()}
+          {t("Next: ")}<span className="font-medium text-foreground">{nameOf(next.member)}</span> {memberActivity(next.member).toLowerCase()}
         </p>
       )}
     </section>
@@ -271,6 +274,7 @@ function CrewSessions({
   onMarkRead: (parentId: string, taskId: string) => Promise<void>
   onStop: (member: CrewMember) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const [filter, setFilter] = useState<Filter>("all")
   const rows = crewTree(crew).filter(({ member }) => {
     if (filter === "all") return true
@@ -278,11 +282,11 @@ function CrewSessions({
     return filter === "done" ? state !== "working" && state !== "needs-you" : state === filter
   })
   return (
-    <section aria-label="Sessions" className="px-1.5 py-2.5">
+    <section aria-label={t("Sessions")} className="px-1.5 py-2.5">
       <div className="mb-1.5 flex items-center gap-2 px-1.5">
-        <h3 className="text-sm font-medium">Sessions</h3>
+        <h3 className="text-sm font-medium">{t("Sessions")}</h3>
         <span className="flex-1" />
-        <div role="radiogroup" aria-label="Show sessions" className="flex gap-0.5">
+        <div role="radiogroup" aria-label={t("Show sessions")} className="flex gap-0.5">
           {FILTERS.map(({ id, label }) => (
             <button
               key={id}
@@ -301,7 +305,7 @@ function CrewSessions({
         </div>
       </div>
       {rows.length === 0 ? (
-        <p className="px-1.5 py-4 text-center text-xs text-muted-foreground">No sessions here.</p>
+        <p className="px-1.5 py-4 text-center text-xs text-muted-foreground">{t("No sessions here.")}</p>
       ) : (
         <ul className="flex flex-col">
           {rows.map((row) => (
@@ -339,6 +343,7 @@ function CrewRow({
   onMarkRead: (parentId: string, taskId: string) => Promise<void>
   onStop: (member: CrewMember) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const state = memberCellState(member)
   const activity = memberActivity(member)
   const pullRequest = member.pullRequests?.at(-1)
@@ -361,7 +366,7 @@ function CrewRow({
         <span className={cn("size-1.5 justify-self-center rounded-full", CREW_DOT[state])} aria-hidden="true" />
         <span className="flex min-w-0 items-center gap-1.5 text-[0.78125rem] font-medium">
           <span className="truncate">{name}</span>
-          {here && <span className="shrink-0 rounded-full border px-1.5 text-[0.65625rem] font-normal text-muted-foreground">you are here</span>}
+          {here && <span className="shrink-0 rounded-full border px-1.5 text-[0.65625rem] font-normal text-muted-foreground">{t("you are here")}</span>}
         </span>
         <span className="text-[0.6875rem] tabular-nums text-muted-foreground/80">
           {member.lastActivityAt ? formatRelativeTime(member.lastActivityAt) : ""}
@@ -377,7 +382,7 @@ function CrewRow({
           </span>
           {pullRequest && <span className="shrink-0 rounded-full border px-1.5 text-[0.6875rem]">#{pullRequest.number}</span>}
           {member.device && <span className="shrink-0">{member.device.name}</span>}
-          {children > 0 && <span className="shrink-0">{children} {children === 1 ? "session" : "sessions"}</span>}
+          {children > 0 && <span className="shrink-0">{children} {children === 1 ? t("session") : t("sessions")}</span>}
           {member.model && <span className="shrink-0 text-muted-foreground/70">{shortenModel(member.model)}</span>}
         </span>
       </button>
@@ -388,8 +393,8 @@ function CrewRow({
               variant="outline"
               size="icon-xs"
               className="bg-popover"
-              aria-label={`Mark ${name}'s result read`}
-              title="Mark the result read"
+              aria-label={t("Mark {0}'s result read", { "0": name })}
+              title={t("Mark the result read")}
               disabled={busy.has(member.result.taskId)}
               onClick={() => void onMarkRead(member.parentId!, member.result!.taskId)}
             >
@@ -401,8 +406,8 @@ function CrewRow({
               variant="outline"
               size="icon-xs"
               className="bg-popover text-destructive"
-              aria-label={`Stop ${name}`}
-              title="Stop this session"
+              aria-label={t("Stop {0}", { "0": name })}
+              title={t("Stop this session")}
               disabled={busy.has(member.sessionId)}
               onClick={() => void onStop(member)}
             >

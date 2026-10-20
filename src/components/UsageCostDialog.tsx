@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -141,6 +142,7 @@ const CHART_H = 180
 const PAD_BOTTOM = 18
 
 function DailyChart({ days, metric }: { days: DayTotals[]; metric: Metric }) {
+  const { t } = useTranslation()
   const [hovered, setHovered] = useState<number | null>(null)
 
   const value = (entry: { costUsd: number; tokens: number }) =>
@@ -149,7 +151,7 @@ function DailyChart({ days, metric }: { days: DayTotals[]; metric: Metric }) {
   if (maxVal <= 0) {
     return (
       <div className="flex h-32 items-center justify-center text-xs text-muted-foreground">
-        No activity in this window.
+        {t("No activity in this window.")}
       </div>
     )
   }
@@ -185,7 +187,7 @@ function DailyChart({ days, metric }: { days: DayTotals[]; metric: Metric }) {
         viewBox={`0 0 ${CHART_W} ${CHART_H}`}
         className="w-full"
         role="img"
-        aria-label={`Daily ${metric === "cost" ? "raw API cost" : "processed tokens"} by provider`}
+        aria-label={t("Daily {0} by provider", { "0": metric === "cost" ? "raw API cost" : "processed tokens" })}
         onMouseLeave={() => setHovered(null)}
       >
         <line x1={0} y1={plotH} x2={CHART_W} y2={plotH} stroke="var(--border)" strokeWidth={1} />
@@ -260,6 +262,7 @@ function StatTile({ label, value }: { label: string; value: string }) {
 }
 
 function UsageCostBody({ days }: { days: number }) {
+  const { t } = useTranslation()
   const { summary, loading, error, refresh } = useUsageCost(days)
   const [metric, setMetric] = useState<Metric>("cost")
   const derived = useMemo(() => (summary ? derive(summary) : null), [summary])
@@ -268,14 +271,14 @@ function UsageCostBody({ days }: { days: number }) {
     return (
       <div className="flex flex-col items-center gap-2 py-10 text-sm text-muted-foreground">
         {error}
-        <Button variant="outline" size="sm" onClick={refresh}>Retry</Button>
+        <Button variant="outline" size="sm" onClick={refresh}>{t("Retry")}</Button>
       </div>
     )
   }
   if (!derived || !summary) {
     return (
       <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-        <Spinner className="size-4" /> Scanning transcripts…
+        <Spinner className="size-4" /> {t(" Scanning transcripts…")}
       </div>
     )
   }
@@ -288,7 +291,7 @@ function UsageCostBody({ days }: { days: number }) {
             {metric === "cost" ? formatCost(derived.costUsd) : formatTokenCount(derived.tokens)}
           </span>
           <span className="text-xs text-muted-foreground">
-            {summary.distinctSessions} sessions · {metric === "cost" ? "raw API price" : "processed tokens"}
+            {summary.distinctSessions} {t(" sessions · ")}{metric === "cost" ? t("raw API price") : t("processed tokens")}
           </span>
         </div>
         <div className="flex flex-col items-end gap-1.5">
@@ -300,7 +303,7 @@ function UsageCostBody({ days }: { days: number }) {
                 size="xs"
                 onClick={() => setMetric(option)}
               >
-                {option === "cost" ? "Cost" : "Tokens"}
+                {option === "cost" ? t("Cost") : t("Tokens")}
               </Button>
             ))}
           </div>
@@ -319,18 +322,18 @@ function UsageCostBody({ days }: { days: number }) {
       <DailyChart days={derived.days} metric={metric} />
 
       <div className="grid grid-cols-3 gap-x-6 gap-y-3 border-t pt-3">
-        <StatTile label="Processed tokens" value={formatTokenCount(derived.tokens)} />
-        <StatTile label="Cache savings" value={formatCost(derived.cacheSavingsUsd)} />
-        <StatTile label="Files scanned" value={String(summary.scannedFiles)} />
+        <StatTile label={t("Processed tokens")} value={formatTokenCount(derived.tokens)} />
+        <StatTile label={t("Cache savings")} value={formatCost(derived.cacheSavingsUsd)} />
+        <StatTile label={t("Files scanned")} value={String(summary.scannedFiles)} />
       </div>
 
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left text-xs text-muted-foreground">
-            <th className="py-1.5 font-normal">Model</th>
-            <th className="py-1.5 text-right font-normal">Cost</th>
-            <th className="py-1.5 text-right font-normal">Share</th>
-            <th className="py-1.5 text-right font-normal">Tokens</th>
+            <th className="py-1.5 font-normal">{t("Model")}</th>
+            <th className="py-1.5 text-right font-normal">{t("Cost")}</th>
+            <th className="py-1.5 text-right font-normal">{t("Share")}</th>
+            <th className="py-1.5 text-right font-normal">{t("Tokens")}</th>
           </tr>
         </thead>
         <tbody>
@@ -363,9 +366,8 @@ function UsageCostBody({ days }: { days: number }) {
       </table>
 
       <p className="text-xs text-muted-foreground">
-        Raw API-equivalent prices from LiteLLM rates
-        {summary.pricing.status === "unavailable" ? " (rate table unavailable — costs incomplete)" : ""}
-        {" "}— not what a subscription bills.
+        {t("Raw API-equivalent prices from LiteLLM rates")}{summary.pricing.status === "unavailable" ? t(" (rate table unavailable — costs incomplete)") : ""}
+        {" "}{t("— not what a subscription bills.")}
       </p>
     </div>
   )
@@ -378,6 +380,7 @@ interface UsageCostDialogProps {
 
 /** Raw API-equivalent spend across all sessions. Opened from the overflow menu. */
 export function UsageCostDialog({ open, onOpenChange }: UsageCostDialogProps) {
+  const { t } = useTranslation()
   const [days, setDays] = useState<number>(30)
 
   return (
@@ -386,9 +389,9 @@ export function UsageCostDialog({ open, onOpenChange }: UsageCostDialogProps) {
         <DialogHeader>
           <div className="flex items-center justify-between gap-4 pr-6">
             <div>
-              <DialogTitle>API usage</DialogTitle>
+              <DialogTitle>{t("API usage")}</DialogTitle>
               <DialogDescription>
-                What this machine's agent usage would cost at raw API prices.
+                {t("What this machine's agent usage would cost at raw API prices.")}
               </DialogDescription>
             </div>
             <div className="flex rounded-md border p-0.5">

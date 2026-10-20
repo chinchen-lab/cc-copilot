@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useId, useState } from "react"
 import { CircleStop, Crosshair, Eye, Plus, Sparkles, Trash2, TriangleAlert, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -81,6 +82,7 @@ export const BrowserSessionBar = memo(function BrowserSessionBar({
   onShowDefault,
   onClose,
 }: BrowserSessionBarProps) {
+  const { t } = useTranslation()
   const nameId = useId()
   const noteId = useId()
   const [createOpen, setCreateOpen] = useState(false)
@@ -143,23 +145,23 @@ export const BrowserSessionBar = memo(function BrowserSessionBar({
         {(close) => <>
           <Button variant="outline" size="sm" disabled={busy} onClick={() => { close(); openCreate() }}>
             <Plus data-icon="inline-start" />
-            New browser…
+            {t("New browser…")}
           </Button>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="xs" onClick={() => { close(); onOpenSkill() }}>
               <Sparkles data-icon="inline-start" />
-              Agent skill…
+              {t("Agent skill…")}
             </Button>
             {canStop && (
               <Button variant="ghost" size="xs" disabled={busy || !selectedInfo?.running} onClick={() => { close(); onStop(selected) }}>
                 <CircleStop data-icon="inline-start" />
-                Stop
+                {t("Stop")}
               </Button>
             )}
             {canDelete && (
               <Button variant="ghost" size="xs" disabled={busy} onClick={() => { close(); setDeleteTarget(selected) }}>
                 <Trash2 data-icon="inline-start" />
-                Delete…
+                {t("Delete…")}
               </Button>
             )}
           </div>
@@ -169,9 +171,9 @@ export const BrowserSessionBar = memo(function BrowserSessionBar({
       <span className="flex-1" />
 
       {control === "watch" && (
-        <Badge variant="outline" title="Only someone who can interact with the session driving it can use it">
+        <Badge variant="outline" title={t("Only someone who can interact with the session driving it can use it")}>
           <Eye data-icon="inline-start" />
-          View only
+          {t("View only")}
         </Badge>
       )}
 
@@ -184,11 +186,11 @@ export const BrowserSessionBar = memo(function BrowserSessionBar({
             <TriangleAlert aria-hidden className="size-3.5 shrink-0" />
             {/* Too narrow and only the icon is left, but the words stay in the a11y tree. */}
             <span className="sr-only @sm/browser-bar:not-sr-only @sm/browser-bar:whitespace-nowrap">
-              {homeIsOwn ? "Not your browser" : "Not the default browser"}
+              {homeIsOwn ? t("Not your browser") : t("Not the default browser")}
             </span>
           </span>
           <Button variant="outline" size="xs" onClick={onShowDefault}>
-            {homeIsOwn ? "Show yours" : "Show default"}
+            {homeIsOwn ? t("Show yours") : t("Show default")}
           </Button>
         </div>
       )}
@@ -198,7 +200,7 @@ export const BrowserSessionBar = memo(function BrowserSessionBar({
           render={
             <Toggle
               size="sm"
-              aria-label="Follow agent"
+              aria-label={t("Follow agent")}
               pressed={followAgent}
               onPressedChange={(pressed) => onToggleFollow(pressed)}
               className="text-muted-foreground data-pressed:text-foreground"
@@ -206,12 +208,12 @@ export const BrowserSessionBar = memo(function BrowserSessionBar({
           }
         >
           <Crosshair data-icon="inline-start" />
-          <span className="hidden @md/browser-bar:inline">Follow</span>
+          <span className="hidden @md/browser-bar:inline">{t("Follow")}</span>
         </TooltipTrigger>
-        <TooltipContent>Switch to whichever browser this session&rsquo;s agent uses</TooltipContent>
+        <TooltipContent>{t("Switch to whichever browser this session’s agent uses")}</TooltipContent>
       </Tooltip>
 
-      <Button variant="ghost" size="icon-sm" aria-label="Close browser panel" onClick={onClose}>
+      <Button variant="ghost" size="icon-sm" aria-label={t("Close browser panel")} onClick={onClose}>
         <X data-icon="inline-start" />
       </Button>
 
@@ -225,15 +227,15 @@ export const BrowserSessionBar = memo(function BrowserSessionBar({
             }}
           >
             <DialogHeader>
-              <DialogTitle>New browser</DialogTitle>
+              <DialogTitle>{t("New browser")}</DialogTitle>
               <DialogDescription>
-                A named browser keeps its own cookies and logins, and stays out of the default one.
+                {t("A named browser keeps its own cookies and logins, and stays out of the default one.")}
               </DialogDescription>
             </DialogHeader>
 
             <FieldGroup className="gap-4">
               <Field data-invalid={Boolean(createMessage)}>
-                <FieldLabel htmlFor={nameId}>Name</FieldLabel>
+                <FieldLabel htmlFor={nameId}>{t("Name")}</FieldLabel>
                 <Input
                   id={nameId}
                   autoFocus
@@ -251,12 +253,12 @@ export const BrowserSessionBar = memo(function BrowserSessionBar({
               </Field>
               <Field>
                 <FieldLabel htmlFor={noteId}>
-                  Note <span className="text-muted-foreground/60">(optional)</span>
+                  {t("Note ")}<span className="text-muted-foreground/60">{t("(optional)")}</span>
                 </FieldLabel>
                 <Input
                   id={noteId}
                   autoComplete="off"
-                  placeholder="What this browser is signed in to"
+                  placeholder={t("What this browser is signed in to")}
                   value={newNote}
                   onChange={(event) => setNewNote(event.target.value)}
                 />
@@ -264,8 +266,8 @@ export const BrowserSessionBar = memo(function BrowserSessionBar({
             </FieldGroup>
 
             <DialogFooter>
-              <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-              <Button type="submit" disabled={!canCreate}>Create browser</Button>
+              <DialogClose render={<Button type="button" variant="outline" />}>{t("Cancel")}</DialogClose>
+              <Button type="submit" disabled={!canCreate}>{t("Create browser")}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -283,14 +285,13 @@ export const BrowserSessionBar = memo(function BrowserSessionBar({
               <AlertDialogMedia className="bg-destructive/10 text-destructive">
                 <Trash2 />
               </AlertDialogMedia>
-              <AlertDialogTitle>Delete {deleteTarget}?</AlertDialogTitle>
+              <AlertDialogTitle>{t("Delete ")}{deleteTarget}?</AlertDialogTitle>
               <AlertDialogDescription>
-                Its profile goes with it, so everything signed in there is signed out. Other
-                browsers are untouched.
+                {t("Its profile goes with it, so everything signed in there is signed out. Other browsers are untouched.")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel size="sm">Cancel</AlertDialogCancel>
+              <AlertDialogCancel size="sm">{t("Cancel")}</AlertDialogCancel>
               <AlertDialogAction
                 variant="destructive"
                 size="sm"
@@ -299,7 +300,7 @@ export const BrowserSessionBar = memo(function BrowserSessionBar({
                   setDeleteTarget(null)
                 }}
               >
-                Delete browser
+                {t("Delete browser")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

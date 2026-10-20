@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo } from "react"
 import { FileChangesPanel } from "@/components/FileChangesPanel"
 import {
@@ -26,6 +27,7 @@ export const MobileFileChanges = memo(function MobileFileChanges({
   session,
   sessionChangeKey,
 }: MobileFileChangesProps) {
+  const { t } = useTranslation()
   return (
     <Sheet
       open={open}
@@ -35,9 +37,9 @@ export const MobileFileChanges = memo(function MobileFileChanges({
     >
       <SheetContent side="bottom" className="h-[72svh] max-h-[92svh] rounded-t-xl">
         <SheetHeader className="shrink-0 px-4 py-3">
-          <SheetTitle>File changes</SheetTitle>
+          <SheetTitle>{t("File changes")}</SheetTitle>
           <SheetDescription className="sr-only">
-            Review files changed in this session.
+            {t("Review files changed in this session.")}
           </SheetDescription>
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-hidden">

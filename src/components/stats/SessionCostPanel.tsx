@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { CircleDollarSign, Info, RefreshCw } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -78,8 +79,9 @@ function usageRows(summary: SessionUsageCostSummary): CostRow[] {
 }
 
 function CostLoading(): React.JSX.Element {
+  const { t } = useTranslation()
   return (
-    <div className="flex flex-col gap-5 pt-2" role="status" aria-label="Reading session cost">
+    <div className="flex flex-col gap-5 pt-2" role="status" aria-label={t("Reading session cost")}>
       <div className="flex flex-col gap-2">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-10 w-32" />
@@ -96,14 +98,15 @@ function CostLoading(): React.JSX.Element {
 }
 
 function CostUnavailable({ message, retry }: { message: string; retry: () => void }): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <Alert variant="destructive" className="mt-2">
       <Info />
-      <AlertTitle>Cost unavailable</AlertTitle>
+      <AlertTitle>{t("Cost unavailable")}</AlertTitle>
       <AlertDescription>{message}</AlertDescription>
       <Button variant="outline" size="xs" onClick={retry} className="mt-2">
         <RefreshCw data-icon="inline-start" />
-        Retry
+        {t("Retry")}
       </Button>
     </Alert>
   )
@@ -119,6 +122,7 @@ function CostStat({ label, value }: { label: string; value: string }): React.JSX
 }
 
 function BreakdownRow({ row, totalCost }: { row: CostRow; totalCost: number }): React.JSX.Element {
+  const { t } = useTranslation()
   const share = totalCost > 0 ? (row.costUsd / totalCost) * 100 : 0
   return (
     <div className="flex flex-col gap-1.5">
@@ -127,7 +131,7 @@ function BreakdownRow({ row, totalCost }: { row: CostRow; totalCost: number }): 
         <ProgressValue>{() => formatCost(row.costUsd)}</ProgressValue>
       </Progress>
       <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground tabular-nums">
-        <span>{row.tokens > 0 ? formatTokenCount(row.tokens) : "Reported by provider"}</span>
+        <span>{row.tokens > 0 ? formatTokenCount(row.tokens) : t("Reported by provider")}</span>
         <span>{share > 0 ? `${share.toFixed(1)}%` : "—"}</span>
       </div>
     </div>
@@ -135,10 +139,11 @@ function BreakdownRow({ row, totalCost }: { row: CostRow; totalCost: number }): 
 }
 
 function ModelBreakdown({ summary }: { summary: SessionUsageCostSummary }): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <section aria-labelledby="cost-models-heading" className="flex flex-col gap-3">
       <h3 id="cost-models-heading" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        By model
+        {t("By model")}
       </h3>
       <div className="flex flex-col gap-3">
         {summary.models.map((model) => {
@@ -152,8 +157,8 @@ function ModelBreakdown({ summary }: { summary: SessionUsageCostSummary }): Reac
                 </ProgressValue>
               </Progress>
               <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground tabular-nums">
-                <span>{model.records} {model.records === 1 ? "call" : "calls"}</span>
-                <span>{formatTokenCount(totalUsageCostTokens(model.totals))} tokens</span>
+                <span>{model.records} {model.records === 1 ? t("call") : t("calls")}</span>
+                <span>{formatTokenCount(totalUsageCostTokens(model.totals))} {t(" tokens")}</span>
               </div>
             </div>
           )
@@ -174,18 +179,19 @@ function expensiveCalls(calls: readonly SessionUsageCostCall[]): RankedCall[] {
 }
 
 function ExpensiveCalls({ rows }: { rows: readonly RankedCall[] }): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <section aria-labelledby="cost-calls-heading" className="flex flex-col gap-2">
       <h3 id="cost-calls-heading" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Most expensive calls
+        {t("Most expensive calls")}
       </h3>
       <ol className="flex flex-col gap-0.5">
         {rows.map((row) => (
           <li key={`${row.timestamp}:${row.call}`} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
             <span className="min-w-0 flex-1 truncate text-xs text-foreground">
-              Call {row.call} · {shortenModel(row.model)}
+              {t("Call ")}{row.call} · {shortenModel(row.model)}
             </span>
-            {row.isSubagent && <Badge variant="outline">Agent</Badge>}
+            {row.isSubagent && <Badge variant="outline">{t("Agent")}</Badge>}
             <span className="shrink-0 font-mono text-xs text-foreground tabular-nums">
               {formatCost(row.costUsd)}
             </span>
@@ -197,6 +203,7 @@ function ExpensiveCalls({ rows }: { rows: readonly RankedCall[] }): React.JSX.El
 }
 
 function SessionCost({ summary }: { summary: SessionUsageCostSummary }): React.JSX.Element {
+  const { t } = useTranslation()
   const ProviderIcon = agentIcon(summary.provider)
   const totalTokens = totalUsageCostTokens(summary.totals)
   const rows = usageRows(summary)
@@ -208,7 +215,7 @@ function SessionCost({ summary }: { summary: SessionUsageCostSummary }): React.J
       <section aria-labelledby="session-cost-heading" className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <p id="session-cost-heading" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            API equivalent
+            {t("API equivalent")}
           </p>
           <Badge variant="outline">
             <ProviderIcon aria-hidden="true" />
@@ -224,9 +231,9 @@ function SessionCost({ summary }: { summary: SessionUsageCostSummary }): React.J
           </Badge>
         </div>
         <p className="text-xs text-muted-foreground">
-          {summary.records} {summary.records === 1 ? "model call" : "model calls"}
+          {summary.records} {summary.records === 1 ? t("model call") : t("model calls")}
           {summary.includedSubagents > 0
-            ? ` · ${summary.includedSubagents} agent ${summary.includedSubagents === 1 ? "transcript" : "transcripts"}`
+            ? t(" · {0} agent {1}", { "0": summary.includedSubagents, "1": summary.includedSubagents === 1 ? "transcript" : "transcripts" })
             : ""}
         </p>
       </section>
@@ -234,10 +241,10 @@ function SessionCost({ summary }: { summary: SessionUsageCostSummary }): React.J
       <Separator />
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
-        <CostStat label="Processed tokens" value={formatTokenCount(totalTokens)} />
-        <CostStat label="Cache savings" value={formatCost(summary.cacheSavingsUsd)} />
-        <CostStat label="Cached input" value={formatTokenCount(summary.totals.cachedInputTokens)} />
-        <CostStat label="Reasoning" value={formatTokenCount(summary.totals.reasoningTokens)} />
+        <CostStat label={t("Processed tokens")} value={formatTokenCount(totalTokens)} />
+        <CostStat label={t("Cache savings")} value={formatCost(summary.cacheSavingsUsd)} />
+        <CostStat label={t("Cached input")} value={formatTokenCount(summary.totals.cachedInputTokens)} />
+        <CostStat label={t("Reasoning")} value={formatTokenCount(summary.totals.reasoningTokens)} />
       </dl>
 
       {rows.length > 0 && (
@@ -245,7 +252,7 @@ function SessionCost({ summary }: { summary: SessionUsageCostSummary }): React.J
           <Separator />
           <section aria-labelledby="cost-breakdown-heading" className="flex flex-col gap-3">
             <h3 id="cost-breakdown-heading" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Cost by token type
+              {t("Cost by token type")}
             </h3>
             <div className="flex flex-col gap-4">
               {rows.map((row) => <BreakdownRow key={row.label} row={row} totalCost={summary.costUsd} />)}
@@ -270,11 +277,9 @@ function SessionCost({ summary }: { summary: SessionUsageCostSummary }): React.J
 
       <Alert>
         <Info />
-        <AlertTitle>How this is calculated</AlertTitle>
+        <AlertTitle>{t("How this is calculated")}</AlertTitle>
         <AlertDescription>
-          Token counts come from the provider transcript. Costs use provider totals when present,
-          then current LiteLLM API rates, the same pricing source as ccusage. This is not a
-          subscription bill.
+          {t("Token counts come from the provider transcript. Costs use provider totals when present, then current LiteLLM API rates, the same pricing source as ccusage. This is not a subscription bill.")}
         </AlertDescription>
       </Alert>
     </div>
@@ -282,6 +287,7 @@ function SessionCost({ summary }: { summary: SessionUsageCostSummary }): React.J
 }
 
 export function SessionCostPanel({ dirName, fileName, revision }: SessionCostPanelProps): React.JSX.Element {
+  const { t } = useTranslation()
   const { summary, loading, error, refresh } = useSessionUsageCost(dirName, fileName, revision)
 
   if (error) return <CostUnavailable message={error} retry={refresh} />
@@ -291,8 +297,8 @@ export function SessionCostPanel({ dirName, fileName, revision }: SessionCostPan
       <Empty className="mt-2 min-h-52">
         <EmptyHeader>
           <EmptyMedia variant="icon"><CircleDollarSign /></EmptyMedia>
-          <EmptyTitle>No transcript cost yet</EmptyTitle>
-          <EmptyDescription>Cost appears after the first model response is written.</EmptyDescription>
+          <EmptyTitle>{t("No transcript cost yet")}</EmptyTitle>
+          <EmptyDescription>{t("Cost appears after the first model response is written.")}</EmptyDescription>
         </EmptyHeader>
       </Empty>
     )

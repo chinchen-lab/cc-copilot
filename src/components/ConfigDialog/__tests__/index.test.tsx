@@ -1,6 +1,12 @@
-import { render, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+
+import { __resetCapabilitiesForTest, setMe } from "@/lib/capabilities"
+import { NO_CAPABILITIES } from "../../../../shared/contracts/identity"
+import { LANGUAGE_KEY, setLanguage } from "@/lib/i18n/language"
+
+afterEach(() => { act(() => setLanguage("en")); localStorage.removeItem(LANGUAGE_KEY); __resetCapabilitiesForTest(); window.history.replaceState(null, "", "/") })
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }))
 vi.mock("@/lib/auth", () => ({ authFetch: mocks.authFetch }))
@@ -129,6 +135,7 @@ describe("ConfigDialog network password", () => {
     renderDialog()
 
     await waitFor(() => expect(editorInput()).toHaveValue("cursor"))
+    await user.click(screen.getByRole("tab", { name: "Network & sharing" }))
     await user.click(screen.getByRole("switch", { name: "Network Access" }))
     const password = screen.getByLabelText("Password")
     await user.type(password, "a".repeat(PASSWORD_MIN_LENGTH - 1))
@@ -145,6 +152,7 @@ describe("ConfigDialog executable picker", () => {
   })
 
   async function expandPicker(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("tab", { name: "Agents" }))
     await user.click(await screen.findByRole("button", { name: /Claude Code executable/ }))
   }
 
@@ -152,6 +160,7 @@ describe("ConfigDialog executable picker", () => {
     mockConfig()
     renderDialog()
 
+    fireEvent.click(screen.getByRole("tab", { name: "Agents" }))
     const trigger = await screen.findByRole("button", { name: /Claude Code executable/ })
     await waitFor(() => expect(trigger).toHaveTextContent("Automatic · v2.1.258"))
     expect(screen.queryByRole("radio", { name: "Automatic" })).not.toBeInTheDocument()
@@ -223,6 +232,7 @@ describe("ConfigDialog account switcher", () => {
     mockConfig()
     renderDialog()
 
+    fireEvent.click(screen.getByRole("tab", { name: "Agents" }))
     await screen.findByRole("button", { name: /Claude Code executable/ })
     await waitFor(() => expect(mocks.authFetch).toHaveBeenCalledWith("/api/agent-accounts/claude"))
     expect(screen.queryByRole("button", { name: /Claude Code accounts/ })).not.toBeInTheDocument()
@@ -232,7 +242,93 @@ describe("ConfigDialog account switcher", () => {
     mockConfig({}, ACCOUNTS_REPORT)
     renderDialog()
 
+    fireEvent.click(screen.getByRole("tab", { name: "Agents" }))
     const trigger = await screen.findByRole("button", { name: /Claude Code accounts/ })
     expect(trigger).toHaveTextContent("me@example.com · 2 accounts")
+  })
+})
+
+describe("ConfigDialog language preference", () => {
+  it("switches interface language without saving or changing the server configuration draft", async () => {
+    mockConfig()
+    const { onSaved } = renderDialog()
+    const input = await screen.findByLabelText("Editor application")
+    fireEvent.change(input, { target: { value: "my-editor --wait" } })
+    fireEvent.change(screen.getByRole("combobox", { name: "Language" }), { target: { value: "zh-TW" } })
+    expect(screen.getByRole("combobox", { name: "語言" })).toHaveValue("zh-TW")
+    expect(screen.getByRole("button", { name: "儲存" })).toBeInTheDocument()
+    expect(input).toHaveValue("my-editor --wait")
+    expect(onSaved).not.toHaveBeenCalled()
+    expect(mocks.authFetch.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "POST")).toBe(false)
+    fireEvent.change(screen.getByRole("combobox", { name: "語言" }), { target: { value: "en" } })
+    expect(input).toHaveValue("my-editor --wait")
+  })
+})
+
+
+describe("ConfigDialog categories", () => {
+  it("shows one category at a time and preserves edits across all three tabs when saving", async () => {
+    const user = userEvent.setup()
+    mockConfig()
+    const { onSaved } = renderDialog()
+    await waitFor(() => expect(editorInput()).toHaveValue("cursor"))
+    expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("aria-selected", "true")
+    expect(screen.queryByRole("switch", { name: "Network Access" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /Claude Code executable/ })).not.toBeInTheDocument()
+    await user.clear(editorInput())
+    await user.type(editorInput(), "my-editor")
+
+    await user.click(screen.getByRole("tab", { name: "Agents" }))
+    await user.click(await screen.findByRole("button", { name: /Claude Code executable/ }))
+    await user.click(await screen.findByRole("radio", { name: "Bundled with Cogpit" }))
+    await waitFor(() => expect(screen.queryByRole("combobox", { name: "Language" })).not.toBeInTheDocument())
+
+    await user.click(screen.getByRole("tab", { name: "Network & sharing" }))
+    await user.click(await screen.findByRole("switch", { name: "Network Access" }))
+    await user.type(screen.getByLabelText("Password"), "secret")
+    await user.click(screen.getByRole("tab", { name: "General" }))
+    expect(editorInput()).toHaveValue("my-editor")
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const saved = mocks.authFetch.mock.calls.find((call) => call[1]?.method === "POST")
+    expect(JSON.parse(saved?.[1]?.body as string)).toMatchObject({
+      editorApp: "my-editor", agentExecutable: { source: "bundled" }, networkAccess: true, networkPassword: "secret",
+    })
+  })
+
+  it("translates category tabs and retains the selected category during language changes", async () => {
+    mockConfig()
+    renderDialog()
+    await waitFor(() => expect(editorInput()).toHaveValue("cursor"))
+    fireEvent.click(screen.getByRole("tab", { name: "Agents" }))
+    act(() => setLanguage("zh-TW"))
+    expect(screen.getByRole("tab", { name: "代理" })).toHaveAttribute("aria-selected", "true")
+    expect(screen.getByRole("tab", { name: "網路與分享" })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("tab", { name: "一般" }))
+    expect(screen.getByRole("combobox", { name: "語言" })).toHaveValue("zh-TW")
+  })
+
+  it("omits network settings on remote devices and reopens on General", async () => {
+    window.history.replaceState(null, "", "/d/remote")
+    mockConfig()
+    const props = { open: true, currentPath: SAVED_CONFIG.claudeDir, onClose: vi.fn(), onSaved: vi.fn() }
+    const { rerender } = render(<ConfigDialog {...props} />)
+    expect(screen.queryByRole("tab", { name: "Network & sharing" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("switch", { name: "Network Access", hidden: true })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole("tab", { name: "Agents" }))
+    rerender(<ConfigDialog {...props} open={false} />)
+    rerender(<ConfigDialog {...props} />)
+    expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("aria-selected", "true")
+  })
+
+  it("keeps local preferences available without permission to write server configuration", () => {
+    setMe({ authenticated: true, edition: "personal", user: null, capabilities: NO_CAPABILITIES })
+    mockConfig()
+    renderDialog()
+    expect(screen.queryByRole("tab", { name: "Network & sharing" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument()
+    fireEvent.change(screen.getByRole("combobox", { name: "Language" }), { target: { value: "zh-TW" } })
+    expect(screen.getByRole("combobox", { name: "語言" })).toHaveValue("zh-TW")
+    expect(screen.getByRole("slider", { name: "文字大小" })).toBeEnabled()
   })
 })

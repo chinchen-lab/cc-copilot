@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { type ComponentType } from "react"
 import {
   BarChart3,
@@ -181,11 +182,12 @@ function availableActions(...items: (PaletteAction | false | undefined)[]): Pale
 }
 
 export function CommandPalette(props: CommandPaletteProps) {
+  const { t } = useTranslation()
   const navigation = availableActions(
-    action("home", "Go to Mission Control", "home overview dashboard", Home, props.onGoHome),
+    action("home", t("Go to Mission Control"), "home overview dashboard", Home, props.onGoHome),
     action(
       "mission-control",
-      props.showMission ? "Exit Mission Control" : "Open Mission Control",
+      props.showMission ? t("Exit Mission Control") : t("Open Mission Control"),
       "live sessions blocked waiting answer everything at once",
       LayoutGrid,
       props.onToggleMissionControl,
@@ -194,7 +196,7 @@ export function CommandPalette(props: CommandPaletteProps) {
     ...(props.extraActions ?? []).map((extra) => action(extra.id, extra.label, extra.keywords, extra.icon, extra.onSelect)),
     action(
       "new-session",
-      "Start a new session",
+      t("Start a new session"),
       "project agent chat create",
       Plus,
       props.onNewSession,
@@ -202,14 +204,14 @@ export function CommandPalette(props: CommandPaletteProps) {
     ),
     props.onDuplicateSession && action(
       "duplicate-session",
-      "Duplicate this session",
+      t("Duplicate this session"),
       "copy fork clone branch thread",
       CopyPlus,
       props.onDuplicateSession,
     ),
     props.canFocusComposer && action(
       "focus-composer",
-      "Focus message composer",
+      t("Focus message composer"),
       "chat prompt input",
       MessageSquare,
       props.onFocusComposer,
@@ -217,7 +219,7 @@ export function CommandPalette(props: CommandPaletteProps) {
     ),
     props.onFindInConversation && action(
       "find-in-conversation",
-      "Find in conversation",
+      t("Find in conversation"),
       "search text transcript turns matches",
       Search,
       props.onFindInConversation,
@@ -233,7 +235,7 @@ export function CommandPalette(props: CommandPaletteProps) {
       FolderOpen,
       () => props.onOpenProject?.(project.dirName),
       undefined,
-      `${project.path} · ${project.sessionCount} session${project.sessionCount === 1 ? "" : "s"}`,
+      project.sessionCount === 1 ? `${project.path} · 1 ${t("session")}` : t("{0} · {1} sessions", { "0": project.path, "1": project.sessionCount }),
     ),
   )
 
@@ -264,7 +266,7 @@ export function CommandPalette(props: CommandPaletteProps) {
     ? deviceList.slice(0, DEVICE_SWITCH_COMMANDS.length).map((device, index) =>
         action(
           `device-${device.id}`,
-          device.isActive ? `${device.name} (current)` : `Switch to ${device.name}`,
+          device.isActive ? t("{0} (current)", { "0": device.name }) : t("Switch to {0}", { "0": device.name }),
           `device machine host remote ${device.id}`,
           device.isLocal ? Laptop : Server,
           () => props.onSwitchDevice?.(device.id),
@@ -276,7 +278,7 @@ export function CommandPalette(props: CommandPaletteProps) {
   const view = availableActions(
     action(
       "toggle-sidebar",
-      props.showSidebar ? "Hide session sidebar" : "Show session sidebar",
+      props.showSidebar ? t("Hide session sidebar") : t("Show session sidebar"),
       "projects navigation panel",
       PanelLeft,
       props.onToggleSidebar,
@@ -284,7 +286,7 @@ export function CommandPalette(props: CommandPaletteProps) {
     ),
     props.hasSession && action(
       "toggle-stats",
-      props.showStats ? "Hide session details" : "Show session details",
+      props.showStats ? t("Hide session details") : t("Show session details"),
       "stats tokens usage panel",
       BarChart3,
       props.onToggleStats,
@@ -292,7 +294,7 @@ export function CommandPalette(props: CommandPaletteProps) {
     ),
     props.onToggleProjectFiles && action(
       "project-files",
-      props.showProjectFiles ? "Close project files" : "Open project files",
+      props.showProjectFiles ? t("Close project files") : t("Open project files"),
       "browse edit save workspace source code",
       FolderTree,
       props.onToggleProjectFiles,
@@ -300,21 +302,21 @@ export function CommandPalette(props: CommandPaletteProps) {
     ),
     props.onToggleBrowser && action(
       "toggle-browser",
-      props.showBrowser ? "Hide browser" : "Show browser",
+      props.showBrowser ? t("Hide browser") : t("Show browser"),
       "web page live view browse panel",
       Globe,
       props.onToggleBrowser,
     ),
     props.hasFileChanges && action(
       "toggle-file-changes",
-      props.showFileChanges ? "Hide file changes" : "Show file changes",
+      props.showFileChanges ? t("Hide file changes") : t("Show file changes"),
       "diff edits review panel",
       FileCode2,
       props.onToggleFileChanges,
     ),
     props.supportsWorktrees && props.canOpenTerminal && action(
       "toggle-worktrees",
-      props.showWorktrees ? "Hide worktrees" : "Show worktrees",
+      props.showWorktrees ? t("Hide worktrees") : t("Show worktrees"),
       "git branches panel",
       GitBranch,
       props.onToggleWorktrees,
@@ -324,35 +326,35 @@ export function CommandPalette(props: CommandPaletteProps) {
   const tools = availableActions(
     props.onOpenProjectInEditor && action(
       "open-project-editor",
-      "Open project in editor",
+      t("Open project in editor"),
       "code cursor vscode zed workspace",
       Code2,
       props.onOpenProjectInEditor,
     ),
     props.onRevealProject && action(
       "reveal-project",
-      "Reveal project in file manager",
+      t("Reveal project in file manager"),
       "finder explorer folder directory",
       FolderSearch,
       props.onRevealProject,
     ),
     props.onCopyResumeCommand && action(
       "copy-resume-command",
-      "Copy resume command",
+      t("Copy resume command"),
       "cli claude codex copilot terminal clipboard continue session",
       Copy,
       props.onCopyResumeCommand,
     ),
     props.onCopyProjectPath && action(
       "copy-project-path",
-      "Copy project path",
+      t("Copy project path"),
       "workspace directory clipboard",
       Copy,
       props.onCopyProjectPath,
     ),
     props.onOpenIntegratedTerminal && action(
       "integrated-terminal",
-      "New integrated terminal",
+      t("New integrated terminal"),
       "embedded shell command line process panel",
       Terminal,
       props.onOpenIntegratedTerminal,
@@ -360,7 +362,7 @@ export function CommandPalette(props: CommandPaletteProps) {
     ),
     props.canOpenTerminal && action(
       "terminal",
-      "Open in system terminal",
+      t("Open in system terminal"),
       "external shell command line app",
       TerminalSquare,
       props.onOpenTerminal,
@@ -368,7 +370,7 @@ export function CommandPalette(props: CommandPaletteProps) {
     ),
     props.onTogglePreview && action(
       "preview",
-      "Toggle development preview",
+      t("Toggle development preview"),
       "browser localhost dev server website",
       Globe2,
       props.onTogglePreview,
@@ -376,47 +378,47 @@ export function CommandPalette(props: CommandPaletteProps) {
     ),
     props.onOpenKeyboardShortcuts && action(
       "keyboard-shortcuts",
-      "Customize keyboard shortcuts",
+      t("Customize keyboard shortcuts"),
       "keybindings hotkeys settings",
       Keyboard,
       props.onOpenKeyboardShortcuts,
     ),
     props.onOpenConfig && action(
       "config",
-      props.showConfig ? "Close agent configuration" : "Open agent configuration",
+      props.showConfig ? t("Close agent configuration") : t("Open agent configuration"),
       "skills commands claude settings files",
       SlidersHorizontal,
       props.onOpenConfig,
     ),
-    action("settings", "Open Cogpit settings", "preferences network", Settings, props.onOpenSettings),
+    action("settings", t("Open Cogpit settings"), "preferences network", Settings, props.onOpenSettings),
     action(
       "theme",
-      "Appearance preferences",
+      t("Appearance preferences"),
       "theme font text size scale light dark oled width narrow wide",
       Palette,
       props.onOpenTheme,
       shortcutLabel("themeSelector"),
     ),
-    action("expand", "Expand all groups", "conversation details", ChevronsDownUp, props.onExpandAll, shortcutLabel("expandAll")),
-    action("expand-payloads", "Expand all tool payloads", "raw input result diff conversation details", ChevronsDownUp, props.onExpandToolPayloads, shortcutLabel("expandToolPayloads")),
-    action("collapse", "Collapse all", "conversation groups payloads details", ChevronsUpDown, props.onCollapseAll),
+    action("expand", t("Expand all groups"), "conversation details", ChevronsDownUp, props.onExpandAll, shortcutLabel("expandAll")),
+    action("expand-payloads", t("Expand all tool payloads"), "raw input result diff conversation details", ChevronsDownUp, props.onExpandToolPayloads, shortcutLabel("expandToolPayloads")),
+    action("collapse", t("Collapse all"), "conversation groups payloads details", ChevronsUpDown, props.onCollapseAll),
     props.onKillAll && action(
       "kill-all",
-      "Kill all agent processes",
+      t("Kill all agent processes"),
       "stop terminate halt everything runaway",
       Skull,
       props.onKillAll,
     ),
     props.onOpenDevices && action(
       "manage-devices",
-      "Manage devices…",
+      t("Manage devices…"),
       "remote machines hub hosts edit rename remove switch",
       Settings2,
       () => props.onOpenDevices?.("manage"),
     ),
     props.onOpenDevices && action(
       "add-device",
-      "Add device…",
+      t("Add device…"),
       "remote machine hub host connect pair new",
       Server,
       () => props.onOpenDevices?.("add"),
@@ -441,34 +443,34 @@ export function CommandPalette(props: CommandPaletteProps) {
     <CommandDialog
       open={props.open}
       onOpenChange={props.onOpenChange}
-      title="Command palette"
-      description="Search for a Cogpit action to run."
+      title={t("Command palette")}
+      description={t("Search for a Cogpit action to run.")}
       className="max-w-xl"
     >
-      <Command label="Search commands" loop>
+      <Command label={t("Search commands")} loop>
         <CommandInput
-          aria-label="Search commands"
+          aria-label={t("Search commands")}
           autoFocus
-          placeholder="Search commands..."
+          placeholder={t("Search commands...")}
         />
 
         {props.loadingNavigation && (
           <div className="motion-enter flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground" role="status">
             <Spinner className="size-3.5" />
-            Loading projects and sessions...
+            {t("Loading projects and sessions...")}
           </div>
         )}
 
         <CommandList className="max-h-[min(26rem,60vh)]">
-          <CommandEmpty>No matching actions.</CommandEmpty>
+          <CommandEmpty>{t("No matching actions.")}</CommandEmpty>
           {groups.map((group) => (
-            <CommandGroup key={group.value} heading={group.value}>
+            <CommandGroup key={group.value} heading={t(group.value)}>
               {group.items.map((item) => {
                 const Icon = item.icon
                 return (
                   <CommandItem
                     key={item.id}
-                    value={item.value}
+                    value={`${item.value} ${item.label}`}
                     onSelect={() => runAction(item)}
                   >
                     <Icon aria-hidden="true" />

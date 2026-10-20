@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useEffect, useRef, useMemo, useId, memo } from "react"
 import { ChevronRight, ListTree, Loader2, XCircle } from "lucide-react"
 import { ToolCallCard } from "./ToolCallCard"
@@ -24,6 +25,7 @@ export const CollapsibleToolCalls = memo(function CollapsibleToolCalls({
   thoughtForMs?: number
   skillMetadata?: Map<string, SkillMeta>
 }) {
+  const { t } = useTranslation()
   const [openOverride, setOpenOverride] = useState<boolean | null>(null)
   const targetRef = useRef<HTMLDivElement | null>(null)
   const panelId = useId()
@@ -93,17 +95,17 @@ export const CollapsibleToolCalls = memo(function CollapsibleToolCalls({
           {description && <span className="text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">{description}</span>}
         </span>
         <span id={statusId} className="flex shrink-0 flex-col items-end gap-1 text-xs">
-          {summary.running > 0 && <span className="flex items-center gap-1.5 text-info"><Loader2 className="size-3.5 motion-safe:animate-spin" aria-hidden="true" />{summary.running} running</span>}
-          {summary.failed > 0 && <span className="flex items-center gap-1.5 text-destructive"><XCircle className="size-3.5" aria-hidden="true" />{summary.failed} failed</span>}
-          {summary.awaitingReview > 0 && <span className="text-muted-foreground">{summary.awaitingReview} awaiting review</span>}
-          {summary.unavailable > 0 && <span className="text-muted-foreground">{summary.unavailable} no result</span>}
+          {summary.running > 0 && <span className="flex items-center gap-1.5 text-info"><Loader2 className="size-3.5 motion-safe:animate-spin" aria-hidden="true" />{summary.running} {t(" running")}</span>}
+          {summary.failed > 0 && <span className="flex items-center gap-1.5 text-destructive"><XCircle className="size-3.5" aria-hidden="true" />{summary.failed} {t(" failed")}</span>}
+          {summary.awaitingReview > 0 && <span className="text-muted-foreground">{summary.awaitingReview} {t(" awaiting review")}</span>}
+          {summary.unavailable > 0 && <span className="text-muted-foreground">{summary.unavailable} {t(" no result")}</span>}
         </span>
         <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", isOpen && "rotate-90")} aria-hidden="true" />
       </button>
       <Collapsible open={isOpen}>
         <CollapsibleContent id={panelId}>
           <div className="min-w-0 border-t border-border/70 px-1 py-1">
-            {tail.hidden > 0 && <Button type="button" variant="ghost" size="sm" className="mb-1 ml-2" onClick={() => setOpenOverride(true)}>Show {tail.hidden} earlier {tail.hidden === 1 ? "step" : "steps"}</Button>}
+            {tail.hidden > 0 && <Button type="button" variant="ghost" size="sm" className="mb-1 ml-2" onClick={() => setOpenOverride(true)}>{t("Show ")}{tail.hidden} {t(" earlier ")}{tail.hidden === 1 ? "step" : "steps"}</Button>}
             {tail.visible.map((entry) => entry.kind === "tool_call"
               ? renderCall(entry.toolCall)
               : <div key={`thinking-${entries.filter((item) => item.kind === "thinking").indexOf(entry)}`} className="px-3 py-1"><ThinkingBlock blocks={entry.blocks} /></div>)}

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useId, useState } from "react"
 import { LogIn, Plug, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -31,6 +32,7 @@ export function McpPicker({
   onAuth,
   isNewSession,
 }: McpPickerProps) {
+  const { t } = useTranslation()
   const [filter, setFilter] = useState("")
   const labelId = useId()
 
@@ -53,30 +55,29 @@ export function McpPicker({
         <span className="truncate">{chipLabel}</span>
         {discovering && <RefreshCw className="size-3 animate-spin" aria-hidden />}
       </PopoverTrigger>
-      <PickerPanel side={pickerSideFor(isNewSession)} aria-label="MCP servers" className="w-[23rem]">
+      <PickerPanel side={pickerSideFor(isNewSession)} aria-label={t("MCP servers")} className="w-[23rem]">
         <div className="flex shrink-0 items-center justify-between gap-2 px-1.5 pt-1.5">
           <PickerSectionLabel id={labelId} className="pt-1">
-            MCP servers
-            {connected.length > 0 && (
-              <span aria-hidden className="ml-1.5 font-normal normal-case tracking-normal">{onCount} on</span>
+            {t("MCP servers")}{connected.length > 0 && (
+              <span aria-hidden className="ml-1.5 font-normal normal-case tracking-normal">{onCount} {t(" on")}</span>
             )}
           </PickerSectionLabel>
           <div className="flex items-center gap-0.5">
             {onSetSelection && connected.length > 1 && (
               <>
                 <HeaderAction
-                  label="Turn every server on"
+                  label={t("Turn every server on")}
                   disabled={onCount === connected.length}
                   onClick={() => onSetSelection(connected.map((server) => server.name))}
                 >
-                  All
+                  {t("All")}
                 </HeaderAction>
                 <HeaderAction
-                  label="Turn every server off"
+                  label={t("Turn every server off")}
                   disabled={onCount === 0}
                   onClick={() => onSetSelection([])}
                 >
-                  None
+                  {t("None")}
                 </HeaderAction>
               </>
             )}
@@ -85,8 +86,8 @@ export function McpPicker({
               variant="ghost"
               size="icon-xs"
               onClick={onRefresh}
-              aria-label="Refresh status"
-              title="Refresh status"
+              aria-label={t("Refresh status")}
+              title={t("Refresh status")}
               className="text-muted-foreground"
             >
               <RefreshCw className={cn(loading && "animate-spin")} />
@@ -100,8 +101,8 @@ export function McpPicker({
               type="search"
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
-              placeholder="Filter servers…"
-              aria-label="Filter servers"
+              placeholder={t("Filter servers…")}
+              aria-label={t("Filter servers")}
               className="h-7 w-full rounded-md bg-muted/60 px-2 text-xs text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40 [&::-webkit-search-cancel-button]:hidden"
             />
           </div>
@@ -110,11 +111,11 @@ export function McpPicker({
         <div role="group" aria-labelledby={labelId} className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-1.5">
           {servers.length === 0 && (
             <p className="px-0.5 py-1 text-xs text-muted-foreground">
-              {loading ? "Loading…" : "No MCP servers configured"}
+              {loading ? t("Loading…") : t("No MCP servers configured")}
             </p>
           )}
           {servers.length > 0 && visibleConnected.length === 0 && visibleUnavailable.length === 0 && (
-            <p className="px-0.5 py-1 text-xs text-muted-foreground">No servers match.</p>
+            <p className="px-0.5 py-1 text-xs text-muted-foreground">{t("No servers match.")}</p>
           )}
 
           {visibleConnected.length > 0 && (
@@ -132,7 +133,7 @@ export function McpPicker({
 
           {visibleUnavailable.length > 0 && (
             <>
-              <PickerSectionLabel className="px-0.5 pt-2 text-warning/80">Needs sign-in</PickerSectionLabel>
+              <PickerSectionLabel className="px-0.5 pt-2 text-warning/80">{t("Needs sign-in")}</PickerSectionLabel>
               <div className="grid grid-cols-2 gap-1">
                 {visibleUnavailable.map((server) => (
                   <ServerTile key={server.name} server={server} onClick={() => onAuth(server.name)} />
@@ -182,6 +183,7 @@ interface ServerTileProps {
  * server, its short name, and the namespace it came from underneath.
  */
 function ServerTile({ server, on, onClick }: ServerTileProps) {
+  const { t } = useTranslation()
   const { short, namespace } = splitServerName(server.name)
   const needsAuth = on === undefined
   return (
@@ -189,8 +191,8 @@ function ServerTile({ server, on, onClick }: ServerTileProps) {
       type="button"
       role={needsAuth ? undefined : "checkbox"}
       aria-checked={needsAuth ? undefined : on}
-      aria-label={needsAuth ? `${server.name}, needs sign-in` : server.name}
-      title={needsAuth ? `${server.name} · Sign in to connect` : server.name}
+      aria-label={needsAuth ? t("{0}, needs sign-in", { "0": server.name }) : server.name}
+      title={needsAuth ? t("{0} · Sign in to connect", { "0": server.name }) : server.name}
       onClick={onClick}
       className={cn(
         "flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm outline-none ring-1 ring-inset transition-[background-color,box-shadow,color] duration-100 focus-visible:ring-2 focus-visible:ring-ring/40",

@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useMemo, useRef, useState, useEffect } from "react"
 import { Bot, Brain, CheckCircle2, CircleEllipsis, ChevronsDownUp, CircleHelp, TerminalSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -41,6 +42,7 @@ function AgentStatusLine({
   fading?: boolean
   startTimestamp?: string
 }) {
+  const { t } = useTranslation()
   const isCompleted = status.status === "completed"
   const pendingDescriptions = status.pendingAgentDescriptions ?? []
 
@@ -76,7 +78,7 @@ function AgentStatusLine({
       )}
       {(status.pendingQueue ?? 0) > 0 && (
         <span className="ml-1 shrink-0 text-xs text-muted-foreground">
-          +{status.pendingQueue} queued
+          +{status.pendingQueue} {t(" queued")}
         </span>
       )}
     </div>
@@ -95,6 +97,7 @@ function CompletedAgentStatus({
   status: SessionStatusInfo
   durationLabel: string | null
 }) {
+  const { t } = useTranslation()
   const [fadePhase, setFadePhase] = useState<"visible" | "fading" | "ready">("visible")
 
   useEffect(() => {
@@ -138,7 +141,7 @@ function CompletedAgentStatus({
       />
       {durationLabel && (
         <span className="font-mono text-xs tabular-nums text-muted-foreground">
-          in {durationLabel}
+          {t("in ")}{durationLabel}
         </span>
       )}
     </div>

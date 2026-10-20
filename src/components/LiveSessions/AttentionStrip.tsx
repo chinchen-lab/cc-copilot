@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useState } from "react"
 import { ChevronDown, Play, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -105,6 +106,7 @@ function StripRow({
   onResume,
   onPrefetch,
 }: StripRowProps) {
+  const { t } = useTranslation()
   const isReadOnlySession = isExternallyDrivenSession(agentKindForDirName(s.dirName), proc)
   const statusLabel = isReadOnlySession
     ? "Read-only"
@@ -150,7 +152,7 @@ function StripRow({
               variant="outline"
               className={cn("shrink-0", compact ? "text-muted-foreground" : chip.className)}
             >
-              {isReadOnlySession ? "Read-only" : chip.label}
+              {isReadOnlySession ? t("Read-only") : chip.label}
             </Badge>
             {!compact && <TimeSince iso={since ?? (s.lastActivityAt || s.lastModified)} />}
           </span>
@@ -168,10 +170,10 @@ function StripRow({
           size="xs"
           onClick={onResume}
           className="absolute bottom-1 right-1 text-warning"
-          aria-label="Resume to evaluate"
+          aria-label={t("Resume to evaluate")}
         >
           <Play data-icon="inline-start" />
-          Resume
+          {t("Resume")}
         </Button>
       )}
       {proc && onKill && !isReadOnlySession && (
@@ -182,8 +184,8 @@ function StripRow({
           onClick={(event) => onKill(proc.pid, event)}
           disabled={killingPids.has(proc.pid)}
           className="absolute right-0 top-0 text-destructive opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
-          title={`Kill PID ${proc.pid}`}
-          aria-label={`Kill process ${proc.pid}`}
+          title={t("Kill PID {0}", { "0": proc.pid })}
+          aria-label={t("Kill process {0}", { "0": proc.pid })}
         >
           <X data-icon="inline-start" />
         </Button>
@@ -238,6 +240,7 @@ export function AttentionStrip({
   onResumeSession,
   onPrefetchSession,
 }: AttentionStripProps) {
+  const { t } = useTranslation()
   const permissionsOf = useListedPermissions()
   const [showAllWorking, setShowAllWorking] = useState(false)
   const visibleWorking = showAllWorking ? groups.working : groups.working.slice(0, WORKING_VISIBLE)
@@ -270,7 +273,7 @@ export function AttentionStrip({
           <SectionHeader
             dotClassName={STATUS_DOT.attention}
             labelClassName="text-warning"
-            label="Needs you"
+            label={t("Needs you")}
             count={groups.needsYou.length}
           />
           {groups.needsYou.map((item) => {
@@ -297,7 +300,7 @@ export function AttentionStrip({
       {groups.working.length > 0 && (
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-medium text-muted-foreground">Working</span>
+            <span className="text-xs font-medium text-muted-foreground">{t("Working")}</span>
             <span className="text-xs tabular-nums text-muted-foreground">{groups.working.length}</span>
           </div>
           <div
@@ -324,7 +327,7 @@ export function AttentionStrip({
               className="justify-start"
             >
               <ChevronDown data-icon="inline-start" />
-              Show {hiddenWorking} more
+              {t("Show ")}{hiddenWorking} {t(" more")}
             </Button>
           )}
         </div>

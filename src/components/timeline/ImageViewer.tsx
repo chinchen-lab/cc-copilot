@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useRef, useState } from "react"
 import {
   ChevronLeft,
@@ -81,6 +82,7 @@ export function ImageViewer({
   onClose,
   onCloseComplete,
 }: ImageViewerProps): React.ReactElement | null {
+  const { t } = useTranslation()
   const safeInitialIndex = Math.min(Math.max(initialIndex, 0), Math.max(images.length - 1, 0))
   const [index, setIndex] = useState(safeInitialIndex)
   const [zoomPercent, setZoomPercent] = useState(100)
@@ -161,9 +163,9 @@ export function ImageViewer({
           "sm:h-[min(820px,calc(100dvh-2rem))] sm:w-[min(1120px,calc(100vw-2rem))] sm:max-w-none",
         )}
       >
-        <DialogTitle className="sr-only">Image viewer</DialogTitle>
+        <DialogTitle className="sr-only">{t("Image viewer")}</DialogTitle>
         <DialogDescription className="sr-only">
-          View and navigate images from this session.
+          {t("View and navigate images from this session.")}
         </DialogDescription>
 
         <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-2.5 sm:px-3">
@@ -176,14 +178,14 @@ export function ImageViewer({
             </div>
             {hasMultiple && (
               <div className="text-xs tabular-nums text-foreground/50">
-                {index + 1} of {images.length}
+                {index + 1} {t(" of ")}{images.length}
               </div>
             )}
           </div>
 
           <div className="flex items-center gap-1">
             <IconButton
-              label="Zoom out"
+              label={t("Zoom out")}
               disabled={zoomPercent <= 100}
               onClick={zoomOut}
             >
@@ -195,20 +197,20 @@ export function ImageViewer({
               size="sm"
               onClick={resetZoom}
               className="min-w-12 px-1.5 font-mono text-xs tabular-nums text-foreground/60 hover:bg-background hover:text-foreground"
-              aria-label="Reset zoom"
-              title="Reset zoom"
+              aria-label={t("Reset zoom")}
+              title={t("Reset zoom")}
             >
               {zoomPercent}%
             </Button>
             <IconButton
-              label="Zoom in"
+              label={t("Zoom in")}
               disabled={zoomPercent >= MAX_ZOOM * 100}
               onClick={zoomIn}
             >
               <Plus className="size-3.5" data-icon="icon" />
             </IconButton>
             <div className="mx-1 h-5 w-px bg-border" />
-            <IconButton label="Close image viewer" onClick={onClose}>
+            <IconButton label={t("Close image viewer")} onClick={onClose}>
               <X className="size-4" data-icon="icon" />
             </IconButton>
           </div>
@@ -252,7 +254,7 @@ export function ImageViewer({
           {hasMultiple && (
             <>
               <IconButton
-                label="Previous image"
+                label={t("Previous image")}
                 disabled={!canGoPrev}
                 onClick={goPrev}
                 className="absolute left-2 top-1/2 size-10 -translate-y-1/2 rounded-full bg-popover backdrop-blur sm:left-3"
@@ -260,7 +262,7 @@ export function ImageViewer({
                 <ChevronLeft className="size-5" data-icon="icon" />
               </IconButton>
               <IconButton
-                label="Next image"
+                label={t("Next image")}
                 disabled={!canGoNext}
                 onClick={goNext}
                 className="absolute right-2 top-1/2 size-10 -translate-y-1/2 rounded-full bg-popover backdrop-blur sm:right-3"
@@ -273,7 +275,7 @@ export function ImageViewer({
           {zoomPercent === 100 && (
             <div className="pointer-events-none absolute bottom-2 left-1/2 hidden -translate-x-1/2 items-center gap-1.5 rounded-full bg-popover px-2.5 py-1 text-xs text-foreground/60 sm:flex">
               <Maximize2 className="size-3" data-icon="inline-start" />
-              Scroll or double-click to zoom · drag to pan
+              {t("Scroll or double-click to zoom · drag to pan")}
             </div>
           )}
         </div>
