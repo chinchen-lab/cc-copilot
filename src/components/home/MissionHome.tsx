@@ -21,6 +21,7 @@ import { revealSessionById } from "@/lib/revealSession"
 import { cn } from "@/lib/utils"
 import { HomeComposer, type HomeProject, type HomeStart } from "./HomeComposer"
 import { HomeRequestPrompt } from "./HomeRequestPrompt"
+import { YourProjects } from "./YourProjects"
 import { homeQueue, homeRequestId, homeSessionRows, homeSessions, recentHomeProjects, searchHomeSessions, type HomeRequest, type HomeSession } from "./homeView"
 
 const CELL: Record<string, string> = {
@@ -33,6 +34,8 @@ export interface MissionHomeProps {
   onOpenSession: (dirName: string, fileName: string) => void
   /** The full list of projects and their history. */
   onBrowseProjects?: () => void
+  /** Open an existing project's full session history. */
+  onSelectProject?: (dirName: string) => void
   /** Starting a session from the home; without it the composer stays hidden. */
   start?: HomeStart
 }
@@ -62,7 +65,7 @@ function isShortcutTarget(event: globalThis.KeyboardEvent): boolean {
  * all of them. The composer and search stay put; only the lists scroll, and
  * the queue takes a column only while something is waiting.
  */
-export function MissionHome({ onOpenSession, onBrowseProjects, start }: MissionHomeProps) {
+export function MissionHome({ onOpenSession, onBrowseProjects, onSelectProject, start }: MissionHomeProps) {
   const inventory = useSessionInventory()
   const input = usePendingHumanInput()
   const { names, rename } = useSessionNames()
@@ -147,18 +150,21 @@ export function MissionHome({ onOpenSession, onBrowseProjects, start }: MissionH
               Nothing is waiting on you.
             </p>
           )}
-          <YourSessions
-            sessions={yours}
-            total={rows.length}
-            query={query}
-            onQueryChange={setQuery}
-            searchRef={searchRef}
-            nameOf={nameOf}
-            projectLabel={projectLabel}
-            onOpen={open}
-            onRename={rename}
-            onBrowseProjects={onBrowseProjects}
-          />
+          <div className="flex min-w-0 flex-col gap-6 lg:min-h-0 lg:flex-1">
+            {onSelectProject && <YourProjects onSelectProject={onSelectProject} />}
+            <YourSessions
+              sessions={yours}
+              total={rows.length}
+              query={query}
+              onQueryChange={setQuery}
+              searchRef={searchRef}
+              nameOf={nameOf}
+              projectLabel={projectLabel}
+              onOpen={open}
+              onRename={rename}
+              onBrowseProjects={onBrowseProjects}
+            />
+          </div>
         </div>
       </div>
     </div>

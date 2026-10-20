@@ -23,6 +23,12 @@ Copilot discovery reads events from `~/.copilot/session-state`. It does not impo
 
 ## Sessions and conversation history
 
+The Mission Control home shows **Your projects** above **Your sessions**. Search
+projects by name or path, then select one to browse its complete session history
+before opening a conversation. Project cards show their paths and session counts,
+including older projects outside the recent-session list. Use **Mission Control**
+above the history to return home, or **All projects** to open the full browser.
+
 The sidebar and mobile Sessions tab show live and recent sessions, with status and attention cues. Search by project, prompt, title, branch, or pull request. Enter `#157`, a project name plus `#157`, or a GitHub pull request URL to find sessions that created or worked on that PR. Sessions are one list of cards, newest first, shelved under "Today", "Yesterday", "Last 7 days", "Last 30 days" and "Older". Each card shows its project, title, last prompt, status, branch and turns; hover a card for the full first and latest prompts. The scope picker below the search box narrows the list to one project, where cards drop the project line and the picker shows how many sessions in other projects are waiting for you. "Load older sessions" at the end fetches beyond the newest ones.
 
 Opening, switching, or starting a chat automatically focuses the sidebar on that chat's project. Worktree sessions use their parent project's group. You can still choose **All projects** or another project in the scope picker: background refreshes preserve that choice until you navigate to another chat. With no chat open, the sidebar keeps its remembered scope for that device.

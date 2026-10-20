@@ -123,6 +123,7 @@ export function MissionControlView({ navigation, showProjectHistory = false }: {
           <MissionHome
             onOpenSession={navigation.actions.handleDashboardSelect}
             onBrowseProjects={() => setBrowsing(true)}
+            onSelectProject={(dirName) => { navigation.onSelectProject(dirName); setBrowsing(true) }}
             start={{ defaultAgentKind: config.defaultAgentKind, model: navigation.newSessionModel, onStart: navigation.onStartNewSessionWith }}
           />
         )}
