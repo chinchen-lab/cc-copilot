@@ -301,7 +301,7 @@ describe("background process port routes", () => {
     addOutput("dead.output", { content: "port 6000", mtimeMs: 3_000 })
     addOutput("symlink.output", { content: "port 7000", symlink: true })
     addOutput("empty.output", { content: "" })
-    addOutput("noise.output", { content: "no listening address" })
+    const commandPath = addOutput("noise.output", { content: "no listening address" })
 
     const handler = getRouteHandler(handlers, "/api/background-tasks")
     const { req, res, next } = createMockReqRes("GET", "/?cwd=/tmp/project")
@@ -324,6 +324,14 @@ describe("background process port routes", () => {
         portStatus: { 4321: true, 5678: true },
         preview: "server on localhost:4321\nbackup :5678",
       },
+      {
+        id: "noise",
+        outputPath: commandPath,
+        sessionId: SESSION,
+        ports: [],
+        portStatus: {},
+        preview: "no listening address",
+      },
     ])
     expect([...sockets.keys()]).toEqual([4321, 5678, 6000])
     expect(sockets.get(4321)?.setTimeout).toHaveBeenCalledWith(500)
@@ -332,17 +340,20 @@ describe("background process port routes", () => {
     expect(next).not.toHaveBeenCalled()
   })
 
-  it("skips unreadable, empty, and portless regular task outputs", async () => {
+  it("includes portless commands without claiming they are running or probing fake ports", async () => {
     addOutput("unreadable.output", { statError: true })
     addOutput("empty.output", { content: "" })
-    addOutput("invalid-ports.output", { content: "port 99999 and port 0000" })
-    addOutput("portless.output", { content: "ready without a port" })
+    const invalid = addOutput("invalid-ports.output", { content: "port 99999 and port 0000" })
+    const portless = addOutput("portless.output", { content: "ready without a port" })
 
     const handler = getRouteHandler(handlers, "/api/background-tasks")
     const { req, res, next } = createMockReqRes("GET", "/?cwd=/tmp/project")
     await handler(req, res, next)
 
-    expect(JSON.parse(res.getBody())).toEqual([])
+    expect(JSON.parse(res.getBody())).toEqual([
+      { id: "invalid-ports", outputPath: invalid, sessionId: SESSION, ports: [], portStatus: {}, preview: "port 99999 and port 0000" },
+      { id: "portless", outputPath: portless, sessionId: SESSION, ports: [], portStatus: {}, preview: "ready without a port" },
+    ])
     expect(mockedCreateConnection).not.toHaveBeenCalled()
     expect(next).not.toHaveBeenCalled()
   })

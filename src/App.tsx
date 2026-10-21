@@ -1228,6 +1228,7 @@ export default function App() {
     <div className="hidden">
       <BackgroundServers
         cwd={state.session.cwd}
+        sessionId={state.session.sessionId}
         turns={state.session.turns}
         onServersChanged={processPanel.handleServersChanged}
       />

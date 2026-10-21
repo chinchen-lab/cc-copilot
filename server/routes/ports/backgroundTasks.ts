@@ -40,8 +40,6 @@ export async function handleBackgroundTasks(
         if (p > 0 && p < 65536) ports.add(p)
       }
 
-      if (ports.size === 0) continue // skip tasks with no detected ports
-
       const lines = content.split("\n").filter((l) => l.trim() && !l.startsWith("[2K"))
       const preview = lines.slice(0, 5).join("\n").slice(0, 300)
 
@@ -81,7 +79,8 @@ export async function handleBackgroundTasks(
       }
     }
 
-    // Deduplicate tasks (a task may own multiple ports)
+    // Portless commands keep their output even after exiting. Their liveness
+    // cannot be inferred from an output file; the UI uses task notifications.
     const seen = new Set<string>()
     const result: Array<{
       id: string
@@ -103,6 +102,17 @@ export async function handleBackgroundTasks(
         sessionId: task.sessionId,
         ports: task.ports,
         portStatus: ps,
+        preview: task.preview,
+      })
+    }
+    for (const task of tasks) {
+      if (task.ports.length > 0) continue
+      result.push({
+        id: task.id,
+        outputPath: task.outputPath,
+        sessionId: task.sessionId,
+        ports: [],
+        portStatus: {},
         preview: task.preview,
       })
     }

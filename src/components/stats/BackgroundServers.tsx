@@ -1,17 +1,20 @@
 import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useMemo, useEffect, useCallback } from "react"
-import { Server, Square, TerminalSquare } from "lucide-react"
+import { Play, Server, Square, TerminalSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { authFetch } from "@/lib/auth"
 import { SectionHeading } from "@/components/stats/SectionHeading"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { Turn } from "../../../shared/session/types"
+import { parseTaskNotifications } from "@/lib/userMessageContent"
+import type { DiscoveredTask, ProcessEntry } from "@/hooks/useProcessPanel"
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
 interface BgTask {
   id: string
+  sessionId?: string
   outputPath: string | null
   ports: number[]
   portStatus: Record<number, boolean>
@@ -20,11 +23,12 @@ interface BgTask {
 
 interface BackgroundServersProps {
   cwd: string
+  sessionId?: string
   turns: Turn[]
   /** The user may stop this session's processes: offers Stop on each running server. */
   canStop?: boolean
   onToggleServer?: (id: string, outputPath: string, title: string) => void
-  onServersChanged?: (servers: { id: string; outputPath: string; title: string }[]) => void
+  onServersChanged?: (servers: DiscoveredTask[]) => void
 }
 
 // ── Port Detection ──────────────────────────────────────────────────────────
@@ -76,6 +80,15 @@ function getTaskTitle(task: BgTask): string {
   return task.preview.split("\n").find((l) => l.trim())?.trim() || `Task ${task.id}`
 }
 
+const STATUS_LABELS: Record<ProcessEntry["status"], string> = {
+  running: "Running", stopped: "Stopped", errored: "Failed", completed: "Completed", unknown: "Output available",
+}
+
+function taskStatus(task: BgTask, sessionId: string | undefined, states: Map<string, ProcessEntry["status"]>): ProcessEntry["status"] {
+  if (task.ports.some(port => task.portStatus[port])) return "running"
+  return task.sessionId && task.sessionId === sessionId ? states.get(task.id) ?? "unknown" : "unknown"
+}
+
 // ── Port Badge ──────────────────────────────────────────────────────────────
 
 function PortBadge({ port, isActive }: { port: number; isActive: boolean }): React.JSX.Element {
@@ -98,6 +111,7 @@ function PortBadge({ port, isActive }: { port: number; isActive: boolean }): Rea
 
 export function BackgroundServers({
   cwd,
+  sessionId,
   turns,
   canStop = false,
   onToggleServer,
@@ -106,6 +120,20 @@ export function BackgroundServers({
   const { t } = useTranslation()
   const [tasks, setTasks] = useState<BgTask[]>([])
   const jsonlPorts = useJsonlPorts(turns)
+  const taskStates = useMemo(() => {
+    const states = new Map<string, ProcessEntry["status"]>()
+    for (const turn of turns) for (const block of turn.contentBlocks) {
+      if (block.kind !== "task_notification") continue
+      for (const notice of parseTaskNotifications(block.content).notifications) {
+        const label = notice.status === "completed" ? "completed"
+          : notice.status === "failed" || notice.status === "error" ? "errored"
+          : notice.status === "killed" || notice.status === "cancelled" || notice.status === "stopped" ? "stopped"
+          : notice.status === "running" ? "running" : null
+        if (label && notice.taskId) states.set(notice.taskId, label)
+      }
+    }
+    return states
+  }, [turns])
 
   // Poll the background-tasks API, fall back to JSONL port checking
   useEffect(() => {
@@ -114,24 +142,22 @@ export function BackgroundServers({
     let cancelled = false
     async function check() {
       try {
+        let apiTasks: BgTask[] = []
         const res = await authFetch(
           `/api/background-tasks?cwd=${encodeURIComponent(cwd)}`
         )
         if (cancelled) return
         if (res.ok) {
-          const apiTasks: BgTask[] = await res.json()
+          apiTasks = await res.json()
           if (cancelled) return
-          if (apiTasks.length > 0) {
-            setTasks(apiTasks)
-            return
-          }
         }
 
-        if (jsonlPorts.size === 0) {
-          setTasks([])
+        setTasks(apiTasks)
+        const listedPorts = new Set(apiTasks.flatMap(task => task.ports))
+        const portsToCheck = [...jsonlPorts.keys()].filter(port => !listedPorts.has(port))
+        if (portsToCheck.length === 0) {
           return
         }
-        const portsToCheck = [...jsonlPorts.keys()]
         const portRes = await authFetch(
           `/api/check-ports?ports=${portsToCheck.join(",")}`
         )
@@ -142,7 +168,7 @@ export function BackgroundServers({
           const fallbackTasks: BgTask[] = []
           const seen = new Set<number>()
           for (const [port, info] of jsonlPorts) {
-            if (!portStatus[port] || seen.has(port)) continue
+            if (listedPorts.has(port) || !portStatus[port] || seen.has(port)) continue
             seen.add(port)
             fallbackTasks.push({
               id: `port-${port}`,
@@ -152,7 +178,7 @@ export function BackgroundServers({
               preview: info.description,
             })
           }
-          setTasks(fallbackTasks)
+          setTasks([...apiTasks, ...fallbackTasks])
         }
       } catch {
         // ignore
@@ -193,33 +219,39 @@ export function BackgroundServers({
         id: t.id,
         outputPath: t.outputPath!,
         title: getTaskTitle(t),
+        status: taskStatus(t, sessionId, taskStates),
       }))
     onServersChanged(discovered)
-  }, [tasks, onServersChanged])
+  }, [tasks, onServersChanged, sessionId, taskStates])
 
   if (tasks.length === 0) return null
 
   return (
     <section>
-      <SectionHeading>{t("Active Servers (")}{tasks.length})</SectionHeading>
+      <SectionHeading>{t("Background Tasks (")}{tasks.length})</SectionHeading>
       <div className="flex flex-col gap-1.5">
         {tasks.map((task) => {
           const activePorts = task.ports.filter((p) => task.portStatus[p])
           const title = getTaskTitle(task)
+          const isServer = task.ports.length > 0
+          const status = taskStatus(task, sessionId, taskStates)
 
           return (
             <div
-              key={task.id}
+              key={`${task.sessionId ?? ""}:${task.id}`}
               className="border-b border-border px-2 py-2 last:border-b-0"
             >
               <div className="flex items-center gap-1.5">
-                  <Server className="size-3 shrink-0 text-success" data-icon="inline-start" />
+                  {isServer
+                    ? <Server className="size-3 shrink-0 text-success" data-icon="inline-start" />
+                    : <Play className="size-3 shrink-0 text-muted-foreground" data-icon="inline-start" />}
                   <span className="truncate text-xs font-medium text-foreground">
                     {title}
                   </span>
               </div>
 
               <div className="mt-1.5 flex items-center gap-1.5">
+                {!isServer && <Badge variant="secondary">{t(STATUS_LABELS[status])}</Badge>}
                 {task.ports.map((port) => (
                   <PortBadge key={port} port={port} isActive={task.portStatus[port]} />
                 ))}
@@ -231,8 +263,8 @@ export function BackgroundServers({
                     variant="ghost"
                     size="icon-xs"
                     onClick={() => onToggleServer?.(task.id, task.outputPath!, title)}
-                    title={t("View server output")}
-                    aria-label={t("View server output")}
+                    title={t(isServer ? "View server output" : "View task output")}
+                    aria-label={t(isServer ? "View server output" : "View task output")}
                   >
                     <TerminalSquare data-icon="inline-start" />
                   </Button>

@@ -6,10 +6,17 @@ export interface ProcessEntry {
   id: string
   name: string
   type: "script" | "task" | "terminal"
-  status: "running" | "stopped" | "errored"
+  status: "running" | "stopped" | "errored" | "completed" | "unknown"
   source?: string
   /** For task type: path to .output file (SSE via /api/task-output) */
   outputPath?: string
+}
+
+export interface DiscoveredTask {
+  id: string
+  outputPath: string
+  title: string
+  status?: ProcessEntry["status"]
 }
 
 interface PanelCache {
@@ -94,7 +101,7 @@ export function useProcessPanel(sessionId: string | null | undefined) {
   }, [])
 
   // Bridge: handle servers discovered by BackgroundServers component (type='task')
-  const handleServersChanged = useCallback((servers: { id: string; outputPath: string; title: string }[]) => {
+  const handleServersChanged = useCallback((servers: DiscoveredTask[]) => {
     setProcesses((prev) => {
       let changed = false
       const next = new Map(prev)
@@ -110,18 +117,19 @@ export function useProcessPanel(sessionId: string | null | undefined) {
 
       // Add/update task entries
       for (const s of servers) {
+        const status = s.status ?? "running"
         const existing = next.get(s.id)
         if (!existing) {
           next.set(s.id, {
             id: s.id,
             name: s.title,
             type: "task",
-            status: "running",
+            status,
             outputPath: s.outputPath,
           })
           changed = true
-        } else if (existing.name !== s.title || existing.outputPath !== s.outputPath) {
-          next.set(s.id, { ...existing, name: s.title, outputPath: s.outputPath })
+        } else if (existing.name !== s.title || existing.outputPath !== s.outputPath || existing.status !== status) {
+          next.set(s.id, { ...existing, name: s.title, outputPath: s.outputPath, status })
           changed = true
         }
       }
@@ -140,7 +148,7 @@ export function useProcessPanel(sessionId: string | null | undefined) {
           id,
           name: title,
           type: "task",
-          status: "running",
+          status: "unknown",
           outputPath,
         })
         return next

@@ -131,6 +131,17 @@ describe("useProcessPanel", () => {
     expect(s1?.outputPath).toBe("/out/s1")
   })
 
+  it("preserves unknown and completed command status as discovery updates", () => {
+    const { result } = renderHook(() => useProcessPanel("session-1"))
+    const task = { id: "build", outputPath: "/out/build", title: "Build" }
+    act(() => result.current.handleServersChanged([{ ...task, status: "unknown" }]))
+    expect(result.current.processes.get("build")?.status).toBe("unknown")
+    act(() => result.current.handleServersChanged([{ ...task, status: "completed" }]))
+    expect(result.current.processes.get("build")?.status).toBe("completed")
+    act(() => result.current.handleToggleServer("build", task.outputPath, task.title))
+    expect(result.current.processes.get("build")?.status).toBe("completed")
+  })
+
   it("handleServersChanged removes old task entries not in new list", () => {
     const { result } = renderHook(() => useProcessPanel("session-1"))
 

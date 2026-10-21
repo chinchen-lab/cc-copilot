@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils"
 import { SessionCostPanel } from "@/components/stats/SessionCostPanel"
 import { ErrorLog } from "@/components/stats/ErrorLog"
 import { BackgroundServers } from "@/components/stats/BackgroundServers"
+import type { DiscoveredTask } from "@/hooks/useProcessPanel"
 import { AgentsPanel } from "@/components/stats/AgentsPanel"
 import { TurnNavigator } from "@/components/stats/TurnNavigator"
 import { ToolCallIndex } from "@/components/stats/ToolCallIndex"
@@ -29,7 +30,7 @@ import { useCapability } from "@/hooks/useCapability"
 interface StatsPanelProps {
   onJumpToTurn?: (turnIndex: number, toolCallId?: string) => void
   onToggleServer?: (id: string, outputPath: string, title: string) => void
-  onServersChanged?: (servers: { id: string; outputPath: string; title: string }[]) => void
+  onServersChanged?: (servers: DiscoveredTask[]) => void
   searchInputRef?: React.RefObject<HTMLInputElement | null>
   /** Called when user clicks a background agent to open its session */
   onLoadSession?: (dirName: string, fileName: string) => void
@@ -131,6 +132,7 @@ export const StatsPanel = memo(function StatsPanel({
         <TabsContent value="agents" className="flex flex-col gap-6 pt-3">
           <BackgroundServers
             cwd={session.cwd}
+            sessionId={session.sessionId}
             turns={turns}
             canStop={canKillAny && permissions.stop}
             onToggleServer={onToggleServer}

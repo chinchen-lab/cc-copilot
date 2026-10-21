@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode, type RefObject } from "react"
 import type { BgAgent } from "@/hooks/useBackgroundAgents"
 import type { useWorktrees } from "@/hooks/useWorktrees"
+import type { DiscoveredTask } from "@/hooks/useProcessPanel"
 import type { BuiltInEditorRequest } from "@/lib/fileOpener"
 import type { ProjectPromptContext } from "@/plugin-api"
 import type { WorktreeSessionRef } from "../../../shared/contracts/worktrees"
@@ -13,7 +14,7 @@ export interface BuiltInPanelServices {
   addProjectContext: (context: ProjectPromptContext) => void
   jumpToTurn: (turnIndex: number, toolCallId?: string) => void
   toggleServer: (id: string, outputPath: string, title: string) => void
-  serversChanged: (servers: { id: string; outputPath: string; title: string }[]) => void
+  serversChanged: (servers: DiscoveredTask[]) => void
   loadSession: (dirName: string, fileName: string) => void
   worktrees: Pick<ReturnType<typeof useWorktrees>, "worktrees" | "loading" | "refetch">
   worktreeDirName: string | null
