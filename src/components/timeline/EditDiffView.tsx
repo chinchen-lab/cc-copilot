@@ -13,6 +13,7 @@ import {
 import { getHighlighter, ensureLang, getLangFromPath, type ThemedToken } from "@/lib/shiki"
 import { useIsDarkMode } from "@/hooks/useIsDarkMode"
 import { Button } from "@/components/ui/button"
+import { canHighlightDiff } from "@/lib/diffHighlight"
 
 // ── Simple line-level diff (LCS-based, optimized) ──────────────────────────
 
@@ -144,16 +145,14 @@ function useHighlightedTokens(
   filePath: string,
   isDark: boolean
 ): { oldTokens: TokenizedLines | null; newTokens: TokenizedLines | null } {
-  const [oldTokens, setOldTokens] = useState<TokenizedLines | null>(null)
-  const [newTokens, setNewTokens] = useState<TokenizedLines | null>(null)
+  const [highlighted, setHighlighted] = useState<{
+    oldStr: string; newStr: string; filePath: string; isDark: boolean
+    oldTokens: TokenizedLines; newTokens: TokenizedLines
+  } | null>(null)
 
   useEffect(() => {
     const lang = getLangFromPath(filePath)
-    if (!lang) {
-      setOldTokens(null)
-      setNewTokens(null)
-      return
-    }
+    if (!lang || !canHighlightDiff(oldStr, newStr)) return
 
     const theme = isDark ? "github-dark" : "github-light"
     let cancelled = false
@@ -169,17 +168,13 @@ function useHighlightedTokens(
           if (cancelled) return
           const oldResult = hl.codeToTokens(oldStr, { lang, theme })
           if (cancelled) return
-          setOldTokens(oldResult.tokens)
           const newResult = hl.codeToTokens(newStr, { lang, theme })
           if (cancelled) return
-          setNewTokens(newResult.tokens)
+          setHighlighted({ oldStr, newStr, filePath, isDark, oldTokens: oldResult.tokens, newTokens: newResult.tokens })
         })
         .catch((err) => {
           console.warn("[EditDiffView] highlight failed:", err)
-          if (!cancelled) {
-            setOldTokens(null)
-            setNewTokens(null)
-          }
+          if (!cancelled) setHighlighted(null)
         })
     })
 
@@ -189,7 +184,10 @@ function useHighlightedTokens(
     }
   }, [oldStr, newStr, filePath, isDark])
 
-  return { oldTokens, newTokens }
+  // A new file paints as plain text immediately, never with a previous file's tokens.
+  const current = highlighted?.oldStr === oldStr && highlighted.newStr === newStr
+    && highlighted.filePath === filePath && highlighted.isDark === isDark ? highlighted : null
+  return { oldTokens: current?.oldTokens ?? null, newTokens: current?.newTokens ?? null }
 }
 
 // ── Diff line style lookups ─────────────────────────────────────────────────
