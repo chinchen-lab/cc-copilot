@@ -19,8 +19,8 @@ export function isRecentlyActive(timestamp: string | null | undefined): boolean 
  */
 export function sessionRowTitle(s: SessionInfo, customName?: string): string {
   const teammateName = s.teamName ? s.agentName : ""
-  const label = customName || s.aiTitle || s.name || teammateName || s.slug
-    || s.firstUserMessage || s.customTitle
+  const label = customName || s.customTitle || s.aiTitle || s.name || teammateName || s.slug
+    || s.firstUserMessage
   // A bare session id is a last resort, and only its head is recognisable.
   return label ? truncate(label, 70) : truncate(s.sessionId, 16)
 }

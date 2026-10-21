@@ -167,6 +167,7 @@ export async function readClaudeSessionMeta(
       let foundMessage = false
       let foundTimestamp = false
       let foundAiTitle = false
+      let foundCustomTitle = false
       let foundModel = !!model
       outer: for (let i = 0; i < MAX_CHUNKS && cursor > 0; i++) {
         const readSize = Math.min(CHUNK, cursor)
@@ -189,6 +190,16 @@ export async function readClaudeSessionMeta(
         for (let j = splitLines.length - 1; j >= startIdx; j--) {
           const line = splitLines[j]
           if (!line) continue
+          if (!foundCustomTitle && line.includes('"custom-title"')) {
+            try {
+              const obj = JSON.parse(line)
+              if (obj.type === "custom-title" && typeof obj.customTitle === "string" && obj.customTitle) {
+                customTitle = obj.customTitle
+                foundCustomTitle = true
+              }
+            } catch { /* skip */ }
+            continue
+          }
           // Scanning newest→oldest, so the first ai-title hit is the latest
           if (!foundAiTitle && line.includes('"ai-title"')) {
             try {
@@ -216,7 +227,7 @@ export async function readClaudeSessionMeta(
                 foundMessage = true
               }
             }
-            if (foundMessage && foundTimestamp && foundAiTitle && foundModel) break outer
+            if (foundMessage && foundTimestamp && foundAiTitle && foundCustomTitle && foundModel) break outer
           } catch { continue }
         }
       }

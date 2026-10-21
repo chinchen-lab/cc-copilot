@@ -178,6 +178,13 @@ describe("SessionsView", () => {
     expect(screen.getByRole("link", { name: "Pull request #482" })).toBeInTheDocument()
   })
 
+  it("shows the CLI rename ahead of generated titles and slugs", () => {
+    const renamed = { ...richSession, customTitle: "User-chosen session name" }
+    renderView({ sessions: [renamed], filteredSessions: [renamed] })
+    expect(screen.getByText("User-chosen session name")).toBeVisible()
+    expect(screen.queryByText("Rewrite the dashboard rows")).not.toBeInTheDocument()
+  })
+
   it("flags a session that ended badly instead of claiming it is live", () => {
     const stopped = {
       ...richSession,

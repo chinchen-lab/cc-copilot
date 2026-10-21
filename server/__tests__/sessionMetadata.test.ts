@@ -231,6 +231,31 @@ describe("getSessionMeta agent detection", () => {
 })
 
 describe("getSessionMeta ai-title support", () => {
+  it("keeps the newest CLI rename beyond the head of a large transcript", async () => {
+    const filePath = await writeSession([
+      userLine("start the long session"),
+      { type: "custom-title", customTitle: "Original name" },
+      { type: "assistant", message: { model: "test-model", content: [{ type: "text", text: "x".repeat(100_000) }] } },
+      { type: "custom-title", customTitle: "First rename" },
+      { type: "custom-title", customTitle: "Latest rename" },
+      { type: "ai-title", aiTitle: "Generated name" },
+      userLine("continue the long session"),
+    ])
+    const meta = await getSessionMeta(filePath)
+    expect(meta.customTitle).toBe("Latest rename")
+    expect(meta.aiTitle).toBe("Generated name")
+  })
+
+  it("retains a head-only custom title when no later rename exists", async () => {
+    const filePath = await writeSession([
+      userLine("start the long session"),
+      { type: "custom-title", customTitle: "Original name" },
+      { type: "assistant", message: { content: [{ type: "text", text: "x".repeat(100_000) }] } },
+      userLine("continue the long session"),
+    ])
+    expect((await getSessionMeta(filePath)).customTitle).toBe("Original name")
+  })
+
   it("extracts the AI-generated title from ai-title events", async () => {
     const filePath = await writeSession([
       userLine("please fix the login flow for me"),
