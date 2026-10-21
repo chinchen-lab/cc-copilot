@@ -211,6 +211,40 @@ describe("ProjectFilesPanel", () => {
   })
 
   describe("markdown files", () => {
+    it("previews Marp slides and preserves source edits when switching modes", async () => {
+      const user = userEvent.setup()
+      const fetch = mocks.authFetch.getMockImplementation()!
+      const content = "---\nmarp: true\ntheme: gaia\npaginate: true\n---\n# First slide\n\n---\n# Second slide"
+      mocks.authFetch.mockImplementation((url: string, init?: RequestInit) => {
+        if (url.startsWith("/api/project-file?") && !init?.method) {
+          return Promise.resolve(jsonResponse({ content, mtimeMs: 10, size: content.length }))
+        }
+        return fetch(url, init)
+      })
+      render(<ProjectFilesPanel cwd="/workspace/cogpit" onClose={vi.fn()} />)
+      await user.click(await screen.findByRole("button", { name: /README\.md/ }))
+
+      const frame = await screen.findByTitle<HTMLIFrameElement>("Slides of README.md")
+      expect(frame).toHaveAttribute("sandbox", "allow-same-origin")
+      const document = new DOMParser().parseFromString(frame.srcdoc, "text/html")
+      expect(document.querySelectorAll("svg[data-marpit-svg]")).toHaveLength(2)
+      expect(document.querySelector("section")?.getAttribute("data-theme")).toBe("gaia")
+
+      await user.click(screen.getByRole("button", { name: "Edit" }))
+      const editor = await screen.findByRole("textbox", { name: "Editing README.md" })
+      expect(editor).toHaveValue(content)
+      fireEvent.change(editor, { target: { value: content.replace("First slide", "Edited slide") } })
+      await user.click(screen.getByRole("button", { name: "Preview" }))
+      expect(await screen.findByTitle("Slides of README.md")).toHaveAttribute("srcdoc", expect.stringContaining("Edited slide"))
+      expect(screen.getByText("Unsaved")).toBeInTheDocument()
+
+      await user.click(screen.getByRole("button", { name: "Edit" }))
+      fireEvent.change(await screen.findByRole("textbox", { name: "Editing README.md" }), { target: { value: "# Ordinary document" } })
+      await user.click(screen.getByRole("button", { name: "Preview" }))
+      expect(screen.getByRole("heading", { name: "Ordinary document" })).toBeInTheDocument()
+      expect(screen.queryByTitle("Slides of README.md")).not.toBeInTheDocument()
+    })
+
     it("renders markdown by default and switches to the raw source for editing", async () => {
       const user = userEvent.setup()
       render(<ProjectFilesPanel cwd="/workspace/cogpit" onClose={vi.fn()} />)

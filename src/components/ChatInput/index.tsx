@@ -22,6 +22,7 @@ import { useCapability } from "@/hooks/useCapability"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useImeComposition } from "@/hooks/useImeComposition"
+import { usePromptHistory } from "@/hooks/usePromptHistory"
 import { ExpandablePromptEditor } from "@/components/ExpandablePromptEditor"
 
 export interface ChatInputHandle {
@@ -134,7 +135,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
     turnError,
     promptSuggestion,
   } = useSessionContext()
-  const { chat: { status, error, isConnected, sendMessage: onSend, interrupt: onInterrupt } } = useSessionChatContext()
+  const { chat: { status, error, isConnected, pendingMessages = [], sendMessage: onSend, interrupt: onInterrupt } } = useSessionChatContext()
   const canInterrupt = isConnected || isLive
 
   const [text, setText] = useState("")
@@ -320,10 +321,18 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
     })
   }, [fileMention, text, updateMultiline])
 
+  const recallPrompt = useCallback((value: string) => {
+    setText(value)
+    setFileSuggestionsDismissed(true)
+    requestAnimationFrame(() => updateMultiline(autoResize(textareaRef.current, isMultilineRef.current)))
+  }, [updateMultiline])
+  const { handleHistoryKeyDown, resetHistory } = usePromptHistory(session, pendingMessages, recallPrompt)
+
   const handleSubmit = useCallback(async () => {
     const trimmed = text.trim()
     if (!trimmed && images.length === 0) return
     if (!allowImages && images.length > 0) return
+    resetHistory()
 
     if (pendingInteraction?.type === "question") {
       void submitUserQuestion(trimmed)
@@ -360,10 +369,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
     clearImages()
     updateMultiline(false)
     if (textareaRef.current) textareaRef.current.style.height = "auto"
-  }, [text, images, allowImages, onSend, clearImages, restoreImages, updateMultiline, pendingInteraction, submitUserQuestion, submitPlanResponse, sessionId])
+  }, [text, images, allowImages, onSend, clearImages, restoreImages, updateMultiline, pendingInteraction, submitUserQuestion, submitPlanResponse, sessionId, resetHistory])
 
   const { isComposingEvent, onCompositionStart, onCompositionEnd } = useImeComposition()
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (isComposingEvent(e)) return
     if (showFiles && e.key === "Escape") {
       e.preventDefault()
@@ -381,21 +390,23 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
       if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) { e.preventDefault(); const selected = filteredSlashList[slashSelectedIndex]; if (selected) handleSlashSelect(selected); return }
       if (e.key === "Escape") { e.preventDefault(); setText(""); return }
     }
+    if (handleHistoryKeyDown(e)) return
     if (e.key === "Escape" && canInterrupt && onInterrupt) { e.preventDefault(); onInterrupt(); return }
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleSubmit() }
-  }, [isComposingEvent, handleSubmit, canInterrupt, onInterrupt, showFiles, fileSuggestions.files, fileSelectedIndex, handleFileSelect, showSlash, filteredSlashList, slashSelectedIndex, handleSlashSelect])
+  }, [isComposingEvent, handleHistoryKeyDown, handleSubmit, canInterrupt, onInterrupt, showFiles, fileSuggestions.files, fileSelectedIndex, handleFileSelect, showSlash, filteredSlashList, slashSelectedIndex, handleSlashSelect])
 
-  const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => { setText(e.target.value); setFileSuggestionsDismissed(false); updateMultiline(autoResize(e.target, isMultilineRef.current)) }, [updateMultiline])
+  const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => { resetHistory(); setText(e.target.value); setFileSuggestionsDismissed(false); updateMultiline(autoResize(e.target, isMultilineRef.current)) }, [resetHistory, updateMultiline])
 
   useImperativeHandle(ref, () => ({
     focus: () => textareaRef.current?.focus(),
     getText: () => textRef.current,
     setText: (newText: string) => {
+      resetHistory()
       setText(newText)
       setFileSuggestionsDismissed(false)
       requestAnimationFrame(() => updateMultiline(autoResize(textareaRef.current, isMultilineRef.current)))
     },
-  }), [updateMultiline])
+  }), [resetHistory, updateMultiline])
 
   const isPlanApproval = pendingInteraction?.type === "plan"
   const isUserQuestion = pendingInteraction?.type === "question"
@@ -512,6 +523,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
               inputRef={textareaRef}
               onPaste={handlePaste}
               onChange={(value) => {
+                resetHistory()
                 setText(value)
                 setFileSuggestionsDismissed(false)
                 requestAnimationFrame(() => updateMultiline(autoResize(textareaRef.current, isMultilineRef.current)))

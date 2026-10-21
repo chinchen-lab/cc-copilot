@@ -1,5 +1,5 @@
 import { useTranslation } from "@/hooks/useTranslation"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AlertTriangle, ArrowLeft, FileCode2, FolderTree, GitBranch, MessageSquarePlus, RefreshCw, Save, Search, X } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import { Badge } from "@/components/ui/badge"
@@ -54,6 +54,9 @@ import type { ProjectPromptContext } from "@/plugin-api"
 import { parseProjectFilesResponse } from "@/hooks/useProjectFileSuggestions"
 import type { GitStatusFile } from "../../shared/contracts/projectTools"
 import { diffLineCount } from "../../shared/diff-utils"
+import { isMarpMarkdown, resolveMarkdownImage } from "@/lib/projectMarkdown"
+
+const MarpPreview = lazy(() => import("@/components/MarpPreview"))
 
 interface ProjectFilesPanelProps {
   cwd: string
@@ -128,19 +131,6 @@ const MARKDOWN_EXTENSIONS = new Set([".md", ".mdx", ".markdown"])
 function isMarkdownPath(path: string): boolean {
   const dot = path.lastIndexOf(".")
   return dot !== -1 && MARKDOWN_EXTENSIONS.has(path.slice(dot).toLowerCase())
-}
-
-/** Resolve a markdown image `src` relative to the file's directory inside the project. */
-function resolveMarkdownImage(src: string | undefined, cwd: string, filePath: string): string | undefined {
-  if (!src || /^(?:[a-z]+:|\/|#)/i.test(src)) return src
-  const directory = filePath.includes("/") ? filePath.slice(0, filePath.lastIndexOf("/")) : ""
-  const resolved: string[] = []
-  for (const segment of [...directory.split("/"), ...src.split("/")]) {
-    if (segment === "..") resolved.pop()
-    else if (segment && segment !== ".") resolved.push(segment)
-  }
-  const separator = cwd.includes("\\") ? "\\" : "/"
-  return [cwd.replace(/[\\/]+$/, ""), ...resolved].join(separator)
 }
 
 async function responseError(response: Response, fallback: string): Promise<string> {
@@ -544,6 +534,7 @@ export function ProjectFilesPanel({
   const selectedName = useMemo(() => selectedPath?.split("/").at(-1) ?? null, [selectedPath])
   const selectedGitFile = selectedPath ? changedFiles.get(selectedPath) : undefined
   const selectedIsMarkdown = selectedPath !== null && isMarkdownPath(selectedPath)
+  const selectedIsMarp = useMemo(() => selectedIsMarkdown && isMarpMarkdown(content), [selectedIsMarkdown, content])
   const fileStatusMark = useCallback((path: string): FileStatusMark | null => {
     const file = changedFiles.get(path)
     return file ? { code: gitStatusCode(file), ...gitStatusStyle(file) } : null
@@ -879,9 +870,13 @@ export function ProjectFilesPanel({
                 {!fileLoading && mtimeMs !== null && (viewMode === "preview" ? (
                   <div
                     aria-label={t("Preview of {0}", { "0": selectedPath })}
-                    className="min-h-0 flex-1 overflow-auto break-words px-6 py-4 text-sm"
+                    className={cn("min-h-0 flex-1", selectedIsMarp ? "flex flex-col" : "overflow-auto break-words px-6 py-4 text-sm")}
                   >
-                    <ReactMarkdown components={previewComponents} remarkPlugins={markdownPlugins}>{content}</ReactMarkdown>
+                    {selectedIsMarp ? (
+                      <Suspense fallback={<div role="status" className="flex flex-1 items-center justify-center gap-2 text-xs text-muted-foreground"><Spinner />{t("Loading slides…")}</div>}>
+                        <MarpPreview content={content} cwd={cwd} filePath={selectedPath} />
+                      </Suspense>
+                    ) : <ReactMarkdown components={previewComponents} remarkPlugins={markdownPlugins}>{content}</ReactMarkdown>}
                   </div>
                 ) : (
                   <HighlightedEditor

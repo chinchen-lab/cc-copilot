@@ -1,12 +1,17 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import type { Turn } from "../../../../shared/session/types"
+import type { SlashSuggestion } from "../../../../shared/contracts/projectTools"
+import { makeTurn } from "@/__tests__/fixtures"
 
 const mocks = vi.hoisted(() => ({
   sendMessage: vi.fn(),
   restoreImages: vi.fn(),
   clearImages: vi.fn(),
   images: [] as Array<{ id: string; data: string; mediaType: string }>,
-  session: null as { sessionId: string } | null,
+  session: null as { sessionId: string; turns?: Turn[] } | null,
+  pendingMessages: [] as string[],
+  slashSuggestions: [] as SlashSuggestion[],
 }))
 
 vi.mock("@/contexts/SessionContext", () => ({
@@ -19,13 +24,13 @@ vi.mock("@/contexts/SessionContext", () => ({
     permissionResponding: new Set(),
     respondPermission: vi.fn(),
     respondAllPermissions: vi.fn(),
-    slashSuggestions: [],
+    slashSuggestions: mocks.slashSuggestions,
     slashSuggestionsLoading: false,
     turnError: null,
     promptSuggestion: null,
   }),
   useSessionChatContext: () => ({
-    chat: { status: "idle", error: null, isConnected: false, sendMessage: mocks.sendMessage, interrupt: vi.fn() },
+    chat: { status: "idle", error: null, isConnected: false, pendingMessages: mocks.pendingMessages, sendMessage: mocks.sendMessage, interrupt: vi.fn() },
   }),
 }))
 vi.mock("@/hooks/useCapability", () => ({ useCapability: () => true }))
@@ -132,6 +137,43 @@ describe("ChatInput sending", () => {
     mocks.restoreImages.mockReset()
     mocks.images = []
     mocks.session = null
+    mocks.pendingMessages = []
+    mocks.slashSuggestions = []
+  })
+
+  it("recalls existing and newly sent prompts without sending until Enter is pressed", async () => {
+    mocks.session = { sessionId: "history", turns: [makeTurn({ userMessage: "earlier prompt" })] }
+    mocks.pendingMessages = ["just sent"]
+    mocks.sendMessage.mockResolvedValue(true)
+    render(<ChatInput />)
+    const message = screen.getByRole("combobox", { name: "Message" })
+    fireEvent.keyDown(message, { key: "ArrowUp" })
+    expect(message).toHaveValue("just sent")
+    fireEvent.keyDown(message, { key: "ArrowUp" })
+    expect(message).toHaveValue("earlier prompt")
+    expect(mocks.sendMessage).not.toHaveBeenCalled()
+    await act(async () => fireEvent.keyDown(message, { key: "Enter" }))
+    expect(mocks.sendMessage).toHaveBeenCalledExactlyOnceWith("earlier prompt", undefined)
+    expect(message).toHaveValue("")
+  })
+
+  it("leaves arrows to Chinese input and active command suggestions", () => {
+    mocks.session = { sessionId: "ime-history", turns: [makeTurn({ userMessage: "older prompt" })] }
+    mocks.slashSuggestions = [{ name: "review", description: "Review changes", type: "command", source: "project", filePath: "/work/review.md" }]
+    render(<ChatInput />)
+    const message = screen.getByRole("combobox", { name: "Message" })
+    fireEvent.compositionStart(message)
+    fireEvent.keyDown(message, { key: "ArrowUp" })
+    expect(message).toHaveValue("")
+    fireEvent.compositionEnd(message)
+    fireEvent.keyDown(message, { key: "ArrowUp", isComposing: true })
+    fireEvent.keyDown(message, { key: "ArrowUp", keyCode: 229 })
+    expect(message).toHaveValue("")
+    fireEvent.change(message, { target: { value: "/rev" } })
+    fireEvent.keyDown(message, { key: "ArrowUp" })
+    expect(message).toHaveValue("/rev")
+    fireEvent.keyDown(message, { key: "Tab" })
+    expect(message).toHaveValue("/review ")
   })
 
   function submit(text: string): HTMLElement {

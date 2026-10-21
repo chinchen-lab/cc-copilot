@@ -421,7 +421,7 @@ describe("FloatingChrome", () => {
     await user.click(screen.getByRole("button", { name: "More actions" }))
     await screen.findByRole("menuitem", { name: "Settings" })
 
-    expect(screen.queryByRole("menuitem", { name: /Copy network URL/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole("menuitem", { name: /Copy URL/ })).not.toBeInTheDocument()
   })
 
   it("copies the connection URL from the overflow menu while reachable on the network", async () => {

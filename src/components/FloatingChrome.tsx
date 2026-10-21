@@ -284,7 +284,7 @@ export const FloatingChrome = memo(function FloatingChrome({
                   {networkUrl && (
                     <DropdownMenuItem onClick={handleCopyNetworkUrl}>
                       <Globe className="text-success" />
-                      {t("Copy network URL")}<span className="ml-auto truncate pl-2 font-mono text-[0.6875rem] text-muted-foreground">
+                      {t("Copy URL")}<span className="ml-auto truncate pl-2 font-mono text-[0.6875rem] text-muted-foreground">
                         {networkUrl}
                       </span>
                     </DropdownMenuItem>
