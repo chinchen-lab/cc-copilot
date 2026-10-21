@@ -73,6 +73,7 @@ export interface CopilotAccountQuotaSnapshot {
 
 export interface CopilotAccountQuota {
   quotaSnapshots: Record<string, CopilotAccountQuotaSnapshot>
+  account?: { login?: string; plan?: string }
 }
 
 export interface CopilotSessionModelTokenUsage {
@@ -418,6 +419,23 @@ export class CopilotRuntime {
       )
     }
 
+    // getQuota currently copies a snapshot's fetch timestamp into resetDate.
+    // The authenticated user response carries the actual billing-cycle reset.
+    // Keep this credential-bearing RPC inside the transport and expose only
+    // the identity/plan fields the usage tooltip needs.
+    const auth = await this.request<unknown>("account.getCurrentAuth", {}).catch(() => null)
+    const authInfo = isRecord(auth) && isRecord(auth.authInfo) ? auth.authInfo : null
+    const user = authInfo && isRecord(authInfo.copilotUser) ? authInfo.copilotUser : null
+    const resetDate = user
+      ? [user.quota_reset_date_utc, user.quota_reset_date, user.limited_user_reset_date]
+        .find((value): value is string => typeof value === "string" && Number.isFinite(Date.parse(value)))
+      : undefined
+    const account: NonNullable<CopilotAccountQuota["account"]> = {}
+    const login = user?.login ?? authInfo?.login
+    if (typeof login === "string") account.login = login
+    if (typeof user?.copilot_plan === "string") account.plan = user.copilot_plan
+    if (typeof user?.access_type_sku === "string" && user.access_type_sku.startsWith("free_")) account.plan = "free"
+
     const quotaSnapshots: Record<string, CopilotAccountQuotaSnapshot> = {}
     for (const [name, value] of Object.entries(response.quotaSnapshots)) {
       if (!isRecord(value)) continue
@@ -441,7 +459,10 @@ export class CopilotRuntime {
       if (typeof value.overageAllowedWithExhaustedQuota === "boolean") {
         snapshot.overageAllowedWithExhaustedQuota = value.overageAllowedWithExhaustedQuota
       }
-      if (typeof value.resetDate === "string" || value.resetDate === null) {
+      if (resetDate) {
+        snapshot.resetDate = new Date(resetDate).toISOString()
+      } else if (!user && (typeof value.resetDate === "string" || value.resetDate === null)) {
+        // Older CLIs may not implement getCurrentAuth; retain their response.
         snapshot.resetDate = value.resetDate
       }
       if (typeof value.hasQuota === "boolean") snapshot.hasQuota = value.hasQuota
@@ -450,7 +471,7 @@ export class CopilotRuntime {
       }
       quotaSnapshots[name] = snapshot
     }
-    return { quotaSnapshots }
+    return { quotaSnapshots, ...(Object.keys(account).length > 0 ? { account } : {}) }
   }
 
   async getSessionUsage(sessionId: string): Promise<CopilotSessionUsage> {

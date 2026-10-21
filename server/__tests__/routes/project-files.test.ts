@@ -8,7 +8,7 @@ import { promisify } from "node:util"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { Middleware, UseFn } from "../../helpers"
 import { rankProjectFiles } from "../../routes/project-files-ranking"
-import { listDirectoryEntries, listProjectFiles, registerProjectFileRoutes } from "../../routes/project-files"
+import { listProjectFiles, registerProjectFileRoutes } from "../../routes/project-files"
 
 const execFile = promisify(execFileCallback)
 const temporaryDirectories: string[] = []
@@ -75,47 +75,6 @@ describe("rankProjectFiles", () => {
     expect(rankProjectFiles(files, "button", 10).totalMatches).toBe(3)
     expect(rankProjectFiles(files, "", 2).totalMatches).toBe(4)
     expect(rankProjectFiles(files, "nothing-matches", 10).totalMatches).toBe(0)
-  })
-})
-
-describe("listDirectoryEntries", () => {
-  const files = [
-    "src/components/Button.tsx",
-    "src/components/ui/dialog.tsx",
-    "src/index.ts",
-    "README.md",
-    ".gitignore",
-  ]
-
-  it("lists the root with directories first", () => {
-    expect(listDirectoryEntries(files, "")).toEqual([
-      { name: "src", type: "directory" },
-      { name: ".gitignore", type: "file" },
-      { name: "README.md", type: "file" },
-    ])
-  })
-
-  it("lists only the direct children of a nested directory", () => {
-    expect(listDirectoryEntries(files, "src/components")).toEqual([
-      { name: "ui", type: "directory" },
-      { name: "Button.tsx", type: "file" },
-    ])
-    expect(listDirectoryEntries(files, "src/components/")).toEqual(listDirectoryEntries(files, "src/components"))
-  })
-
-  it("collapses single-child directory chains into one entry", () => {
-    expect(listDirectoryEntries(["packages/app/src/index.ts", "packages/app/src/lib/a.ts", "top.ts"], "")).toEqual([
-      { name: "packages/app/src", type: "directory" },
-      { name: "top.ts", type: "file" },
-    ])
-    expect(listDirectoryEntries(["packages/app/src/index.ts", "packages/app/src/lib/a.ts"], "packages/app/src")).toEqual([
-      { name: "lib", type: "directory" },
-      { name: "index.ts", type: "file" },
-    ])
-  })
-
-  it("does not treat a sibling directory with a shared prefix as a child", () => {
-    expect(listDirectoryEntries(["src/a.ts", "src-legacy/b.ts"], "src")).toEqual([{ name: "a.ts", type: "file" }])
   })
 })
 

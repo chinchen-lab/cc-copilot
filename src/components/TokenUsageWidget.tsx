@@ -50,11 +50,15 @@ function TooltipBody({ usage }: { usage: UsageData }) {
           </Badge>
         )}
       </div>
+      {usage.accountLogin && <div className="truncate text-xs text-muted-foreground">@{usage.accountLogin}</div>}
+      {usage.quotaUnavailable && <p className="max-w-64 text-xs text-muted-foreground">{t("This account does not report a usage quota.")}</p>}
       {rows.map((r) => {
         const resetMs = r.resetsAt && usage.fetchedAt != null
           ? new Date(r.resetsAt).getTime() - usage.fetchedAt
           : null
-        const resetH = resetMs != null ? Math.max(0, Math.round(resetMs / 3_600_000)) : null
+        const resetH = resetMs != null && Number.isFinite(resetMs) && resetMs > 0
+          ? Math.ceil(resetMs / 3_600_000)
+          : null
         const level = usageLevel(r.pct)
         return (
           <div key={r.label} className="flex flex-col gap-1">
@@ -101,19 +105,19 @@ export function TokenUsageIndicator({ agentKind = DEFAULT_AGENT_KIND }: { agentK
 
   if (!available || !usage) return null
 
-  // Show the primary metric: 5-hour utilization
+  // Show the provider’s primary quota, or its explicit unavailable state.
   const primary = usage.fiveHour?.utilization ?? usage.sevenDay?.utilization
-  if (primary == null) return null
+  if (primary == null && !usage.quotaUnavailable) return null
 
   return (
     <Tooltip>
       <TooltipTrigger render={<Button type="button" variant="ghost" size="xs" aria-label={t("Refresh {0} usage", { "0": usage.agentKind ? agentShortName(usage.agentKind) : "agent" })} onClick={refresh} disabled={loading} className="mr-1 font-mono" />}>
           <span className={cn(
             "tabular-nums",
-            USAGE_TEXT_COLOR[usageLevel(primary)],
+            USAGE_TEXT_COLOR[usageLevel(primary ?? 0)],
             loading && "opacity-50",
           )}>
-            {primary.toFixed(0)}%
+            {primary == null ? "—" : `${primary.toFixed(0)}%`}
           </span>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="p-3">

@@ -656,77 +656,79 @@ export function ProjectFilesPanel({
             )}
           </div>
           <Separator />
-          <ScrollArea className="min-h-0 flex-1">
-            {showTree ? (
-              <ProjectFileTree
-                cwd={cwd}
-                selectedPath={selectedPath}
-                onSelect={selectFile}
-                fileStatus={fileStatusMark}
-                reloadToken={reloadToken}
-              />
-            ) : listLoading ? (
-              <div className="flex items-center justify-center gap-2 p-6 text-xs text-muted-foreground" role="status">
-                <Spinner />
-                {t("Loading files…")}
-              </div>
-            ) : listError ? (
-              <Empty className="min-h-48 rounded-none p-4">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon"><AlertTriangle /></EmptyMedia>
-                  <EmptyTitle>{t("Could not load files")}</EmptyTitle>
-                  <EmptyDescription>{listError}</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : displayedFiles.length === 0 ? (
-              <Empty className="min-h-48 rounded-none p-4">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon"><FolderTree /></EmptyMedia>
-                  <EmptyTitle>{fileScope === "changes" ? t("No working-tree changes") : t("No matching files")}</EmptyTitle>
-                  <EmptyDescription>
-                    {fileScope === "changes" ? t("This project has no changed files matching the filter.") : t("Try a different path or filename.")}
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : (
-              <div className="flex flex-col py-1">
-                {displayedFiles.map((path) => {
-                  const name = path.split("/").at(-1) ?? path
-                  const directory = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""
-                  const status = fileStatusMark(path)
-                  const FileIcon = fileTypeIcon(path)
-                  return (
-                    <Button
-                      key={path}
-                      variant={selectedPath === path ? "secondary" : "ghost"}
-                      size="sm"
-                      className="h-auto w-full justify-start rounded-none px-2 py-1.5 text-left"
-                      onClick={() => selectFile(path)}
-                      title={path}
-                    >
-                      <FileIcon data-icon="inline-start" className="text-muted-foreground" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-xs">{name}</span>
-                        {directory && <span className="block truncate font-mono text-xs text-muted-foreground">{directory}</span>}
-                      </span>
-                      {status && (
-                        <Badge variant="outline" className={cn("font-mono", status.className)} title={status.label}>
-                          {status.code}
-                        </Badge>
-                      )}
-                    </Button>
-                  )
-                })}
-                {fileScope === "all" && (totalMatches > matchedFiles.length || scanLimited) && (
-                  <p className="px-3 py-2 text-xs text-muted-foreground">
-                    {totalMatches > matchedFiles.length
-                      && t("Showing {0} of {1} matches. Type to narrow the list. ", { "0": matchedFiles.length, "1": totalMatches })}
-                    {scanLimited && t("This project is too large to scan completely.")}
-                  </p>
-                )}
-              </div>
-            )}
-          </ScrollArea>
+          {showTree ? (
+            <ProjectFileTree
+              cwd={cwd}
+              selectedPath={selectedPath}
+              onSelect={selectFile}
+              fileStatus={fileStatusMark}
+              reloadToken={reloadToken}
+            />
+          ) : (
+            <ScrollArea className="min-h-0 flex-1">
+              {listLoading ? (
+                <div className="flex items-center justify-center gap-2 p-6 text-xs text-muted-foreground" role="status">
+                  <Spinner />
+                  {t("Loading files…")}
+                </div>
+              ) : listError ? (
+                <Empty className="min-h-48 rounded-none p-4">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon"><AlertTriangle /></EmptyMedia>
+                    <EmptyTitle>{t("Could not load files")}</EmptyTitle>
+                    <EmptyDescription>{listError}</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : displayedFiles.length === 0 ? (
+                <Empty className="min-h-48 rounded-none p-4">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon"><FolderTree /></EmptyMedia>
+                    <EmptyTitle>{fileScope === "changes" ? t("No working-tree changes") : t("No matching files")}</EmptyTitle>
+                    <EmptyDescription>
+                      {fileScope === "changes" ? t("This project has no changed files matching the filter.") : t("Try a different path or filename.")}
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : (
+                <div className="flex flex-col py-1">
+                  {displayedFiles.map((path) => {
+                    const name = path.split("/").at(-1) ?? path
+                    const directory = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""
+                    const status = fileStatusMark(path)
+                    const FileIcon = fileTypeIcon(path)
+                    return (
+                      <Button
+                        key={path}
+                        variant={selectedPath === path ? "secondary" : "ghost"}
+                        size="sm"
+                        className="h-auto w-full justify-start rounded-none px-2 py-1.5 text-left"
+                        onClick={() => selectFile(path)}
+                        title={path}
+                      >
+                        <FileIcon data-icon="inline-start" className="text-muted-foreground" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs">{name}</span>
+                          {directory && <span className="block truncate font-mono text-xs text-muted-foreground">{directory}</span>}
+                        </span>
+                        {status && (
+                          <Badge variant="outline" className={cn("font-mono", status.className)} title={status.label}>
+                            {status.code}
+                          </Badge>
+                        )}
+                      </Button>
+                    )
+                  })}
+                  {fileScope === "all" && (totalMatches > matchedFiles.length || scanLimited) && (
+                    <p className="px-3 py-2 text-xs text-muted-foreground">
+                      {totalMatches > matchedFiles.length
+                        && t("Showing {0} of {1} matches. Type to narrow the list. ", { "0": matchedFiles.length, "1": totalMatches })}
+                      {scanLimited && t("This project is too large to scan completely.")}
+                    </p>
+                  )}
+                </div>
+              )}
+            </ScrollArea>
+          )}
         </section>
 
         <Separator orientation="vertical" className="hidden md:block" />

@@ -20,7 +20,7 @@ export interface SlashSuggestion {
 }
 
 export interface ProjectTreeEntry {
-  /** Basename, or a `a/b/c` chain when the server collapsed single-child directories. */
+  /** Basename relative to the requested directory. */
   name: string
   type: "file" | "directory"
 }

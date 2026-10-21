@@ -196,6 +196,55 @@ describe("CopilotRuntime", () => {
     expect(harness.calls[0]).toEqual({ method: "connect", params: {} })
   })
 
+  it("uses the billing reset and exposes account metadata without credentials", async () => {
+    const harness = createHarness()
+    harness.handle("account.getQuota", () => ({
+      quotaSnapshots: { chat: { remainingPercentage: 100, resetDate: "2026-10-21T07:00:00Z" } },
+    }))
+    harness.handle("account.getCurrentAuth", () => ({
+      authInfo: {
+        type: "gh-cli", token: "secret-token",
+        copilotUser: {
+          login: "company-user", copilot_plan: "business",
+          quota_reset_date: "2026-11-01", quota_reset_date_utc: "2026-11-01T00:00:00Z",
+          organization_list: [{ login: "private-company" }],
+        },
+      },
+    }))
+    const quota = await harness.runtime.getAccountQuota()
+    expect(quota).toEqual({
+      account: { login: "company-user", plan: "business" },
+      quotaSnapshots: { chat: { remainingPercentage: 100, resetDate: "2026-11-01T00:00:00.000Z" } },
+    })
+    expect(JSON.stringify(quota)).not.toContain("secret-token")
+    expect(JSON.stringify(quota)).not.toContain("private-company")
+  })
+
+  it("does not expose a fetch timestamp as a reset when the account has no billing reset", async () => {
+    const harness = createHarness()
+    harness.handle("account.getQuota", () => ({
+      quotaSnapshots: { chat: { remainingPercentage: 100, resetDate: "2026-10-21T07:00:00Z" } },
+    }))
+    harness.handle("account.getCurrentAuth", () => ({
+      authInfo: { copilotUser: { copilot_plan: "business" } },
+    }))
+    expect(await harness.runtime.getAccountQuota()).toEqual({
+      account: { plan: "business" },
+      quotaSnapshots: { chat: { remainingPercentage: 100 } },
+    })
+  })
+
+  it("identifies the free tier when the API names its plan individual", async () => {
+    const harness = createHarness()
+    harness.handle("account.getQuota", () => ({ quotaSnapshots: {} }))
+    harness.handle("account.getCurrentAuth", () => ({
+      authInfo: { login: "personal-user", copilotUser: { copilot_plan: "individual", access_type_sku: "free_limited_copilot" } },
+    }))
+    expect(await harness.runtime.getAccountQuota()).toEqual({
+      quotaSnapshots: {}, account: { login: "personal-user", plan: "free" },
+    })
+  })
+
   it("reads only quota data and accumulated usage through safe RPCs", async () => {
     const harness = createHarness()
     harness.handle("account.getQuota", () => ({

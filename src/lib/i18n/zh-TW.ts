@@ -165,6 +165,7 @@ export const zhTW: Readonly<Record<string, string>> = {
   "Extra: $": "額外費用：$",
   "Lifetime:": "累計：",
   "Credits: Unlimited": "額度：無限制",
+  "This account does not report a usage quota.": "此帳號未提供用量額度資訊。",
   "Credits:": "額度：",
   "archived": "已封存",
   "Redo all": "全部重做",

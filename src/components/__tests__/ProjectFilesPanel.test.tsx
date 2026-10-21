@@ -378,22 +378,20 @@ describe("ProjectFilesPanel", () => {
       expect(screen.queryByRole("button", { name: /App\.tsx/ })).not.toBeInTheDocument()
     })
 
-    it("lists compacted folder chains under their full path", async () => {
+    it("loads nested folders one level at a time", async () => {
       const user = userEvent.setup()
       const files = ["packages/app/src/index.ts", "packages/app/src/lib/util.ts"]
       mocks.authFetch.mockImplementation((url: string) => {
         if (url.startsWith("/api/git-status")) return Promise.resolve(jsonResponse({ isRepository: false, files: [] }))
-        if (url.startsWith("/api/project-files/tree")) {
-          const directory = new URL(url, "http://localhost").searchParams.get("dir")
-          if (directory === "") return Promise.resolve(jsonResponse({ entries: [{ name: "packages/app/src", type: "directory" }] }))
-          return Promise.resolve(treeResponse(files, url))
-        }
+        if (url.startsWith("/api/project-files/tree")) return Promise.resolve(treeResponse(files, url))
         if (url.startsWith("/api/project-file?")) return Promise.resolve(jsonResponse({ content: "export {}\n", mtimeMs: 1, size: 10 }))
         throw new Error(`Unexpected request: ${url}`)
       })
       render(<ProjectFilesPanel cwd="/workspace/cogpit" onClose={vi.fn()} />)
 
-      await user.click(await screen.findByRole("button", { name: "packages/app/src" }))
+      await user.click(await screen.findByRole("button", { name: "packages" }))
+      await user.click(await screen.findByRole("button", { name: "app" }))
+      await user.click(await screen.findByRole("button", { name: "src" }))
       await user.click(await screen.findByRole("button", { name: /index\.ts/ }))
 
       expect(await screen.findByRole("textbox", { name: "Editing packages/app/src/index.ts" })).toBeInTheDocument()

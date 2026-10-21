@@ -1,6 +1,7 @@
 import { useTranslation } from "@/hooks/useTranslation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AlertTriangle, ChevronRight, Folder, FolderOpen, FolderTree, type LucideIcon } from "lucide-react"
+import { Virtualizer, type VirtualizerHandle } from "virtua"
 import { Button } from "@/components/ui/button"
 import {
   Empty,
@@ -37,6 +38,7 @@ type DirectoryState =
   | { status: "ready"; entries: ProjectTreeEntry[]; scanLimited: boolean }
 
 const INDENT_PX = 12
+const VIRTUALIZE_THRESHOLD = 100
 const ROW_CLASS = "h-6 w-full justify-start gap-1 rounded-none px-2 text-left font-normal"
 
 /** Rows without a chevron of their own line up past where one would be. */
@@ -56,10 +58,11 @@ function parseEntries(data: unknown): ProjectTreeEntry[] {
   return Array.isArray(entries) ? entries.filter(isTreeEntry) : []
 }
 
-async function fetchDirectory(cwd: string, directory: string, refresh: boolean): Promise<DirectoryState> {
+async function fetchDirectory(cwd: string, directory: string, refresh: boolean, signal: AbortSignal): Promise<DirectoryState> {
   try {
     const response = await authFetch(
       `/api/project-files/tree?cwd=${encodeURIComponent(cwd)}&dir=${encodeURIComponent(directory)}${refresh ? "&refresh=1" : ""}`,
+      { signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) },
     )
     if (!response.ok) {
       const body: unknown = await response.json().catch(() => null)
@@ -87,37 +90,37 @@ export function ProjectFileTree({ cwd, selectedPath, onSelect, fileStatus, reloa
   const { t } = useTranslation()
   const [directories, setDirectories] = useState<Map<string, DirectoryState>>(() => new Map())
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
-  const inFlightRef = useRef<Set<string>>(new Set())
-  const cwdRef = useRef(cwd)
-  cwdRef.current = cwd
+  const requestsRef = useRef(new Map<string, AbortController>())
+  const generationRef = useRef(0)
+  const virtualizerRef = useRef<VirtualizerHandle>(null)
 
-  const loadDirectory = useCallback(async (directory: string) => {
-    if (inFlightRef.current.has(directory)) return
-    inFlightRef.current.add(directory)
+  const loadDirectory = useCallback(async (directory: string, refresh = false) => {
+    const requests = requestsRef.current
+    if (requests.has(directory)) return
+    const controller = new AbortController()
+    const generation = generationRef.current
+    requests.set(directory, controller)
     setDirectories((current) => new Map(current).set(directory, { status: "loading" }))
-    const result = await fetchDirectory(cwd, directory, false)
-    inFlightRef.current.delete(directory)
-    if (cwdRef.current !== cwd) return
+    const result = await fetchDirectory(cwd, directory, refresh, controller.signal)
+    if (requests.get(directory) === controller) requests.delete(directory)
+    if (controller.signal.aborted || generation !== generationRef.current) return
     setDirectories((current) => new Map(current).set(directory, result))
   }, [cwd])
 
-  // The root is (re)read here; children load themselves once it is ready, so a
-  // refresh — which bypasses the server cache for the root read — never lets
-  // an open directory re-read from the stale cache first.
   const loadedCwdRef = useRef<string | null>(null)
   useEffect(() => {
     const refresh = loadedCwdRef.current === cwd
     loadedCwdRef.current = cwd
     if (!refresh) setExpanded(new Set())
-    setDirectories(new Map([["", { status: "loading" }]]))
-    let cancelled = false
-    void fetchDirectory(cwd, "", refresh).then((root) => {
-      if (!cancelled) setDirectories(new Map([["", root]]))
-    })
+    setDirectories(new Map())
+    void loadDirectory("", refresh)
+    const requests = requestsRef.current
     return () => {
-      cancelled = true
+      generationRef.current += 1
+      for (const controller of requests.values()) controller.abort()
+      requests.clear()
     }
-  }, [cwd, reloadToken])
+  }, [cwd, reloadToken, loadDirectory])
 
   // Keep the open file visible: expand every directory on its path.
   useEffect(() => {
@@ -141,37 +144,71 @@ export function ProjectFileTree({ cwd, selectedPath, onSelect, fileStatus, reloa
     })
   }, [])
 
-  const root = directories.get("")
-  const placeholder = rootPlaceholder(root)
+  // Flatten the expanded branches, then let the virtualizer mount only rows
+  // near the viewport. Loading is independent of row mounting, so selected
+  // files can reveal ancestors that are currently off screen.
+  const rows = useMemo(() => visibleRows(directories, expanded), [directories, expanded])
+  useEffect(() => {
+    for (const row of rows) {
+      if (row.kind === "status" && !directories.has(row.path)) void loadDirectory(row.path)
+    }
+  }, [rows, directories, loadDirectory])
+  const selectedIndex = rows.findIndex((row) => row.kind === "entry" && row.path === selectedPath)
+  useEffect(() => {
+    if (selectedIndex >= 0) virtualizerRef.current?.scrollToIndex(selectedIndex, { align: "nearest" })
+  }, [selectedIndex])
+
+  const placeholder = rootPlaceholder(directories.get(""))
+  const renderRow = (row: TreeRow) => {
+    if (row.kind === "status") return <DirectoryStatus key={`status:${row.path}`} state={directories.get(row.path)} depth={row.depth} directory={row.path} onRetry={loadDirectory} />
+    if (row.kind === "warning") return <p key={`warning:${row.path}`} className="h-6 truncate px-3 text-xs text-muted-foreground">{t("This project is too large to scan completely.")}</p>
+    if (row.entry.type === "directory") return <DirectoryRow key={row.path} path={row.path} name={row.entry.name} depth={row.depth} open={expanded.has(row.path)} onToggle={toggle} />
+    return <FileRow key={row.path} path={row.path} name={row.entry.name} depth={row.depth} selected={selectedPath === row.path} status={fileStatus(row.path)} onSelect={onSelect} />
+  }
   return (
-    <div aria-label={t("Project file tree")} className="flex flex-col py-1">
+    <div aria-label={t("Project file tree")} className="min-h-0 flex-1 overflow-auto py-1">
       {placeholder ? (
         <Empty className="min-h-48 rounded-none p-4">
           <EmptyHeader>
             <EmptyMedia variant="icon"><placeholder.Icon /></EmptyMedia>
-            <EmptyTitle>{placeholder.title}</EmptyTitle>
-            <EmptyDescription>{placeholder.description}</EmptyDescription>
+            <EmptyTitle>{t(placeholder.title)}</EmptyTitle>
+            <EmptyDescription>{t(placeholder.description)}</EmptyDescription>
           </EmptyHeader>
+          {directories.get("")?.status === "error" && (
+            <Button variant="outline" size="sm" onClick={() => loadDirectory("")}>{t("Retry")}</Button>
+          )}
         </Empty>
       ) : (
-        <DirectoryChildren
-          directory=""
-          depth={0}
-          state={root}
-          directories={directories}
-          expanded={expanded}
-          selectedPath={selectedPath}
-          onSelect={onSelect}
-          onToggle={toggle}
-          onLoad={loadDirectory}
-          fileStatus={fileStatus}
-        />
-      )}
-      {root?.status === "ready" && root.scanLimited && (
-        <p className="px-3 py-2 text-xs text-muted-foreground">{t("This project is too large to scan completely.")}</p>
+        rows.length > VIRTUALIZE_THRESHOLD
+          ? <Virtualizer ref={virtualizerRef} data={rows} itemSize={24}>{renderRow}</Virtualizer>
+          : rows.map(renderRow)
       )}
     </div>
   )
+}
+
+type TreeRow =
+  | { kind: "entry"; path: string; depth: number; entry: ProjectTreeEntry }
+  | { kind: "status"; path: string; depth: number }
+  | { kind: "warning"; path: string; depth: number }
+
+function visibleRows(directories: Map<string, DirectoryState>, expanded: Set<string>): TreeRow[] {
+  const rows: TreeRow[] = []
+  const append = (directory: string, depth: number) => {
+    const state = directories.get(directory)
+    if (!state || state.status !== "ready") {
+      rows.push({ kind: "status", path: directory, depth })
+      return
+    }
+    for (const entry of state.entries) {
+      const path = directory ? `${directory}/${entry.name}` : entry.name
+      rows.push({ kind: "entry", path, depth, entry })
+      if (entry.type === "directory" && expanded.has(path)) append(path, depth + 1)
+    }
+    if (state.scanLimited) rows.push({ kind: "warning", path: directory, depth })
+  }
+  append("", 0)
+  return rows
 }
 
 function rootPlaceholder(root: DirectoryState | undefined): { Icon: LucideIcon; title: string; description: string } | null {
@@ -182,113 +219,44 @@ function rootPlaceholder(root: DirectoryState | undefined): { Icon: LucideIcon; 
   return null
 }
 
-interface DirectoryChildrenProps {
-  directory: string
-  depth: number
+function DirectoryStatus({ state, depth, directory, onRetry }: {
   state: DirectoryState | undefined
-  directories: Map<string, DirectoryState>
-  expanded: Set<string>
-  selectedPath: string | null
-  onSelect: (path: string) => void
-  onToggle: (directory: string) => void
-  onLoad: (directory: string) => void
-  fileStatus: (path: string) => FileStatusMark | null
-}
-
-function DirectoryChildren({ directory, depth, state, onLoad, ...rest }: DirectoryChildrenProps) {
+  depth: number
+  directory: string
+  onRetry: (directory: string) => void
+}) {
   const { t } = useTranslation()
-  useEffect(() => {
-    if (state === undefined && directory !== "") onLoad(directory)
-  }, [directory, onLoad, state])
-
-  if (!state || state.status === "loading") {
+  if (state?.status === "error") {
     return (
-      <div
-        role="status"
-        className="flex h-6 items-center gap-2 text-xs text-muted-foreground"
-        style={indentStyle(depth, false)}
-      >
-        <Spinner className="size-3" />
-        {directory === "" && t("Loading files…")}
-      </div>
-    )
-  }
-  if (state.status === "error") {
-    return (
-      <div
-        role="alert"
-        className="flex h-6 items-center gap-1.5 truncate text-xs text-destructive"
-        style={indentStyle(depth, false)}
-        title={state.message}
-      >
+      <div role="alert" className="flex h-6 items-center gap-1.5 text-xs text-destructive" style={indentStyle(depth, false)} title={state.message}>
         <AlertTriangle aria-hidden="true" className="size-3 shrink-0" />
         <span className="truncate">{state.message}</span>
+        <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => onRetry(directory)}>{t("Retry")}</Button>
       </div>
     )
   }
   return (
-    <>
-      {state.entries.map((entry) => {
-        const path = directory ? `${directory}/${entry.name}` : entry.name
-        return entry.type === "directory" ? (
-          <DirectoryNode
-            key={path}
-            path={path}
-            name={entry.name}
-            depth={depth}
-            onLoad={onLoad}
-            {...rest}
-          />
-        ) : (
-          <FileRow
-            key={path}
-            path={path}
-            name={entry.name}
-            depth={depth}
-            selected={rest.selectedPath === path}
-            status={rest.fileStatus(path)}
-            onSelect={rest.onSelect}
-          />
-        )
-      })}
-    </>
+    <div role="status" className="flex h-6 items-center gap-2 text-xs text-muted-foreground" style={indentStyle(depth, false)}>
+      <Spinner className="size-3" />
+      {directory === "" && t("Loading files…")}
+    </div>
   )
 }
 
-type DirectoryNodeProps = Omit<DirectoryChildrenProps, "directory" | "state"> & { path: string; name: string }
-
-function DirectoryNode({ path, name, depth, ...rest }: DirectoryNodeProps) {
-  const open = rest.expanded.has(path)
+function DirectoryRow({ path, name, depth, open, onToggle }: {
+  path: string
+  name: string
+  depth: number
+  open: boolean
+  onToggle: (directory: string) => void
+}) {
   const FolderIcon = open ? FolderOpen : Folder
   return (
-    <div>
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-expanded={open}
-        className={ROW_CLASS}
-        style={indentStyle(depth, true)}
-        onClick={() => rest.onToggle(path)}
-        title={path}
-      >
-        <ChevronRight
-          aria-hidden="true"
-          className={cn("size-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
-        />
-        <FolderIcon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1 truncate text-xs">{name}</span>
-      </Button>
-      {open && (
-        <div>
-          <DirectoryChildren
-            directory={path}
-            depth={depth + 1}
-            state={rest.directories.get(path)}
-            {...rest}
-          />
-        </div>
-      )}
-    </div>
+    <Button variant="ghost" size="sm" aria-expanded={open} className={ROW_CLASS} style={indentStyle(depth, true)} onClick={() => onToggle(path)} title={path}>
+      <ChevronRight aria-hidden="true" className={cn("size-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
+      <FolderIcon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+      <span className="min-w-0 flex-1 truncate text-xs">{name}</span>
+    </Button>
   )
 }
 

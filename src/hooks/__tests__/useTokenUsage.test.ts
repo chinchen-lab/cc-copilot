@@ -146,6 +146,84 @@ describe("mapCopilotRuntimeResponse", () => {
     expect(mapCopilotRuntimeResponse({ available: false })).toBeNull()
     expect(mapCopilotRuntimeResponse({ available: true, quota: {} })).toBeNull()
   })
+
+  it("uses the finite premium quota for Business accounts with unlimited Chat", () => {
+    expect(mapCopilotRuntimeResponse({
+      available: true,
+      quota: {
+        account: { login: "company-user", plan: "business" },
+        quotaSnapshots: {
+          chat: { isUnlimitedEntitlement: true, entitlementRequests: -1, remainingPercentage: 100 },
+          premium_interactions: { entitlementRequests: 300, usedRequests: 90, remainingPercentage: 70 },
+        },
+      },
+    })).toEqual({
+      accountLogin: "company-user", subscriptionType: "business",
+      fiveHour: { utilization: 30, label: "Premium interactions" },
+    })
+  })
+
+  it("does not turn disabled or unlimited Business placeholders into a percentage", () => {
+    expect(mapCopilotRuntimeResponse({
+      available: true,
+      quota: { quotaSnapshots: {
+        chat: { isUnlimitedEntitlement: true, entitlementRequests: 0, remainingPercentage: 100 },
+        premium_interactions: { hasQuota: false, entitlementRequests: 0, remainingPercentage: 0 },
+      } },
+    })).toBeNull()
+    expect(mapCopilotRuntimeResponse({
+      available: true,
+      quota: { quotaSnapshots: {
+        chat: { hasQuota: false, remainingPercentage: 100 },
+        premium_interactions: { entitlementRequests: 300, usedRequests: 120 },
+      } },
+    })?.fiveHour).toEqual({ utilization: 40, label: "Premium interactions" })
+  })
+
+  it("keeps account details available when an organization reports no personal quota", () => {
+    expect(mapCopilotRuntimeResponse({
+      available: true,
+      quota: {
+        account: { login: "company-user", plan: "business" },
+        quotaSnapshots: { chat: { isUnlimitedEntitlement: true, entitlementRequests: 0, remainingPercentage: 100 } },
+      },
+    })).toEqual({ accountLogin: "company-user", subscriptionType: "business", quotaUnavailable: true })
+  })
+
+  it.each([
+    ["chat", "Chat"],
+    ["premium_interactions", "Premium interactions"],
+    ["completions", "Completions"],
+  ])("selects the finite %s allowance instead of zero-entitlement placeholders", (key, label) => {
+    expect(mapCopilotRuntimeResponse({
+      available: true,
+      quota: { quotaSnapshots: {
+        chat: { entitlementRequests: 0, usedRequests: 0, remainingPercentage: 100 },
+        completions: { entitlementRequests: 0, usedRequests: 0, remainingPercentage: 100 },
+        premium_interactions: { entitlementRequests: 0, usedRequests: 0, remainingPercentage: 100 },
+        [key]: { entitlementRequests: 8000, usedRequests: 2000, remainingPercentage: 75 },
+      } },
+    })?.fiveHour).toEqual({ utilization: 25, label })
+  })
+
+  it("prefers a known finite allowance over an incomplete zero-usage Chat snapshot", () => {
+    expect(mapCopilotRuntimeResponse({
+      available: true,
+      quota: { quotaSnapshots: {
+        chat: { remainingPercentage: 100 },
+        premium_interactions: { entitlementRequests: 8000, usedRequests: 2000, remainingPercentage: 75 },
+      } },
+    })?.fiveHour).toEqual({ utilization: 25, label: "Premium interactions" })
+  })
+
+  it("keeps an exhausted finite allowance visible even when hasQuota is false", () => {
+    expect(mapCopilotRuntimeResponse({
+      available: true,
+      quota: { quotaSnapshots: {
+        premium_interactions: { entitlementRequests: 8000, usedRequests: 8000, remainingPercentage: 0, hasQuota: false },
+      } },
+    })?.fiveHour).toEqual({ utilization: 100, label: "Premium interactions" })
+  })
 })
 
 describe("useTokenUsage", () => {

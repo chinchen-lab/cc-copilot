@@ -4,23 +4,10 @@ import { isAbsolute, relative, resolve, sep } from "node:path"
 import { promisify } from "node:util"
 import { sendJson, type UseFn } from "../http"
 import { rankProjectFiles } from "./project-files-ranking"
-import type { ProjectTreeEntry } from "../../shared/contracts/projectTools"
+import { IGNORED_PROJECT_DIRECTORIES, listProjectDirectory, ProjectDirectoryError } from "./project-directory"
 
 const MAX_FILES = 20_000
 const CACHE_TTL_MS = 30_000
-const IGNORED_DIRECTORIES = new Set([
-  ".git",
-  ".next",
-  ".nuxt",
-  ".output",
-  ".turbo",
-  ".vercel",
-  "build",
-  "coverage",
-  "dist",
-  "node_modules",
-  "target",
-])
 
 const fileCache = new Map<string, { expiresAt: number; files: string[] }>()
 const execFile = promisify(execFileCallback)
@@ -75,7 +62,7 @@ export async function listProjectFiles(
       if (entry.isSymbolicLink()) continue
       const absolutePath = resolve(directory, entry.name)
       if (entry.isDirectory()) {
-        if (!IGNORED_DIRECTORIES.has(entry.name)) pending.push(absolutePath)
+        if (!IGNORED_PROJECT_DIRECTORIES.has(entry.name)) pending.push(absolutePath)
         continue
       }
       if (!entry.isFile()) continue
@@ -86,46 +73,6 @@ export async function listProjectFiles(
   files.sort((a, b) => a.localeCompare(b))
   fileCache.set(root, { expiresAt: Date.now() + CACHE_TTL_MS, files })
   return files
-}
-
-/**
- * Direct children of `directory` (project-relative, "" for the root) derived
- * from the flat listing, so the tree honours the same ignore rules as search.
- * Directories sort before files, each group alphabetically. A directory whose
- * only child is another directory is reported as one entry named with the
- * whole chain (`src/components/ui`), the way compact folder views draw it.
- */
-export function listDirectoryEntries(files: string[], directory: string): ProjectTreeEntry[] {
-  const prefix = directory ? `${directory.replace(/\/+$/, "")}/` : ""
-  const children = directChildren(files, prefix)
-  return [
-    ...children.directories.map((name) => ({ name: compactChain(files, prefix, name), type: "directory" as const })),
-    ...children.files.map((name) => ({ name, type: "file" as const })),
-  ]
-}
-
-/** Names one level below `prefix`, each group sorted alphabetically. */
-function directChildren(files: string[], prefix: string): { directories: string[]; files: string[] } {
-  const directories = new Set<string>()
-  const plainFiles = new Set<string>()
-  for (const file of files) {
-    if (!file.startsWith(prefix)) continue
-    const rest = file.slice(prefix.length)
-    const slash = rest.indexOf("/")
-    if (slash === -1) plainFiles.add(rest)
-    else directories.add(rest.slice(0, slash))
-  }
-  const byName = (a: string, b: string) => a.localeCompare(b)
-  return { directories: [...directories].sort(byName), files: [...plainFiles].sort(byName) }
-}
-
-function compactChain(files: string[], prefix: string, name: string): string {
-  let chain = name
-  for (;;) {
-    const children = directChildren(files, `${prefix}${chain}/`)
-    if (children.files.length > 0 || children.directories.length !== 1) return chain
-    chain = `${chain}/${children.directories[0]}`
-  }
 }
 
 async function resolveProjectRoot(cwd: string): Promise<{ root: string } | { error: string; status: number }> {
@@ -146,17 +93,20 @@ export function registerProjectFileRoutes(use: UseFn) {
   use("/api/project-files/tree", async (req, res, next) => {
     if (req.method !== "GET") return next()
     const url = new URL(req.url || "", "http://localhost")
-    const directory = (url.searchParams.get("dir") ?? "").replace(/^\/+|\/+$/g, "")
-    if (directory.split("/").some((segment) => segment === "..")) {
+    const directory = (url.searchParams.get("dir") ?? "").replace(/\/+$/g, "")
+    if (isAbsolute(directory) || directory.includes("\0") || directory.split(/[/\\]/).some((segment) => segment === "..")) {
       return sendJson(res, 400, { error: "dir must stay inside the project" })
     }
     const resolved = await resolveProjectRoot(url.searchParams.get("cwd") ?? "")
     if ("error" in resolved) return sendJson(res, resolved.status, { error: resolved.error })
-    const files = await listProjectFiles(resolved.root, { skipCache: url.searchParams.get("refresh") === "1" })
-    return sendJson(res, 200, {
-      entries: listDirectoryEntries(files, directory),
-      scanLimited: files.length >= MAX_FILES,
-    })
+    try {
+      const entries = await listProjectDirectory(resolved.root, directory)
+      return sendJson(res, 200, { entries, scanLimited: false })
+    } catch (error) {
+      return sendJson(res, error instanceof ProjectDirectoryError ? error.status : 500, {
+        error: error instanceof ProjectDirectoryError ? error.message : "Unable to list directory",
+      })
+    }
   })
 
   use("/api/project-files", async (req, res, next) => {

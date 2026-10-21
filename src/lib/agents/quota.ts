@@ -29,6 +29,8 @@ export interface UsageData {
     utilization?: number
   }
   subscriptionType?: string
+  accountLogin?: string
+  quotaUnavailable?: boolean
   lifetimeTokens?: number
   creditBalance?: string
   creditsUnlimited?: boolean
@@ -191,13 +193,17 @@ function copilotQuotaBucket(
   label: string,
 ): UsageBucket | undefined {
   if (!raw) return undefined
+  // Business seats may have unlimited Chat plus a finite premium allowance.
+  // An unlimited/disabled placeholder must not mask that allowance as 0%.
   const remaining = num(raw.remainingPercentage)
   const used = num(raw.usedRequests)
   const entitlement = num(raw.entitlementRequests)
+  if (raw.isUnlimitedEntitlement === true || entitlement === -1 || entitlement === 0) return undefined
+  // hasQuota can also be false for an exhausted finite allowance.
+  if (raw.hasQuota === false && !(entitlement !== undefined && entitlement > 0)) return undefined
 
   let utilization: number | undefined
   if (remaining !== undefined) utilization = 100 - remaining
-  else if (raw.isUnlimitedEntitlement === true || entitlement === -1) utilization = 0
   else if (used !== undefined && entitlement !== undefined && entitlement > 0) {
     utilization = used / entitlement * 100
   }
@@ -207,10 +213,25 @@ function copilotQuotaBucket(
 /** Map Copilot's account quota into the primary shared usage meter. */
 export function mapCopilotRuntimeResponse(data: Record<string, unknown>): UsageData | null {
   if (data.available !== true) return null
-  const snapshots = asObject(asObject(data.quota)?.quotaSnapshots)
-  const primary = copilotQuotaBucket(asObject(snapshots?.chat), "Chat")
-    ?? copilotQuotaBucket(asObject(snapshots?.premium_interactions), "Premium interactions")
-  return primary ? { fiveHour: primary } : null
+  const quota = asObject(data.quota)
+  const snapshots = asObject(quota?.quotaSnapshots)
+  const account = asObject(quota?.account)
+  const candidates = [
+    ["chat", "Chat"],
+    ["premium_interactions", "Premium interactions"],
+    ["completions", "Completions"],
+  ].map(([key, label]) => {
+    const raw = asObject(snapshots?.[key])
+    return { entitlement: num(raw?.entitlementRequests), bucket: copilotQuotaBucket(raw, label) }
+  })
+  const primary = candidates.find(({ entitlement, bucket }) => bucket && entitlement !== undefined && entitlement > 0)?.bucket
+    ?? candidates.find(({ bucket }) => bucket)?.bucket
+  if (!primary && !account) return null
+  return {
+    ...(primary ? { fiveHour: primary } : { quotaUnavailable: true }),
+    ...(str(account?.login) ? { accountLogin: str(account?.login) } : {}),
+    ...(str(account?.plan) ? { subscriptionType: str(account?.plan) } : {}),
+  }
 }
 
 // ── The table ─────────────────────────────────────────────────────────────
