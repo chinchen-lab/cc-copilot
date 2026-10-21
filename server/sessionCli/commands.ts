@@ -496,7 +496,12 @@ async function sendCommand(inv: CliInvocation, rest: string[]): Promise<CliOutpu
   const { delivery, receipt } = await host.send(sessionId, message, { interrupt: args.switches.has("interrupt"), intent: args.switches.has("steer") ? "steer" : args.switches.has("interrupt") ? "restart" : "queue", commandId, req: inv.req })
   watchDelegatedRequestsOf(sessionId)
   if (receipt && host.receipt && inv.callerSessionId && (await sessionOrigin(sessionId))?.parentSessionId === inv.callerSessionId) {
-    orchestrationStore().putTask(inv.scope, { parentSessionId: inv.callerSessionId, childSessionId: sessionId, sourceId: `send:${sessionId}:${commandId}`, commandId, deliveryDisposition: "async" })
+    const store = orchestrationStore()
+    const task = store.putTask(inv.scope, { parentSessionId: inv.callerSessionId, childSessionId: sessionId, sourceId: `send:${sessionId}:${commandId}`, commandId, deliveryDisposition: "async" })
+    // The turn this one queues behind ends in its result, so only the newest task reports it.
+    for (const older of store.tasks(inv.scope, inv.callerSessionId)) {
+      if (older.id !== task.id && older.childSessionId === sessionId && older.state === "running" && !older.acknowledgedAt && older.createdAt <= task.createdAt) store.updateTask(inv.scope, older.id, { acknowledgedAt: Date.now() })
+    }
     if (inv.req) resumeDelegations(inv.req, inv.callerSessionId)
   }
   if (args.switches.has("wait")) {
@@ -653,12 +658,13 @@ async function receiptCommand(inv: CliInvocation, rest: string[]): Promise<CliOu
   return json({ receipt, ...deviceField(host) })
 }
 
-const UNSETTLED = new Set<CommandReceipt["state"]>(["queued", "held", "dispatching", "delivered", "unknown"])
+/** Delivered messages are already the agent's; a long turn can hold a hundred steered notices. */
+const ON_THE_WAY = new Set<CommandReceipt["state"]>(["queued", "held", "dispatching", "unknown"])
 
 /** Messages still on their way to a session, oldest first; null when its host cannot list them. */
 async function unsettledMessages(host: SessionHost, sessionId: string, req?: IncomingMessage): Promise<CommandReceipt[] | null> {
   if (!host.queue) return null
-  return (await host.queue(sessionId, null, req)).filter((command) => UNSETTLED.has(command.state)).sort((a, b) => a.position - b.position)
+  return (await host.queue(sessionId, null, req)).filter((command) => ON_THE_WAY.has(command.state)).sort((a, b) => a.position - b.position)
 }
 
 const queueEntry = (command: CommandReceipt) => ({

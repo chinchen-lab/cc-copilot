@@ -478,6 +478,12 @@ describe("send", () => {
     expect(out(await run(["send", "child-1", "Add a test", "--command-id", "follow-up-1"]))).toMatchObject({ ahead: 1 })
     expect(orchestrationStore().tasks("local", "parent-1").find((task) => task.sourceId === "send:child-1:follow-up-1")).toMatchObject({ childSessionId: "child-1", commandId: "follow-up-1", state: "running" })
 
+    const first = orchestrationStore().tasks("local", "parent-1").find((task) => task.sourceId === "send:child-1:follow-up-1")!
+    mocks.local.send.mockResolvedValue({ delivery: "queued", receipt: receipt("follow-up-3", "queued", 6) })
+    await run(["send", "child-1", "And the docs", "--command-id", "follow-up-3"])
+    expect(orchestrationStore().tasks("local", "parent-1").find((task) => task.id === first.id)?.acknowledgedAt).toEqual(expect.any(Number))
+    expect(orchestrationStore().tasks("local", "parent-1").find((task) => task.sourceId === "send:child-1:follow-up-3")?.acknowledgedAt).toBeUndefined()
+
     mocks.sessionOrigin.mockResolvedValue({ parentSessionId: "someone-else", createdAt: 1 })
     await run(["send", "child-2", "Not mine", "--command-id", "follow-up-2"])
     expect(orchestrationStore().tasks("local", "parent-1").some((task) => task.childSessionId === "child-2")).toBe(false)
@@ -486,7 +492,7 @@ describe("send", () => {
 
 describe("queue", () => {
   it("lists messages still on their way, oldest first, with what unblocks them", async () => {
-    mocks.local.queue.mockResolvedValue([receipt("later", "queued", 7), receipt("done", "completed", 2), receipt("lost", "unknown", 4, "Host stopped during delivery"), receipt("paused", "held", 5)])
+    mocks.local.queue.mockResolvedValue([receipt("later", "queued", 7), receipt("done", "completed", 2), receipt("steered", "delivered", 3), receipt("lost", "unknown", 4, "Host stopped during delivery"), receipt("paused", "held", 5)])
     const listed = out(await run(["queue", "s1"]))
     expect(listed.messages.map((message: { commandId: string }) => message.commandId)).toEqual(["lost", "paused", "later"])
     expect(listed.messages[0]).toMatchObject({ state: "unknown", error: "Host stopped during delivery" })

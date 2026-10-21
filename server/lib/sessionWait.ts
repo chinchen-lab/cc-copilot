@@ -1,12 +1,15 @@
 import { stat } from "node:fs/promises"
 import { getSessionStatus } from "../helpers"
 import { listPendingInput, type PendingInput } from "../agents/pendingInput"
+import { nativeBinding } from "../agents/nativeBindings"
 import { storeForPath } from "../agents"
 import { sessionAgentsRunning } from "../agents/agentsRunning"
 import { runtimeFor, runtimeForSession } from "../agents/runtimes"
 import type { RuntimeActivity } from "../agents/runtimeTypes"
 import type { AgentStore } from "../agents/types"
 import { findJsonlPath } from "../sessionPaths"
+import { orchestrationStore } from "../orchestration/storage"
+import type { AgentKind } from "../../shared/session/agent-descriptors"
 import type { SessionStatusInfo } from "../../shared/session/types"
 import { RECENT_ACTIVITY_MS, WORKING_STATUSES } from "../../shared/sessionActivity"
 import type { WorkspaceEnvironment, WorkspaceRunContext } from "../../shared/contracts/workspaces"
@@ -81,6 +84,17 @@ async function tailStillWorking(
   return address !== null && await sessionAgentsRunning(address.dirName, sessionId)
 }
 
+/**
+ * Whether a message waiting in the session's queue will start its next turn.
+ * Until the dispatcher hands it over, the session still describes the turn
+ * before, so a `wait` right after a `send` would return that turn's reply.
+ */
+async function messageStartsNext(sessionId: string, kind: AgentKind, filePath: string | null): Promise<boolean> {
+  const store = orchestrationStore()
+  const conversation = store.findConversation(await nativeBinding(sessionId, kind, filePath))
+  return conversation !== null && store.startsNext(conversation.id)
+}
+
 export async function readSessionState(sessionId: string, known?: KnownTranscript): Promise<SessionState> {
   // The transcript decides whose session it is; a live session whose
   // transcript is not on disk yet falls back to the runtime holding it.
@@ -101,6 +115,7 @@ export async function readSessionState(sessionId: string, known?: KnownTranscrip
   let outcome: SessionOutcome
   if (waiting.length > 0) outcome = "needs_input"
   else if (activity.running) outcome = "running"
+  else if (await messageStartsNext(sessionId, runtime.kind, filePath).catch(() => false)) outcome = "running"
   else if (filePath && store && await tailStillWorking(sessionId, statusInfo?.status, activity, { store, filePath, lastActivityMs: known?.lastActivityMs })) outcome = "running"
   else if (error) outcome = "error"
   else outcome = "completed"

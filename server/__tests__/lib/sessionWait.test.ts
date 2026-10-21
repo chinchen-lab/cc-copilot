@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 const runtime = {
+  kind: "claude",
   descriptor: { capabilities: { activeNotifications: true } },
   activity: (id: string) => mocks.activity.get(id) ?? { live: false, running: false },
   hasSession: (id: string) => mocks.held.has(id),
@@ -28,6 +29,7 @@ vi.mock("../../agents/runtimes", () => ({
 }))
 vi.mock("../../agents/pendingInput", () => ({ listPendingInput: mocks.listPendingInput }))
 
+import { orchestrationStore } from "../../orchestration/storage"
 import {
   clearTurnError,
   parseWaitSeconds,
@@ -100,6 +102,20 @@ describe("readSessionState", () => {
     mocks.agentsRunning.mockResolvedValue(true)
     expect((await readSessionState("a", written(60 * 60_000))).outcome).toBe("running")
     expect(mocks.agentsRunning).toHaveBeenCalledWith("-work", "a")
+  })
+
+  it("keeps a session running while a message queued for it is about to start its next turn", async () => {
+    mocks.activity.set("a", { live: true, running: false })
+    const store = orchestrationStore()
+    const conversation = store.ensureConversation({ hostId: "local", agent: "claude", instanceId: "default", sessionId: "a", nativeSessionId: "a" })
+    store.admit("local", "notice-only", conversation.id, { message: "chat notice", onlyWhileRunning: true })
+    expect((await readSessionState("a")).outcome).toBe("completed")
+    store.admit("local", "follow-up", conversation.id, { message: "Now add a test" })
+    expect((await readSessionState("a")).outcome).toBe("running")
+    // A restart holds queued messages, and a held message blocks the queue.
+    store.acquire("restarted-host")
+    expect(store.command("local", "follow-up")?.receipt.state).toBe("held")
+    expect((await readSessionState("a")).outcome).toBe("completed")
   })
 
   it("surfaces a recorded turn error until it is cleared", async () => {

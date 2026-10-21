@@ -371,6 +371,11 @@ export class OrchestrationStore {
       return { ...updated, position: command.receipt.position }
     })
   }
+  /** Whether a message that starts a turn is about to be handed over, with nothing held or uncertain blocking it. */
+  startsNext(conversationId: string): boolean {
+    if (this.db.prepare("SELECT 1 FROM commands WHERE conversation_id=? AND state IN ('held','unknown') LIMIT 1").get(conversationId)) return false
+    return Boolean(this.db.prepare("SELECT 1 FROM commands WHERE conversation_id=? AND state IN ('queued','dispatching') AND json_extract(payload,'$.onlyWhileRunning') IS NOT 1 LIMIT 1").get(conversationId))
+  }
   /** Cancels every message still waiting for a conversation, from any account, so a stop is final. */
   cancelWaiting(conversationId: string): number {
     return this.transaction(() => {
