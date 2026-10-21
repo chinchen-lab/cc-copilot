@@ -1,4 +1,5 @@
-import type { ReactNode } from "react"
+import { useLayoutEffect, useRef, type ReactNode } from "react"
+import type { GroupImperativeHandle } from "react-resizable-panels"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -27,6 +28,8 @@ interface DesktopWorkspacePanelsProps {
   onClosePanel: () => void
   onTogglePanel: (panelId: string) => void
   actions?: readonly WorkspaceActivityAction[]
+  expanded?: boolean
+  onToggleExpanded?: () => void
 }
 
 function mainPanelDefaultSize(panelSize?: string): string {
@@ -45,26 +48,44 @@ export function DesktopWorkspacePanels({
   onClosePanel,
   onTogglePanel,
   actions,
+  expanded = false,
+  onToggleExpanded,
 }: DesktopWorkspacePanelsProps) {
+  const group = useRef<GroupImperativeHandle | null>(null)
+  const previousLayout = useRef<Record<string, number> | null>(null)
+  useLayoutEffect(() => {
+    if (expanded || !previousLayout.current) return
+    if (activePanel) group.current?.setLayout(previousLayout.current)
+    previousLayout.current = null
+  }, [expanded, activePanel])
+
+  function toggleExpanded() {
+    if (!expanded) previousLayout.current = group.current?.getLayout() ?? null
+    onToggleExpanded?.()
+  }
+
   return (
     <>
-      <ResizablePanelGroup orientation="horizontal" className="min-h-0 min-w-0 w-auto flex-1">
+      <ResizablePanelGroup groupRef={group} disabled={expanded} orientation="horizontal" className="min-h-0 min-w-0 w-auto flex-1">
         <ResizablePanel
+          id="workspace-main"
           defaultSize={activePanel
             ? mainPanelDefaultSize(activePanel.defaultSize)
             : "100%"}
-          minSize="320px"
+          minSize={expanded ? "0%" : "320px"}
+          maxSize={expanded ? "0%" : "100%"}
         >
-          {children}
+          <div className="h-full min-h-0" hidden={expanded} inert={expanded}>{children}</div>
         </ResizablePanel>
 
         {activePanel && (
           <>
-            <ResizableHandle withHandle />
+            <ResizableHandle withHandle className={expanded ? "hidden" : undefined} />
             <ResizablePanel
+              id="workspace-panel"
               defaultSize={activePanel.defaultSize ?? "36%"}
-              minSize={activePanel.minSize ?? "300px"}
-              maxSize={activePanel.maxSize ?? "70%"}
+              minSize={expanded ? "100%" : activePanel.minSize ?? "300px"}
+              maxSize={expanded ? "100%" : activePanel.maxSize ?? "70%"}
             >
               <BuiltInPanelServicesProvider value={services}>
                 <WorkspacePanelHost
@@ -85,6 +106,8 @@ export function DesktopWorkspacePanels({
         activePanelId={activePanel?.id ?? null}
         onTogglePanel={onTogglePanel}
         actions={actions}
+        expanded={expanded}
+        onToggleExpanded={onToggleExpanded ? toggleExpanded : undefined}
       />
     </>
   )

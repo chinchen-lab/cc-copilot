@@ -1,6 +1,7 @@
 import { useTranslation } from "@/hooks/useTranslation"
 import { useEffect, useState, type ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
+import { Maximize2, Minimize2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -16,6 +17,8 @@ interface WorkspaceActivityBarProps {
   activePanelId: string | null
   onTogglePanel: (panelId: string) => void
   actions?: readonly WorkspaceActivityAction[]
+  expanded?: boolean
+  onToggleExpanded?: () => void
 }
 
 export interface WorkspaceActivityAction {
@@ -79,6 +82,8 @@ export function WorkspaceActivityBar({
   activePanelId,
   onTogglePanel,
   actions = [],
+  expanded = false,
+  onToggleExpanded,
 }: WorkspaceActivityBarProps) {
   const { t } = useTranslation()
   const available = availableWorkspacePanels(panels, context)
@@ -89,6 +94,17 @@ export function WorkspaceActivityBar({
       aria-label={t("Workspace panels")}
       className="electron-no-drag flex w-11 shrink-0 flex-col items-center gap-1 border-l bg-sidebar py-2 text-sidebar-foreground"
     >
+      {activePanelId && onToggleExpanded && (
+        <>
+          <ActivityBarButton
+            title={expanded ? "Restore panel size" : "Expand panel"}
+            icon={expanded ? Minimize2 : Maximize2}
+            active={expanded}
+            onClick={onToggleExpanded}
+          />
+          <div aria-hidden className="my-1 h-px w-6 bg-sidebar-border" />
+        </>
+      )}
       {actions.map((action) => (
         <ActivityBarButton
           key={action.id}

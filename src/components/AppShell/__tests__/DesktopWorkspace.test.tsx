@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import { Users } from "lucide-react"
 import { DesktopWorkspace } from "../DesktopWorkspace"
 import type { DesktopAppShellProps } from "../desktopTypes"
@@ -424,6 +424,40 @@ describe("DesktopWorkspace", () => {
     expect(await screen.findByTestId("mission-control")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Mission Control" })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Config" })).toHaveAttribute("aria-pressed", "false")
+  })
+
+  it("expands a right panel across the workspace, preserves the session and restores the sidebar", async () => {
+    setContexts({ session: makeSession() })
+    const props = makeProps()
+    props.navigation.panels.activeWorkspacePanel = "cogpit.file-changes"
+    props.project.hasFileChanges = true
+    const view = render(<DesktopWorkspace {...props} />)
+    const chat = screen.getByTestId("chat-area")
+    const sidebar = screen.getByTestId("session-browser").parentElement
+    fireEvent.click(screen.getByRole("button", { name: "Expand panel" }))
+    expect(sidebar).toHaveClass("hidden")
+    expect(chat.closest("[hidden]")).not.toBeNull()
+    expect(screen.getByTestId("file-changes")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Restore panel size" }))
+    expect(sidebar).not.toHaveClass("hidden")
+    expect(chat.closest("[hidden]")).toBeNull()
+    expect(screen.getByTestId("chat-area")).toBe(chat)
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand panel" }))
+    props.navigation.panels.activeWorkspacePanel = "cogpit.session-info"
+    view.rerender(<DesktopWorkspace {...props} />)
+    expect(screen.getByRole("button", { name: "Expand panel" })).toBeInTheDocument()
+    expect(sidebar).not.toHaveClass("hidden")
+    expect(screen.getByTestId("stats-panel")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand panel" }))
+    setContexts({ mainView: "config", session: makeSession() })
+    view.rerender(<DesktopWorkspace {...props} />)
+    expect(await screen.findByTestId("config-browser")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Restore panel size" })).not.toBeInTheDocument()
+    setContexts({ session: makeSession() })
+    view.rerender(<DesktopWorkspace {...props} />)
+    expect(screen.getByRole("button", { name: "Expand panel" })).toBeInTheDocument()
   })
 
   it("keeps the right panel collapsed when opening a session with a crew", () => {

@@ -42,6 +42,24 @@ describe("PreviewPanel", () => {
     )
   })
 
+  it("expands and restores the development preview without losing its URL, frame or width", async () => {
+    const toggle = vi.fn()
+    const props = { cwd: "/workspace/cogpit", onClose: vi.fn(), onToggleExpanded: toggle }
+    const view = render(<PreviewPanel {...props} />)
+    const panel = screen.getByRole("complementary", { name: "Development preview" })
+    const originalWidth = panel.style.width
+    const frame = await screen.findByTitle("Development preview")
+    fireEvent.click(screen.getByRole("button", { name: "Expand preview" }))
+    expect(toggle).toHaveBeenCalledOnce()
+    view.rerender(<PreviewPanel {...props} expanded />)
+    expect(panel).toHaveStyle({ width: "100%" })
+    expect(screen.getByTitle("Development preview")).toBe(frame)
+    fireEvent.click(screen.getByRole("button", { name: "Restore preview size" }))
+    view.rerender(<PreviewPanel {...props} />)
+    expect(panel.style.width).toBe(originalWidth)
+    expect(screen.getByTitle("Development preview")).toBe(frame)
+  })
+
   it("supports preview-focused URL and refresh shortcuts", async () => {
     const user = userEvent.setup()
     render(<PreviewPanel cwd="/workspace/cogpit" onClose={vi.fn()} />)

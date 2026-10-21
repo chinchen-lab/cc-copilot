@@ -54,9 +54,10 @@ import type { ProjectPromptContext } from "@/plugin-api"
 import { parseProjectFilesResponse } from "@/hooks/useProjectFileSuggestions"
 import type { GitStatusFile } from "../../shared/contracts/projectTools"
 import { diffLineCount } from "../../shared/diff-utils"
-import { isMarpMarkdown, resolveMarkdownImage } from "@/lib/projectMarkdown"
+import { needsHtmlMarkdownPreview, isMarpMarkdown, resolveMarkdownImage } from "@/lib/projectMarkdown"
 
 const MarpPreview = lazy(() => import("@/components/MarpPreview"))
+const StyledMarkdownPreview = lazy(() => import("@/components/StyledMarkdownPreview"))
 
 interface ProjectFilesPanelProps {
   cwd: string
@@ -535,6 +536,7 @@ export function ProjectFilesPanel({
   const selectedGitFile = selectedPath ? changedFiles.get(selectedPath) : undefined
   const selectedIsMarkdown = selectedPath !== null && isMarkdownPath(selectedPath)
   const selectedIsMarp = useMemo(() => selectedIsMarkdown && isMarpMarkdown(content), [selectedIsMarkdown, content])
+  const selectedNeedsHtmlPreview = useMemo(() => viewMode === "preview" && selectedIsMarkdown && !selectedIsMarp && needsHtmlMarkdownPreview(content), [viewMode, selectedIsMarkdown, selectedIsMarp, content])
   const fileStatusMark = useCallback((path: string): FileStatusMark | null => {
     const file = changedFiles.get(path)
     return file ? { code: gitStatusCode(file), ...gitStatusStyle(file) } : null
@@ -870,11 +872,15 @@ export function ProjectFilesPanel({
                 {!fileLoading && mtimeMs !== null && (viewMode === "preview" ? (
                   <div
                     aria-label={t("Preview of {0}", { "0": selectedPath })}
-                    className={cn("min-h-0 flex-1", selectedIsMarp ? "flex flex-col" : "overflow-auto break-words px-6 py-4 text-sm")}
+                    className={cn("min-h-0 flex-1", selectedIsMarp || selectedNeedsHtmlPreview ? "flex flex-col" : "overflow-auto break-words px-6 py-4 text-sm")}
                   >
                     {selectedIsMarp ? (
                       <Suspense fallback={<div role="status" className="flex flex-1 items-center justify-center gap-2 text-xs text-muted-foreground"><Spinner />{t("Loading slides…")}</div>}>
                         <MarpPreview content={content} cwd={cwd} filePath={selectedPath} />
+                      </Suspense>
+                    ) : selectedNeedsHtmlPreview ? (
+                      <Suspense fallback={<div role="status" className="flex flex-1 items-center justify-center"><Spinner /></div>}>
+                        <StyledMarkdownPreview content={content} cwd={cwd} filePath={selectedPath} />
                       </Suspense>
                     ) : <ReactMarkdown components={previewComponents} remarkPlugins={markdownPlugins}>{content}</ReactMarkdown>}
                   </div>

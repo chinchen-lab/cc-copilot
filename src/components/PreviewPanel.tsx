@@ -4,6 +4,7 @@ import {
   ExternalLink,
   Globe2,
   Maximize2,
+  Minimize2,
   Monitor,
   RefreshCw,
   Server,
@@ -46,6 +47,8 @@ interface PreviewTask {
 interface PreviewPanelProps {
   cwd: string
   onClose: () => void
+  expanded?: boolean
+  onToggleExpanded?: () => void
 }
 
 const MIN_WIDTH = 360
@@ -124,7 +127,7 @@ function urlForPort(port: number, host: string): string {
   return `http://${host || "localhost"}:${port}/`
 }
 
-export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
+export function PreviewPanel({ cwd, onClose, expanded = false, onToggleExpanded }: PreviewPanelProps) {
   const { t } = useTranslation()
   const [tasks, setTasks] = useState<PreviewTask[]>([])
   const [url, setUrl] = useState("")
@@ -299,12 +302,12 @@ export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
     <aside
       ref={panelRef}
       aria-label={t("Development preview")}
-      className="view-transition-right-panel panel-enter-right relative flex min-h-0 shrink-0 flex-col border-l bg-canvas"
-      style={{ width }}
+      className={cn("view-transition-right-panel panel-enter-right flex min-h-0 shrink-0 flex-col border-l bg-canvas", expanded ? "absolute inset-0 z-20" : "relative")}
+      style={{ width: expanded ? "100%" : width }}
     >
       <div
         aria-hidden="true"
-        className="absolute inset-y-0 left-0 w-1 cursor-col-resize hover:bg-primary/30"
+        className={cn("absolute inset-y-0 left-0 w-1 cursor-col-resize hover:bg-primary/30", expanded && "hidden")}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -315,6 +318,11 @@ export function PreviewPanel({ cwd, onClose }: PreviewPanelProps) {
         <Globe2 aria-hidden="true" className="size-4 text-muted-foreground" />
         <h2 className="text-sm font-medium">{t("Preview")}</h2>
         <span className="flex-1" />
+        {onToggleExpanded && (
+          <Button variant="ghost" size="icon-sm" onClick={onToggleExpanded} aria-label={t(expanded ? "Restore preview size" : "Expand preview")} title={t(expanded ? "Restore preview size" : "Expand preview")}>
+            {expanded ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}
+          </Button>
+        )}
         <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label={t("Close preview")}>
           <X data-icon="inline-start" />
         </Button>

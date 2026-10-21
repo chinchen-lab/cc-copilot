@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ProjectFilesPanel } from "@/components/ProjectFilesPanel"
+import readme from "../../../README.md?raw"
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }))
 vi.mock("@/lib/auth", () => ({ authFetch: mocks.authFetch, authUrl: (path: string) => path }))
@@ -211,6 +212,48 @@ describe("ProjectFilesPanel", () => {
   })
 
   describe("markdown files", () => {
+    it("renders the real README's HTML title, aligned paragraphs and Markdown images", async () => {
+      const user = userEvent.setup()
+      const fetch = mocks.authFetch.getMockImplementation()!
+      mocks.authFetch.mockImplementation((url: string, init?: RequestInit) => {
+        if (url.startsWith("/api/project-file?") && !init?.method) return Promise.resolve(jsonResponse({ content: readme, mtimeMs: 10, size: readme.length }))
+        return fetch(url, init)
+      })
+      render(<ProjectFilesPanel cwd="/workspace/cogpit" onClose={vi.fn()} />)
+      await user.click(await screen.findByRole("button", { name: /README\.md/ }))
+
+      const frame = await screen.findByTitle<HTMLIFrameElement>("Styled preview of README.md")
+      const document = new DOMParser().parseFromString(frame.srcdoc, "text/html")
+      expect(document.querySelector("h1")?.textContent).toBe("Cogpit")
+      expect(document.querySelector("h1")?.getAttribute("align")).toBe("center")
+      expect(document.querySelector('p[align="center"] strong')?.textContent).toBe("Your coding agents, in one workspace.")
+      expect(document.querySelector("h2")?.textContent).toBe("Keep the work in view")
+      expect(document.querySelector("img")?.getAttribute("src")).toBe("/api/local-file?path=%2Fworkspace%2Fcogpit%2Fdocs%2Fimages%2Fcogpit-shared-browser.png")
+      expect(document.querySelector("table")).not.toBeNull()
+      expect(document.querySelector("script")).toBeNull()
+    })
+
+    it("uses an isolated CSS preview and keeps source edits when switching modes", async () => {
+      const user = userEvent.setup()
+      const fetch = mocks.authFetch.getMockImplementation()!
+      const content = '<style>h1 { color: red }</style>\n\n# Styled document\n\n<div class="card" style="color: blue">Card</div>'
+      mocks.authFetch.mockImplementation((url: string, init?: RequestInit) => {
+        if (url.startsWith("/api/project-file?") && !init?.method) return Promise.resolve(jsonResponse({ content, mtimeMs: 10, size: content.length }))
+        return fetch(url, init)
+      })
+      render(<ProjectFilesPanel cwd="/workspace/cogpit" onClose={vi.fn()} />)
+      await user.click(await screen.findByRole("button", { name: /README\.md/ }))
+      const frame = await screen.findByTitle<HTMLIFrameElement>("Styled preview of README.md")
+      expect(frame).toHaveAttribute("sandbox", "allow-same-origin")
+      expect(frame.srcdoc).toContain("h1 { color: red }")
+      expect(frame.srcdoc).toContain('class="card"')
+      await user.click(screen.getByRole("button", { name: "Edit" }))
+      fireEvent.change(await screen.findByRole("textbox", { name: "Editing README.md" }), { target: { value: content.replace("red", "green") } })
+      await user.click(screen.getByRole("button", { name: "Preview" }))
+      expect(await screen.findByTitle("Styled preview of README.md")).toHaveAttribute("srcdoc", expect.stringContaining("h1 { color: green }"))
+      expect(screen.getByText("Unsaved")).toBeInTheDocument()
+    })
+
     it("previews Marp slides and preserves source edits when switching modes", async () => {
       const user = userEvent.setup()
       const fetch = mocks.authFetch.getMockImplementation()!

@@ -1,7 +1,7 @@
 import { useTranslation } from "@/hooks/useTranslation"
 import { resolvePluginPanelPreference } from "@/plugins/panelAliases"
 import { useOpenSessionCrew } from "@/hooks/useOpenSessionCrew"
-import { lazy, Suspense, useCallback, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useState } from "react"
 import type { ReactNode } from "react"
 import { Code2, FolderSearch, Puzzle, SlidersHorizontal, TerminalSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -241,6 +241,7 @@ export function DesktopWorkspace({
   const openCrew = useOpenSessionCrew(session?.sessionId ?? null)
   const [pluginsOpen, setPluginsOpen] = useState(() => new URLSearchParams(window.location.search).get("pluginSafeMode") === "1")
   const [pluginSettingsId, setPluginSettingsId] = useState<string>()
+  const [expandedPanelId, setExpandedPanelId] = useState<string | null>(null)
   const openPluginSettings = useCallback((pluginId: string) => { setPluginSettingsId(pluginId); setPluginsOpen(true) }, [])
   const runtimePlugins = useRuntimePlugins(can("configWrite"))
   const workspacePanels = useRuntimeWorkspacePanels({ ...runtimePlugins, projectPath: project.currentCwd ?? null, openSettings: openPluginSettings })
@@ -299,6 +300,13 @@ export function DesktopWorkspace({
   const activePanel = state.mainView === "sessions" && !isHome
     ? resolvePluginPanelPreference(navigation.panels.activeWorkspacePanel, visiblePanels)
     : null
+  const activeRightPanelId = state.mainView === "sessions"
+    ? project.showPreview ? "development-preview" : activePanel?.id ?? null
+    : null
+  const panelExpanded = activeRightPanelId !== null && expandedPanelId === activeRightPanelId
+  const previewExpanded = project.showPreview && panelExpanded
+  useEffect(() => { setExpandedPanelId(null) }, [activeRightPanelId])
+  const togglePanelExpanded = () => setExpandedPanelId(panelExpanded ? null : activeRightPanelId)
   const worktreeDirName = sessionSource?.dirName
     ?? state.pendingDirName
     ?? state.dashboardProject
@@ -338,15 +346,18 @@ export function DesktopWorkspace({
   return (
     <div className="relative flex min-h-0 flex-1 overflow-hidden">
       {sidebarRendered && (
-        <div className="view-transition-sidebar panel-enter w-80 shrink-0 border-r bg-sidebar text-sidebar-foreground">
+        <div className={cn("view-transition-sidebar panel-enter w-80 shrink-0 border-r bg-sidebar text-sidebar-foreground", panelExpanded && "hidden")}>
           <PrimarySessionBrowser navigation={navigation} header={sidebarHeader} />
         </div>
       )}
 
+      <div className={cn("flex min-h-0 min-w-0 flex-1", previewExpanded && "invisible")} inert={previewExpanded}>
       <DesktopWorkspacePanels
         panels={visiblePanels}
         context={panelContext}
         activePanel={activePanel ?? null}
+        expanded={panelExpanded && !project.showPreview}
+        onToggleExpanded={togglePanelExpanded}
         services={{
           projectFilesRoot: project.projectFilesRoot ?? project.currentCwd ?? null,
           projectFilesRequest: project.projectFilesRequest,
@@ -391,10 +402,11 @@ export function DesktopWorkspace({
           />
         </main>
       </DesktopWorkspacePanels>
+      </div>
 
       {project.showPreview && project.currentCwd && (
         <Suspense fallback={null}>
-          <PreviewPanel cwd={project.currentCwd} onClose={project.onCloseRightWorkspace} />
+          <PreviewPanel cwd={project.currentCwd} onClose={project.onCloseRightWorkspace} expanded={previewExpanded} onToggleExpanded={togglePanelExpanded} />
         </Suspense>
       )}
 

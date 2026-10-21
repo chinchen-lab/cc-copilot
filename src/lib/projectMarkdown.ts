@@ -1,4 +1,17 @@
 import { JSON_SCHEMA, load } from "js-yaml"
+import MarkdownIt from "markdown-it"
+
+const markdown = new MarkdownIt({ html: true })
+
+/** HTML and styles need the isolated renderer; code examples remain plain text. */
+export function needsHtmlMarkdownPreview(content: string): boolean {
+  const hasHtml = (tokens: ReturnType<MarkdownIt["parse"]>): boolean => tokens.some((token) =>
+    ((token.type === "html_block" || token.type === "html_inline")
+      && /<\/?[a-z][^>]*>/i.test(token.content.replace(/<!--[\s\S]*?-->/g, "")))
+    || (token.children !== null && hasHtml(token.children)),
+  )
+  return hasHtml(markdown.parse(content, {}))
+}
 
 /** Marp's opt-in lives in the document's YAML front matter. */
 export function isMarpMarkdown(content: string): boolean {

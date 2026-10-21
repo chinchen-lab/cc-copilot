@@ -155,4 +155,41 @@ describe("WorkspaceActivityBar", () => {
     rerender(<DesktopWorkspacePanels {...props} activePanel={panels[0]} />)
     expect(screen.getByRole("button", { name: "Count 1" })).toBeVisible()
   })
+
+  it("expands any desktop panel and restores it without losing panel or composer state", () => {
+    function Layout() {
+      const [expanded, setExpanded] = useState(false)
+      return (
+        <DesktopWorkspacePanels
+          panels={panels} context={context} activePanel={panels[0]}
+          expanded={expanded} onToggleExpanded={() => setExpanded(!expanded)}
+          services={{
+            projectFilesRoot: "/repo", projectFilesRequest: null, backgroundAgents: [],
+            searchInputRef: { current: null }, addProjectContext: vi.fn(), jumpToTurn: vi.fn(),
+            toggleServer: vi.fn(), serversChanged: vi.fn(), loadSession: vi.fn(),
+            worktrees: { worktrees: [], loading: false, refetch: vi.fn() },
+            worktreeDirName: "test", openWorktreeSession: vi.fn(),
+          }}
+          onClosePanel={vi.fn()} onTogglePanel={vi.fn()}
+        >
+          <input aria-label="Composer" defaultValue="Unsent draft" />
+        </DesktopWorkspacePanels>
+      )
+    }
+    render(<Layout />)
+    fireEvent.click(screen.getByRole("button", { name: "Count 0" }))
+    fireEvent.click(screen.getByRole("button", { name: "Expand panel" }))
+    expect(screen.getByLabelText("Composer")).not.toBeVisible()
+    expect(screen.getByRole("button", { name: "Count 1" })).toBeVisible()
+    expect(screen.getByRole("button", { name: "Restore panel size" })).toHaveAttribute("aria-pressed", "true")
+    fireEvent.click(screen.getByRole("button", { name: "Restore panel size" }))
+    expect(screen.getByLabelText("Composer")).toBeVisible()
+    expect(screen.getByLabelText("Composer")).toHaveValue("Unsent draft")
+    expect(screen.getByRole("button", { name: "Count 1" })).toBeVisible()
+  })
+
+  it("offers no expand button when there is no active panel", () => {
+    render(<WorkspaceActivityBar panels={panels} context={context} activePanelId={null} onTogglePanel={vi.fn()} onToggleExpanded={vi.fn()} />)
+    expect(screen.queryByRole("button", { name: "Expand panel" })).not.toBeInTheDocument()
+  })
 })
