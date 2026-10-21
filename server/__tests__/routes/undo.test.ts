@@ -32,6 +32,13 @@ vi.mock("../../sessionPaths", () => ({
 }))
 
 const mockStoreForPath = vi.hoisted(() => vi.fn())
+const mockReadTranscriptText = vi.hoisted(() => vi.fn())
+
+vi.mock("../../agents/transcriptFile", () => ({
+  isCompressedTranscript: (filePath: string) => filePath.endsWith(".zst"),
+  uncompressedTranscriptName: (fileName: string) => fileName.replace(/\.zst$/, ""),
+  readTranscriptText: mockReadTranscriptText,
+}))
 
 vi.mock("../../agents", () => ({ storeForPath: mockStoreForPath }))
 
@@ -231,6 +238,35 @@ describe("undo routes", () => {
         "/tmp/test-undo/session-1.json",
         makeTransactionState(),
       )
+    })
+
+    it("rewrites a compressed transcript as its plain file and drops the compressed one", async () => {
+      const { resolveSessionFilePath } = await import("../../sessionPaths")
+      vi.mocked(resolveSessionFilePath).mockResolvedValueOnce("/tmp/test-projects/proj/sess.jsonl.zst")
+      const handler = getRouteHandler(handlers, "/api/undo/transaction")
+      const { req, res, next, sendBody } = createMockReqRes(
+        "POST",
+        "/api/undo/transaction",
+        transactionBody(),
+      )
+      const missing = () => Object.assign(new Error("ENOENT"), { code: "ENOENT" })
+      mockedReadFile
+        .mockResolvedValueOnce("new value" as unknown as Buffer)
+        .mockRejectedValueOnce(missing())
+        .mockRejectedValueOnce(missing())
+      mockReadTranscriptText.mockResolvedValueOnce("original-session\n")
+
+      const pending = handler(req, res, next)
+      sendBody()
+      await pending
+
+      expect(res._getStatus()).toBe(200)
+      expect(mockReadTranscriptText).toHaveBeenCalledWith("/tmp/test-projects/proj/sess.jsonl.zst")
+      expect(atomicFiles.writeOwnerOnlyText).toHaveBeenCalledWith(
+        "/tmp/test-projects/proj/sess.jsonl",
+        "original-session\n",
+      )
+      expect(mockedUnlink).toHaveBeenCalledWith("/tmp/test-projects/proj/sess.jsonl.zst")
     })
 
     it("rolls back file and session changes when undo-state persistence fails", async () => {

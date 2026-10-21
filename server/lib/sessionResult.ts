@@ -1,9 +1,9 @@
-import { readFile } from "../helpers"
 import { findJsonlPath } from "../sessionPaths"
 import { parseSessionFileChanges } from "../routes/session-file-changes"
 import { parseSession } from "../../shared/session/parser"
 import { scopeParsedSession } from "../../shared/session/instances"
 import { storeForPath } from "../agents"
+import { readTranscriptText } from "../agents/transcriptFile"
 import type { Turn } from "../../shared/session/types"
 
 /**
@@ -53,7 +53,7 @@ export async function readSessionResult(
 ): Promise<SessionResult | null> {
   const filePath = await findJsonlPath(sessionId)
   if (!filePath) return null
-  const content = await readFile(filePath, "utf-8")
+  const content = await readTranscriptText(filePath)
   const session = scopeParsedSession(parseSession(content), storeForPath(filePath)?.instanceId ?? "default")
   const { changes } = await parseSessionFileChanges(content, false)
 

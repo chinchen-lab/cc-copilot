@@ -1,6 +1,7 @@
 import type { EditOp } from "../../shared/diff-utils"
 import { formatForRecords } from "../../shared/session/agents"
 import type { AgentKind } from "../../shared/session/agent-descriptors"
+import { createCodexPromptReader } from "../../shared/session/codex"
 import {
   hasFailedExit,
   normalizeFunctionName,
@@ -426,11 +427,6 @@ function foldCodexEvent(acc: SessionAccumulator, payload: Record<string, unknown
     return
   }
 
-  if (type === "user_message") {
-    acc.turnCount += 1
-    return
-  }
-
   if (type === "agent_message" && str(payload.phase) === "final_answer") {
     notePreview(acc, str(payload.message))
     return
@@ -497,9 +493,23 @@ function foldCodexResponseItem(acc: SessionAccumulator, payload: Record<string, 
   }
 }
 
+/** Each card's prompt reader, which must see its rollout's records in order. */
+const codexPromptReaders = new WeakMap<SessionAccumulator, ReturnType<typeof createCodexPromptReader>>()
+
+function readCodexPrompt(acc: SessionAccumulator, entry: Record<string, unknown>): string {
+  let read = codexPromptReaders.get(acc)
+  if (!read) {
+    read = createCodexPromptReader()
+    codexPromptReaders.set(acc, read)
+  }
+  return read(entry)
+}
+
 const foldCodex: SummaryFold = (acc, entry) => {
   const type = str(entry.type)
   const payload = asRecordOrEmpty(entry.payload)
+
+  if (readCodexPrompt(acc, entry)) acc.turnCount += 1
 
   // Model is per turn and can change mid-session, so the newest wins.
   if (type === "turn_context") {

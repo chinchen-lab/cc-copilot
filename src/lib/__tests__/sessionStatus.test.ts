@@ -470,6 +470,16 @@ describe("deriveSessionStatus — Codex collab agents", () => {
     expect(deriveSessionStatus(msgs).status).toBe("completed")
   })
 
+  it("returns completed once a SubAgentActivity item reports the agent completed", () => {
+    const activity = (kind: string, id: string) => ({
+      type: "event_msg",
+      payload: { type: "item_completed", item: { type: "SubAgentActivity", id, kind, agent_thread_id: "agA", agent_path: "/root/researcher" } },
+    })
+    const running = [sessionMeta, ...spawn("c1", "agA"), activity("started", "c1"), taskComplete]
+    expect(deriveSessionStatus(running).status).toBe("awaiting_agents")
+    expect(deriveSessionStatus([...running, activity("completed", "subagent-completed-1")]).status).toBe("completed")
+  })
+
   it("handles agent-id renumbering between spawn output and activity events", () => {
     const msgs = [
       sessionMeta,

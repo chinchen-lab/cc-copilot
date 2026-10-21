@@ -458,9 +458,12 @@ function base64DirNameCodec(prefix: string): AgentDirNameCodec {
   }
 }
 
-/** The trailing-uuid grammar Claude and Codex transcripts share. */
+/**
+ * The trailing-uuid grammar Claude and Codex transcripts share, also matching
+ * the `.jsonl.zst` a transcript is compressed to.
+ */
 function sessionIdFromJsonlName(fileName: string): string | null {
-  const match = new RegExp(`(${SESSION_UUID})\\.jsonl$`, "i").exec(fileName)
+  const match = new RegExp(`(${SESSION_UUID})\\.jsonl(?:\\.zst)?$`, "i").exec(fileName)
   return match ? match[1] : null
 }
 

@@ -3,12 +3,12 @@
  * prefilter, and streaming line-at-a-time parsing so large transcripts are
  * never materialised.
  */
-import { createReadStream } from "node:fs"
 import { readdir, stat } from "node:fs/promises"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
 import type { UsageCostProvider } from "../../../shared/contracts/usageCost"
 import { createUsageScanner, type UsageCostRecord } from "../../agents/usageScanners"
+import { isListableTranscript, transcriptReadStream } from "../../agents/transcriptFile"
 
 export interface TranscriptFile {
   path: string
@@ -17,9 +17,10 @@ export interface TranscriptFile {
 }
 
 /**
- * Lists `.jsonl` transcripts under `root` last modified at or after `sinceMs`.
- * Errors on individual entries are swallowed: session files rotate and vanish
- * mid-walk, and a partial listing beats failing the page.
+ * Lists `.jsonl` transcripts, compressed or not, under `root` last modified
+ * at or after `sinceMs`. Errors on individual entries are swallowed: session
+ * files rotate and vanish mid-walk, and a partial listing beats failing the
+ * page.
  */
 export async function listTranscriptFiles(
   root: string,
@@ -34,13 +35,14 @@ export async function listTranscriptFiles(
     } catch {
       return
     }
+    const names = new Set(entries.map((entry) => entry.name))
     for (const entry of entries) {
       const child = join(dir, entry.name)
       if (entry.isDirectory()) {
         await walk(child)
         continue
       }
-      if (!entry.name.endsWith(".jsonl")) continue
+      if (!isListableTranscript(entry.name, names)) continue
       try {
         const stats = await stat(child)
         if (stats.mtimeMs >= sinceMs) {
@@ -72,7 +74,7 @@ export async function readTranscriptRecords(
 
   try {
     const lines = createInterface({
-      input: createReadStream(filePath, { encoding: "utf8" }),
+      input: transcriptReadStream(filePath).setEncoding("utf8"),
       crlfDelay: Infinity,
     })
 

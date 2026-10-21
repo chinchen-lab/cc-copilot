@@ -13,6 +13,11 @@ describe("CompactionMarker", () => {
     expect(screen.getByText("auto · 167.0k")).toBeInTheDocument()
   })
 
+  it("says when the session compacted while it sat idle", () => {
+    render(<CompactionMarker meta={{ trigger: "idle", preTokens: 400000, postTokens: 30000 }} />)
+    expect(screen.getByText("while idle · 400.0k → 30.0k")).toBeInTheDocument()
+  })
+
   it("reveals the summary as markdown when expanded", () => {
     render(<CompactionMarker summary={"## Primary request\n\nShip the thing."} />)
     expect(screen.queryByText("Primary request")).not.toBeInTheDocument()

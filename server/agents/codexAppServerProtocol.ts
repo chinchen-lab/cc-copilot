@@ -152,11 +152,14 @@ export interface ThreadGoal extends JsonObject {
   timeUsedSeconds: number
 }
 
+export type ThreadGoalMutationOrigin = Generated.ThreadGoalMutationOrigin
+
 export interface ThreadGoalSetParams extends JsonObject {
   threadId: string
   objective?: string | null
   status?: string | null
   tokenBudget?: number | null
+  origin?: ThreadGoalMutationOrigin | null
 }
 
 export type InitializeResult = JsonObject

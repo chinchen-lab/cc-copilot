@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest"
-import { cn, copyToClipboard, getEffortOptions, getModelOptions, normalizeEffortForAgent, supportsImageInput } from "../utils"
+import { cn, copyToClipboard, getEffortOptions, getModelOptions, normalizeEffortForAgent } from "../utils"
 
 const claude = getModelOptions("claude")
 const codex = getModelOptions("codex")
@@ -73,14 +73,6 @@ describe("normalizeEffortForAgent", () => {
 
   it("drops Ultra when the selected model does not support it", () => {
     expect(normalizeEffortForAgent("codex", codex, "ultra", "gpt-5.6-luna")).toBe("medium")
-  })
-
-  it("uses the live-catalog fallback limits for GPT-5.5", () => {
-    expect(getEffortOptions("codex", codex, "gpt-5.5").map((option) => option.value)).toEqual([
-      "low", "medium", "high", "xhigh",
-    ])
-    expect(normalizeEffortForAgent("codex", codex, "max", "gpt-5.5")).toBe("medium")
-    expect(supportsImageInput("codex", codex, "gpt-5.5")).toBe(true)
   })
 })
 

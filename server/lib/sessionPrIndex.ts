@@ -1,4 +1,3 @@
-import { open } from "node:fs/promises"
 import { StringDecoder } from "node:string_decoder"
 import {
   createPullRequestScanner,
@@ -6,6 +5,7 @@ import {
   type SessionPullRequest,
   type SessionPullRequestReference,
 } from "../../shared/session/prLinks"
+import { isCompressedTranscript, openTranscript, statTranscript } from "../agents/transcriptFile"
 import { recencyCache } from "./recencyCache"
 
 interface IndexEntry {
@@ -52,6 +52,15 @@ async function scanSessionPullRequests(
   size: number,
   complete: boolean,
 ): Promise<SessionPullRequestData> {
+  // Callers pass the listed size, which for a compressed transcript is not
+  // the size of the content the scan walks.
+  if (isCompressedTranscript(filePath)) {
+    try {
+      size = (await statTranscript(filePath)).size
+    } catch {
+      return { pullRequests: [], references: [] }
+    }
+  }
   const cached = cache.get(filePath)
   // A file that shrank was rewritten (undo, branch restore) — its old scan state
   // no longer describes the content, so start over.
@@ -59,7 +68,7 @@ async function scanSessionPullRequests(
 
   if (size > entry.parsedBytes) {
     try {
-      const handle = await open(filePath, "r")
+      const handle = await openTranscript(filePath)
       try {
         let remaining = complete
           ? size - entry.parsedBytes

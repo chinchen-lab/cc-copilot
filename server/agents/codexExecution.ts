@@ -13,6 +13,7 @@ import { descriptorFor, type PermissionsConfig } from "../../shared/session/agen
 import { storeFor } from "."
 import { codexBrowserConfig } from "./codexBrowser"
 import { AgentRuntimeError } from "./runtimeTypes"
+import { uncompressedTranscriptName } from "./transcriptFile"
 
 export interface CodexExecutionClient {
   start(): Promise<unknown>
@@ -287,7 +288,7 @@ export function getCodexThreadIdentity(
 
   const root = resolve(sessionsDir)
   const filePath = resolve(threadPath)
-  const fileName = relative(root, filePath)
+  const fileName = uncompressedTranscriptName(relative(root, filePath))
   if (
     !fileName
     || fileName === ".."

@@ -394,6 +394,29 @@ describe("summarizeSession", () => {
     ])
   })
 
+  it("counts Codex prompts written only as response items, and an older echo once", async () => {
+    const userItem = (text: string) => codexRecord("response_item", {
+      type: "message",
+      role: "user",
+      content: [{ type: "input_text", text }],
+    })
+    write([
+      codexRecord("session_meta", { id: "codex-session" }),
+      userItem("<environment_context>\n  <cwd>/workspace</cwd>\n</environment_context>"),
+      codexRecord("turn_context", { model: "gpt-5.5" }),
+      userItem("Fix the parser"),
+    ])
+    expect((await summarizeSession("codex-session", file))!.turnCount).toBe(1)
+
+    // An older CLI's echo can land in the next poll; it is still the same prompt.
+    appendFileSync(file, [
+      codexRecord("event_msg", { type: "user_message", message: "Fix the parser" }, "2026-08-01T10:00:01.000Z"),
+      codexRecord("turn_context", { model: "gpt-5.5" }, "2026-08-01T10:00:02.000Z"),
+      userItem("Now add a test"),
+    ].join("\n") + "\n")
+    expect((await summarizeSession("codex-session", file))!.turnCount).toBe(2)
+  })
+
   it("reports a failing Codex tool and keeps an unresolved call current", async () => {
     write([
       codexRecord("session_meta", { id: "codex-session" }),

@@ -74,6 +74,19 @@ describe("RateLimitBanner", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/Resets/)
   })
 
+  it("says whether extra usage is on when the runtime reported it", () => {
+    const { unmount } = renderBanner({ ...weekly, extraUsage: false })
+    expect(screen.getByRole("status")).toHaveTextContent(/Extra usage is off/)
+    unmount()
+    renderBanner({ ...weekly, extraUsage: true })
+    expect(screen.getByRole("status")).toHaveTextContent(/Extra usage is on/)
+  })
+
+  it("says nothing about extra usage when the runtime did not", () => {
+    renderBanner(weekly)
+    expect(screen.getByRole("status")).not.toHaveTextContent(/Extra usage/)
+  })
+
   it("still explains the block when the runtime named no reset time", () => {
     renderBanner({ limit: "five_hour", resetsAt: null, lowPriority: true })
     expect(screen.getByRole("status")).toHaveTextContent(/limit/i)

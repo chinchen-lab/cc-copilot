@@ -4,10 +4,17 @@ import {
   watch,
 } from "../helpers"
 import { descriptorForDirName } from "../../shared/session/agent-descriptors"
+import { formatFor } from "../../shared/session/agents"
 import { storeForPath } from "../agents"
 import { sessionAgentsRunning } from "../agents/agentsRunning"
 import { runtimeForDirName } from "../agents/runtimes"
 import { resolveTaskOutput } from "../agents/taskOutput"
+import {
+  isCompressedTranscript,
+  openTranscript,
+  statTranscript,
+  uncompressedTranscriptName,
+} from "../agents/transcriptFile"
 import { authorizeStreamSession, visibilityFor } from "../edition"
 import { authorizeTranscript } from "../edition/transcript"
 import { StringDecoder } from "node:string_decoder"
@@ -182,7 +189,23 @@ export function registerFileWatchRoutes(use: UseFn) {
       sendJson(res, 403, { error: "Access denied" })
       return
     }
-    const sessionFilePath = filePath
+    let sessionFilePath = filePath
+    const { isNoiseLine } = formatFor(descriptorForDirName(dirName).kind)
+    /**
+     * A `lines` event. Noise lines are not sent, but a client advances its
+     * resume offset by the bytes of the lines it receives, so their bytes are.
+     */
+    const writeLines = (rawLines: readonly string[]) => {
+      const lines: string[] = []
+      let skippedBytes = 0
+      for (const line of rawLines) {
+        if (!line.trim()) continue
+        if (isNoiseLine(line)) skippedBytes += Buffer.byteLength(line, "utf8") + 1
+        else lines.push(line)
+      }
+      if (lines.length === 0 && skippedBytes === 0) return
+      res.write(`data: ${JSON.stringify({ type: "lines", lines, ...(skippedBytes > 0 ? { skippedBytes } : {}) })}\n\n`)
+    }
 
     // SSE headers
     res.writeHead(200, {
@@ -221,7 +244,7 @@ export function registerFileWatchRoutes(use: UseFn) {
         while (!closed) {
           recordActivity("Session file checks")
           try {
-            const s = await stat(sessionFilePath)
+            const s = await statTranscript(sessionFilePath)
             if (s.size < offset) {
               // File was truncated (e.g. by undo). Reset to current size.
               offset = s.size
@@ -236,9 +259,7 @@ export function registerFileWatchRoutes(use: UseFn) {
                   JSON.parse(remainder)
                   const line = remainder
                   remainder = ""
-                  res.write(
-                    `data: ${JSON.stringify({ type: "lines", lines: [line] })}\n\n`,
-                  )
+                  writeLines([line])
                 } catch {
                   // Not valid JSON yet -- still a partial line, keep waiting.
                 }
@@ -247,7 +268,7 @@ export function registerFileWatchRoutes(use: UseFn) {
             }
 
             const bytesToRead = Math.min(s.size - offset, SESSION_READ_CHUNK_BYTES)
-            const fh = await open(sessionFilePath, "r")
+            const fh = await openTranscript(sessionFilePath)
             try {
               const buf = Buffer.alloc(bytesToRead)
               const { bytesRead } = await fh.read(buf, 0, buf.length, offset)
@@ -261,14 +282,12 @@ export function registerFileWatchRoutes(use: UseFn) {
               // Last element may be a partial line (no trailing \n).
               remainder = rawParts.pop() || ""
 
-              const lines = rawParts.filter((line) => line.trim())
-              if (lines.length > 0) {
-                res.write(`data: ${JSON.stringify({ type: "lines", lines })}\n\n`)
-              }
+              writeLines(rawParts)
             } finally {
               await fh.close()
             }
           } catch {
+            if (await followMaterializedTranscript()) continue
             // File temporarily unavailable during writes.
             return
           }
@@ -369,7 +388,7 @@ export function registerFileWatchRoutes(use: UseFn) {
     // its snapshot byte offset, replay anything written between that snapshot
     // and this connection. Without this, a line written in that race window
     // is skipped and the UI stays one response behind until the next write.
-    stat(sessionFilePath)
+    statTranscript(sessionFilePath)
       .then((s) => {
         if (!hasRequestedOffset) offset = s.size
         else if (offset > s.size) offset = s.size
@@ -391,25 +410,48 @@ export function registerFileWatchRoutes(use: UseFn) {
     // Throttle: fire immediately on first change, then at most once per
     // THROTTLE_MS while writes continue. A trailing flush catches the
     // final write after activity stops.
-    let watcherHealthy = false
-    try {
-      watcher = watch(sessionFilePath, () => {
-        if (closed) return
-        recordActivity("Session file events")
-        if (trailingTimer) clearTimeout(trailingTimer)
-        trailingTimer = setTimeout(() => flushNewLines(), THROTTLE_MS)
+    function watchSessionFile(): boolean {
+      watcher?.close()
+      watcher = null
+      try {
+        watcher = watch(sessionFilePath, () => {
+          if (closed) return
+          recordActivity("Session file events")
+          if (trailingTimer) clearTimeout(trailingTimer)
+          trailingTimer = setTimeout(() => flushNewLines(), THROTTLE_MS)
 
-        if (throttleTimer) return
-        flushNewLines()
-        throttleTimer = setTimeout(() => {
-          throttleTimer = null
-        }, THROTTLE_MS)
-      })
-      watcher.on("error", () => {}) // prevent uncaught crash when file is removed
-      watcherHealthy = true
-    } catch {
-      // file may not exist yet -- poller below will pick up changes
+          if (throttleTimer) return
+          flushNewLines()
+          throttleTimer = setTimeout(() => {
+            throttleTimer = null
+          }, THROTTLE_MS)
+        })
+        watcher.on("error", () => {}) // prevent uncaught crash when file is removed
+        return true
+      } catch {
+        // file may not exist yet -- poller below will pick up changes
+        return false
+      }
     }
+
+    /**
+     * Resuming a compressed transcript replaces it with its plain form, whose
+     * bytes are the decompressed ones, so the stream carries on from `offset`.
+     */
+    async function followMaterializedTranscript(): Promise<boolean> {
+      if (closed || !isCompressedTranscript(sessionFilePath)) return false
+      const plainPath = uncompressedTranscriptName(sessionFilePath)
+      try {
+        await stat(plainPath)
+      } catch {
+        return false
+      }
+      sessionFilePath = plainPath
+      watchSessionFile()
+      return true
+    }
+
+    const watcherHealthy = watchSessionFile()
 
     // Poll as a fallback for fs.watch. With a healthy watcher the poll is
     // only a safety net for missed FSEvents, so it can be slow; without one

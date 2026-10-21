@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
+  codexPageHeaderLine,
+  createCodexPromptReader,
   extractApplyPatchInputs,
   extractCodexMetadataFromLines,
   isCodexSessionText,
@@ -1906,5 +1908,184 @@ describe("parseCodexSession paged windows", () => {
     expect(joined).toHaveLength(1)
     expect(joined[0].userMessage).toBe("Add view transitions")
     expect(joined[0].assistantText).toEqual(["Starting.", "Finished."])
+  })
+})
+
+describe("Codex 0.16x rollout records", () => {
+  function record(ordinal: number, type: string, payload: Record<string, unknown>, timestamp = "2024-01-01T00:00:01.000Z"): string {
+    return JSON.stringify({ timestamp, ordinal, type, payload })
+  }
+  function prompt(ordinal: number, text: string): string {
+    return record(ordinal, "response_item", { type: "message", role: "user", content: [{ type: "input_text", text }] })
+  }
+  function answer(ordinal: number, text: string): string {
+    return record(ordinal, "response_item", { type: "message", role: "assistant", content: [{ type: "output_text", text }] })
+  }
+
+  it("renders a failed turn's task_complete error as its reply", () => {
+    const session = parseCodexSession([
+      sessionMeta(),
+      turnContext(),
+      userMessage("build it"),
+      JSON.stringify({
+        type: "event_msg",
+        timestamp: "2024-01-01T00:00:04.000Z",
+        payload: {
+          type: "task_complete",
+          last_agent_message: null,
+          error: { message: "You've hit your usage limit.", codex_error_info: "usage_limit_exceeded" },
+        },
+      }),
+    ].join("\n"))
+
+    expect(session.turns).toHaveLength(1)
+    expect(session.turns[0].userMessage).toBe("build it")
+    expect(session.turns[0].assistantText).toEqual(["You've hit your usage limit."])
+    expect(session.turns[0].contentBlocks).toEqual([
+      { kind: "text", text: ["You've hit your usage limit."], timestamp: "2024-01-01T00:00:04.000Z" },
+    ])
+  })
+
+  describe("sub-agent history copied from the parent", () => {
+    const childMeta = (start: number) => record(0, "session_meta", {
+      id: "child",
+      cwd: "/repo",
+      parent_thread_id: "parent",
+      source: { subagent: { thread_spawn: { parent_thread_id: "parent", agent_path: "/root/worker" } } },
+      subagent_history_start_ordinal: start,
+    })
+    const inherited = [
+      record(1, "session_meta", { id: "parent", cwd: "/repo" }),
+      prompt(2, "the parent's prompt"),
+      answer(3, "the parent's reply"),
+    ]
+
+    it("starts the child at its own history", () => {
+      const text = [childMeta(4), ...inherited, prompt(4, "the child's task"), answer(5, "done")].join("\n")
+      const session = parseCodexSession(text)
+      expect(session.sessionId).toBe("child")
+      expect(session.turns.map((turn) => turn.userMessage)).toEqual(["the child's task"])
+      expect(session.rawMessages.map((raw) => raw.ordinal)).toEqual([0, 4, 5])
+
+      const meta = extractCodexMetadataFromLines(text.split("\n"))
+      expect(meta.firstUserMessage).toBe("the child's task")
+      expect(meta.parentSessionId).toBe("parent")
+      expect(meta.turnCount).toBe(1)
+    })
+
+    it("keeps everything when the boundary sits past the last record", () => {
+      const session = parseCodexSession([childMeta(4), ...inherited].join("\n"))
+      expect(session.turns.map((turn) => turn.userMessage)).toEqual(["the parent's prompt"])
+    })
+
+    describe("on a page of the rollout", () => {
+      const own = [prompt(4, "the child's task"), answer(5, "done")]
+      const pageHeader = (start: number, lastLines: string[]) => codexPageHeaderLine(childMeta(start), async () => lastLines)
+
+      it("marks a sub-agent's header with the rollout's last ordinal, read from its last parseable line", async () => {
+        const header = JSON.parse(await pageHeader(4, [...own, "{\"timestamp\":\"partial"]))
+        expect(header.rolloutLastOrdinal).toBe(5)
+        expect(header.payload.subagent_history_start_ordinal).toBe(4)
+
+        const plain = record(0, "session_meta", { id: "root", cwd: "/repo" })
+        const lastLines = async (): Promise<string[]> => { throw new Error("not needed") }
+        await expect(codexPageHeaderLine(plain, lastLines)).resolves.toBe(plain)
+      })
+
+      it("leaves out copied history on an older page that holds nothing else", async () => {
+        const header = await pageHeader(4, own)
+        const olderPage = parseCodexSession([header, ...inherited].join("\n"))
+        expect(olderPage.turns).toEqual([])
+
+        const tailPage = parseCodexSession([header, ...own].join("\n"))
+        expect(tailPage.turns.map((turn) => turn.userMessage)).toEqual(["the child's task"])
+      })
+
+      it("keeps a converted rollout's records, whose boundary is at the end of the file", async () => {
+        const header = await pageHeader(4, inherited)
+        const page = parseCodexSession([header, ...inherited.slice(1)].join("\n"))
+        expect(page.turns.map((turn) => turn.userMessage)).toEqual(["the parent's prompt"])
+      })
+    })
+  })
+
+  it("reads sub-agent identity, model and effort from SubAgentActivity items", () => {
+    const activity = (id: string, kind: string, extra: Record<string, unknown> = {}) => JSON.stringify({
+      type: "event_msg",
+      timestamp: "2024-01-01T00:00:04.000Z",
+      payload: {
+        type: "item_completed",
+        item: { type: "SubAgentActivity", id, kind, agent_thread_id: "thread-7", agent_path: "/root/reviewer", model: null, reasoning_effort: null, ...extra },
+      },
+    })
+    const session = parseCodexSession([
+      sessionMeta(),
+      turnContext(),
+      userMessage("review it"),
+      namespacedFunctionCall("call-1", "spawn_agent", { task_name: "reviewer", message: "review the diff" }),
+      activity("call-1", "started", { model: "gpt-6.1-sol", reasoning_effort: "xhigh" }),
+      JSON.stringify({
+        type: "response_item",
+        timestamp: "2024-01-01T00:00:04.100Z",
+        payload: { type: "function_call_output", call_id: "call-1", output: "{\"task_name\":\"/root/reviewer\"}" },
+      }),
+      activity("subagent-completed-1", "completed"),
+    ].join("\n"))
+
+    const [agent] = session.turns[0].subAgentActivity
+    expect(session.turns[0].subAgentActivity).toHaveLength(1)
+    expect(agent).toMatchObject({
+      agentId: "thread-7",
+      agentName: "reviewer",
+      parentToolUseId: "call-1",
+      model: "gpt-6.1-sol",
+      effort: "xhigh",
+      status: "completed",
+      prompt: "review the diff",
+    })
+  })
+})
+
+describe("createCodexPromptReader", () => {
+  const userItem = (text: string) => ({
+    type: "response_item",
+    payload: { type: "message", role: "user", content: [{ type: "input_text", text }] },
+  })
+  const echo = (message: string) => ({ type: "event_msg", payload: { type: "user_message", message } })
+  const reply = { type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "ok" }] } }
+
+  function prompts(records: object[]): string[] {
+    const read = createCodexPromptReader()
+    return records.map(read).filter(Boolean)
+  }
+
+  it("reads prompts a current rollout writes only as response items, skipping injected context", () => {
+    expect(prompts([
+      userItem("# AGENTS.md instructions for /proj\n\n<INSTRUCTIONS>x</INSTRUCTIONS>"),
+      userItem("<environment_context>\n  <cwd>/proj</cwd>\n</environment_context>"),
+      userItem("first"),
+      reply,
+      userItem("second"),
+    ])).toEqual(["first", "second"])
+  })
+
+  it("skips an older rollout's echo but keeps a prompt repeated in a later turn", () => {
+    expect(prompts([
+      userItem("<environment_context></environment_context>"),
+      userItem("continue"),
+      echo("continue"),
+      reply,
+      userItem("continue"),
+      echo("continue"),
+    ])).toEqual(["continue", "continue"])
+  })
+
+  it("pairs an echo with its prompt even when their text differs", () => {
+    expect(prompts([userItem("<image name=[Image #1]>\n</image>\nlook"), echo("look")]))
+      .toEqual(["<image name=[Image #1]>\n</image>\nlook"])
+  })
+
+  it("reads a prompt written only as an event", () => {
+    expect(prompts([echo("hello"), reply, echo("again")])).toEqual(["hello", "again"])
   })
 })

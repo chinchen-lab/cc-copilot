@@ -26,6 +26,7 @@ import type {
   PendingApproval,
   PendingElicitation,
   ThreadGoalClearResponse,
+  ThreadGoalMutationOrigin,
   ThreadGoalResponse,
   ThreadGoalSetParams,
   ThreadResponse,
@@ -437,8 +438,8 @@ export class CodexAppServer {
     return this.call("thread/goal/set", params)
   }
 
-  clearGoal(threadId: string): Promise<ThreadGoalClearResponse> {
-    return this.call("thread/goal/clear", { threadId })
+  clearGoal(threadId: string, origin?: ThreadGoalMutationOrigin): Promise<ThreadGoalClearResponse> {
+    return this.call("thread/goal/clear", origin ? { threadId, origin } : { threadId })
   }
 
   getActiveTurnId(threadId: string): string | undefined {

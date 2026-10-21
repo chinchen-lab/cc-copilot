@@ -5,6 +5,7 @@ import { authorizeSession } from "../edition"
 import { findJsonlPath } from "../sessionPaths"
 import { matchSubagentToMember } from "../lib/agentTeamIdentity"
 import { parseSession } from "../../shared/session/parser"
+import { readTranscriptText } from "../agents/transcriptFile"
 import type {
   ParsedSession,
   Turn,
@@ -218,7 +219,13 @@ function mapContentBlock(block: TurnContentBlock) {
     case "task_notification":
       return { kind: "task_notification" as const, content: block.content, timestamp: block.timestamp ?? null }
     case "local_command":
-      return { kind: "local_command" as const, content: block.content, timestamp: block.timestamp ?? null }
+      return {
+        kind: "local_command" as const,
+        content: block.content,
+        timestamp: block.timestamp ?? null,
+        ...(block.contextUsage ? { contextUsage: block.contextUsage } : {}),
+        ...(block.usageReport ? { usageReport: block.usageReport } : {}),
+      }
     default: {
       // Exhaustiveness guard: a new TurnContentBlock kind must fail typecheck here
       // rather than silently serializing as undefined and vanishing from the response.
@@ -382,7 +389,7 @@ export function registerSessionContextRoutes(use: UseFn) {
         return sendJson(res, 404, { error: "Session not found" })
       }
 
-      const parsed = parseSession(await readFile(jsonlPath, "utf-8"))
+      const parsed = parseSession(await readTranscriptText(jsonlPath))
 
       // L1: GET /api/session-context/:sessionId
       if (parts.length === 1) {
@@ -403,7 +410,7 @@ export function registerSessionContextRoutes(use: UseFn) {
         return sendJson(res, 404, { error: "Agent not found" })
       }
 
-      const subagentSession = parseSession(await readFile(subagentFile.filePath, "utf-8"))
+      const subagentSession = parseSession(await readTranscriptText(subagentFile.filePath))
 
       if (parts.length === 5) {
         return sendTurnDetail(res, subagentSession, parts[4])

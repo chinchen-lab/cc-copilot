@@ -9,7 +9,7 @@
  */
 
 import { existsSync, mkdirSync } from "node:fs"
-import { open, readFile, readdir, stat } from "node:fs/promises"
+import { readdir, stat } from "node:fs/promises"
 import { join, basename, dirname } from "node:path"
 import { SearchIndex } from "../lib/search-index"
 import { DEFAULT_DB_PATH } from "../lib/dirs"
@@ -18,6 +18,7 @@ import { findSessionFile, listAllSessionFiles } from "../lib/stores"
 import { formatForText } from "../lib/agents"
 import { getUserMessageText } from "../lib/parser"
 import { parseTranscript } from "../lib/read-session"
+import { openTranscript, readTranscriptText } from "../lib/transcriptFile"
 import type { ParsedSession } from "../lib/types"
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -174,7 +175,7 @@ async function cwdFromFilePath(filePath: string): Promise<string> {
   if (cached !== undefined) return cached
 
   try {
-    const fh = await open(filePath, "r")
+    const fh = await openTranscript(filePath)
     try {
       const buf = Buffer.alloc(CWD_READ_BYTES)
       const { bytesRead } = await fh.read(buf, 0, CWD_READ_BYTES, 0)
@@ -272,7 +273,7 @@ function discoverAllSessions(maxAgeMs: number): Array<{ path: string; mtimeMs: n
 
 async function rawTextMatch(filePath: string, query: string, caseSensitive: boolean): Promise<string | null> {
   try {
-    const content = await readFile(filePath, "utf-8")
+    const content = await readTranscriptText(filePath)
     const haystack = caseSensitive ? content : content.toLowerCase()
     const needle = caseSensitive ? query : query.toLowerCase()
     if (haystack.includes(needle)) return content

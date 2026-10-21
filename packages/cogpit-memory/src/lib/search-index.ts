@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite"
-import { readFileSync, statSync, unlinkSync } from "node:fs"
+import { statSync, unlinkSync } from "node:fs"
 import { parseSession, getUserMessageText } from "./parser"
+import { readTranscriptTextSync } from "./transcriptFile"
 import {
   allStores,
   defaultStore,
@@ -212,7 +213,7 @@ export class SearchIndex {
       mtimeMs = statSync(filePath).mtimeMs
     }
 
-    const content = readFileSync(filePath, "utf-8")
+    const content = readTranscriptTextSync(filePath)
     const session = parseSession(content, { skipStats: true })
 
     const isSubagent = opts?.isSubagent ? 1 : 0
@@ -439,7 +440,7 @@ export class SearchIndex {
     const txn = this.db.transaction(() => {
       for (const file of files) {
         try {
-          const content = readFileSync(file.path, "utf-8")
+          const content = readTranscriptTextSync(file.path)
           const session = parseSession(content, { skipStats: true })
           this.insertSessionContent(insert, file.sessionId, file.path, session)
           insertFile.run(file.path, file.mtimeMs, file.sessionId, file.isSubagent ? 1 : 0, file.parentSessionId)

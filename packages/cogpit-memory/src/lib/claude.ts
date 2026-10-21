@@ -39,6 +39,26 @@ export function isClaudeSessionText(): boolean {
   return true
 }
 
+const API_REQUEST_TYPE = '"type":"api-request'
+/** How far into a line its top-level `type` key is looked for. */
+const RECORD_TYPE_WINDOW = 256
+
+/**
+ * True for the `api-request`, `api-request-blob` and `api-request-shape`
+ * records Claude Code 2.1.300+ logs for every API call. Nothing reads them,
+ * and they can be most of a transcript's bytes.
+ *
+ * Inside a JSON string every quote is escaped, so `"type":"api-request` can
+ * only be a key and its value; with no `{` before it but the line's own, it is
+ * the top-level key, wherever the writer put it.
+ */
+export function isClaudeNoiseLine(line: string): boolean {
+  if (line.startsWith(`{${API_REQUEST_TYPE}`)) return true
+  const head = line.slice(0, RECORD_TYPE_WINDOW)
+  const at = head.indexOf(API_REQUEST_TYPE)
+  return at > 0 && head.lastIndexOf("{", at) === 0
+}
+
 // ── Parsing ─────────────────────────────────────────────────────────────────
 
 export interface ClaudeMetadata {
@@ -56,7 +76,7 @@ function parseRecords(lines: readonly string[]): RawMessage[] {
   const messages: RawMessage[] = []
   for (const line of lines) {
     const trimmed = line.trim()
-    if (!trimmed) continue
+    if (!trimmed || isClaudeNoiseLine(trimmed)) continue
     try {
       messages.push(JSON.parse(trimmed) as RawMessage)
     } catch {

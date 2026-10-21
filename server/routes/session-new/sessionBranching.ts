@@ -1,7 +1,6 @@
 import {
   dirname,
   mkdir,
-  readFile,
   stat,
   writeFile,
   randomUUID,
@@ -15,6 +14,7 @@ import {
 } from "../../../shared/session/agents"
 import { storeForDirName, storeForPath } from "../../agents"
 import { runtimeForDirName } from "../../agents/runtimes"
+import { readTranscriptText } from "../../agents/transcriptFile"
 import { sendJson, withJsonBody, type UseFn } from "../../http"
 import { reportSessionEvent, recordSessionOwner } from "../../edition"
 import { authorizeTranscript } from "../../edition/transcript"
@@ -70,7 +70,7 @@ export function registerBranchSessionRoute(use: UseFn) {
           reportSessionEvent(req, "session.branch", { sessionId, agent: descriptor.kind, dirName }, { branchedFrom: source.sessionId })
         }
 
-        const content = await readFile(sourcePath, "utf-8")
+        const content = await readTranscriptText(sourcePath)
         let lines = content.split("\n").filter(Boolean)
 
         if (lines.length === 0) {

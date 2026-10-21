@@ -231,6 +231,62 @@ describe("getSessionMeta agent detection", () => {
   })
 })
 
+describe("Codex prompts", () => {
+  function codexUserItem(text: string, timestamp: string) {
+    return {
+      type: "response_item",
+      timestamp,
+      payload: { type: "message", role: "user", content: [{ type: "input_text", text }] },
+    }
+  }
+
+  const header = [
+    { type: "session_meta", timestamp: "2026-10-18T10:00:00Z", payload: { id: "codex-1", cwd: "/code/app", cli_version: "0.163.0" } },
+    codexUserItem("# AGENTS.md instructions for /code/app\n\n<INSTRUCTIONS>never mention zebras</INSTRUCTIONS>", "2026-10-18T10:00:00Z"),
+    codexUserItem("<environment_context>\n  <cwd>/code/app</cwd>\n</environment_context>", "2026-10-18T10:00:00Z"),
+  ]
+
+  /** Codex 0.15x+ writes prompts only as `response_item` user messages. */
+  const currentRollout = [
+    ...header,
+    { type: "turn_context", timestamp: "2026-10-18T10:00:01Z", payload: { turn_id: "t1", model: "gpt-5.5" } },
+    codexUserItem("rename the billing module", "2026-10-18T10:00:01Z"),
+    { type: "response_item", timestamp: "2026-10-18T10:00:05Z", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "Done." }] } },
+    { type: "turn_context", timestamp: "2026-10-18T10:01:00Z", payload: { turn_id: "t1", model: "gpt-5.5" } },
+    codexUserItem("now update the invoice tests", "2026-10-18T10:01:00Z"),
+  ]
+
+  it("reads prompts a current rollout writes only as response items", async () => {
+    const meta = await getSessionMeta(await writeSession(currentRollout))
+
+    expect(meta.firstUserMessage).toBe("rename the billing module")
+    expect(meta.lastUserMessage).toBe("now update the invoice tests")
+    expect(meta.turnCount).toBe(2)
+  })
+
+  it("counts an older rollout's echoed prompts once", async () => {
+    const meta = await getSessionMeta(await writeSession([
+      ...header,
+      { type: "turn_context", timestamp: "2026-03-01T10:00:01Z", payload: { turn_id: "t1" } },
+      codexUserItem("continue", "2026-03-01T10:00:01Z"),
+      { type: "event_msg", timestamp: "2026-03-01T10:00:01Z", payload: { type: "user_message", message: "continue" } },
+      { type: "response_item", timestamp: "2026-03-01T10:00:05Z", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "ok" }] } },
+      { type: "turn_context", timestamp: "2026-03-01T10:01:00Z", payload: { turn_id: "t1" } },
+      codexUserItem("continue", "2026-03-01T10:01:00Z"),
+      { type: "event_msg", timestamp: "2026-03-01T10:01:00Z", payload: { type: "user_message", message: "continue" } },
+    ]))
+
+    expect(meta.turnCount).toBe(2)
+  })
+
+  it("searches prompts written only as response items, not injected context", async () => {
+    const filePath = await writeSession(currentRollout)
+
+    await expect(searchSessionMessages(filePath, "invoice")).resolves.toContain("now update the invoice tests")
+    await expect(searchSessionMessages(filePath, "zebras")).resolves.toBeNull()
+  })
+})
+
 describe("getSessionMeta ai-title support", () => {
   it("extracts the AI-generated title from ai-title events", async () => {
     const filePath = await writeSession([
@@ -494,6 +550,26 @@ describe("getSessionStatus background agents", () => {
     const status = await getSessionStatus(filePath)
     expect(status.status).toBe("awaiting_agents")
     expect(status.pendingAgents).toBe(1)
+    expect(status.pendingAgentDescriptions).toEqual(["Explore the parser"])
+  })
+
+  it("finds a pending launch behind more api-request records than the scan cap", async () => {
+    // Each blob quotes the launch result, which would match the filtered
+    // phase's markers if the scan parsed it.
+    const blob = (i: number) => ({
+      type: "api-request-blob",
+      hash: `h${i}`,
+      message: { role: "user", content: `async_launched ${"x".repeat(50_000)}` },
+    })
+    const filePath = await writeSession([
+      userLine("kick off the agents"),
+      asyncLaunch("tu1", "ag1", "Explore the parser"),
+      ...Array.from({ length: 8 }, (_, i) => blob(i)),
+      endTurn,
+    ])
+
+    const status = await getSessionStatus(filePath)
+    expect(status.status).toBe("awaiting_agents")
     expect(status.pendingAgentDescriptions).toEqual(["Explore the parser"])
   })
 

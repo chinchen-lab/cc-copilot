@@ -46,6 +46,12 @@ function resetText(resetsAt: number | null): string | null {
   })
 }
 
+/** What the runtime said about the account's extra usage, as a sentence; empty when it said nothing. */
+function extraUsageText(extraUsage: boolean | undefined): string {
+  if (extraUsage === undefined) return ""
+  return extraUsage ? "Extra usage is on but did not cover this. " : "Extra usage is off for this account. "
+}
+
 /**
  * Why a session stopped on a spent allowance, and the one way past it.
  *
@@ -74,6 +80,7 @@ export function RateLimitBanner({ block, dirName, fileName, cwd, terminal }: Rat
       <AlertDescription className="flex flex-col items-start gap-2">
         <span>
           {reset ? `Resets at ${reset}. ` : ""}
+          {extraUsageText(block.extraUsage)}
           {lowPriority ? (
             <>
               It can keep this session going before then at lower priority, spending your

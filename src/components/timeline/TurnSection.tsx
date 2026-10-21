@@ -654,7 +654,12 @@ function ContentBlocks({
 
     if (block.kind === "local_command") {
       elements.push(
-        <LocalCommandBlock key={keyFor(block, i)} content={block.content} />
+        <LocalCommandBlock
+          key={keyFor(block, i)}
+          content={block.content}
+          contextUsage={block.contextUsage}
+          usageReport={block.usageReport}
+        />
       )
       i++
       continue

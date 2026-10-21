@@ -1,5 +1,6 @@
 import { AGENT_KINDS, type AgentKind } from "../../shared/session/agent-descriptors"
 import { isRecord } from "../../shared/objects"
+import { codexPromptText } from "../../shared/session/codex"
 
 /**
  * Per-agent readers for single transcript records, for the scans in
@@ -58,14 +59,9 @@ const codexReader: AgentRecordReader = {
     const settings = isRecord(payload.thread_settings) ? payload.thread_settings : null
     return nonEmpty(settings?.reasoning_effort)
   },
-  userMessageMarkers: ['"event_msg"'],
-  userMessageText(record) {
-    if (record.type !== "event_msg" || !isRecord(record.payload)) return null
-    const { payload } = record
-    return payload.type === "user_message" && typeof payload.message === "string"
-      ? payload.message.trim()
-      : null
-  },
+  // Older CLIs also echo each prompt as an `event_msg` `user_message`.
+  userMessageMarkers: ['"role":"user"', '"user_message"'],
+  userMessageText: (record) => codexPromptText(record) || null,
 }
 
 const copilotReader: AgentRecordReader = {

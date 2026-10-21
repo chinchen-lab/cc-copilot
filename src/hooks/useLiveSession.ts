@@ -331,7 +331,10 @@ export function useLiveSession(
         } else if (data.type === "stream_clear") {
           clearOverlay()
           setIsCompacting(false)
-        } else if (data.type === "lines" && data.lines.length > 0) {
+        } else if (data.type === "lines") {
+          // Lines the server left out still moved the file on.
+          if (typeof data.skippedBytes === "number") trackedOffset += data.skippedBytes
+          if (data.lines.length === 0) return
           setIsLive(true)
           setIsCompacting(false)
           resetStaleTimer()

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { zstdCompressSync } from "node:zlib"
 import { installDirsMock, mockDirs } from "../fixtures"
 
 let tmpDir: string
@@ -11,6 +12,7 @@ installDirsMock()
 const { listAllSessionFiles, storeFor, storeForPath } = await import("../../lib/stores")
 const { findSessionFile } = await import("../../lib/stores")
 const { instanceSessionId } = await import("../../lib/instances")
+const { readTranscriptTextSync } = await import("../../lib/transcriptFile")
 const originalRoot = process.env.COGPIT_ORCHESTRATION_ROOT
 
 function write(filePath: string, content = "{}\n"): string {
@@ -65,6 +67,25 @@ describe("agent session stores", () => {
       .sort()
 
     expect(kinds).toEqual(["claude", "codex", "copilot"])
+  })
+
+  it("lists and finds compressed Codex rollouts, preferring a plain copy", async () => {
+    const archived = "1c0e7a52-5b0f-4b6e-a7a1-3f9d2c4e8b10"
+    const live = "9b2a3af0-9728-49a7-8f6f-f3bc66a2de22"
+    const day = join(mockDirs.CODEX_SESSIONS_DIR, "2026", "07", "01")
+    const records = `${JSON.stringify({ type: "session_meta", payload: { id: archived, cwd: "/work" } })}\n`
+    const archivedPath = write(join(day, `rollout-2026-07-01T09-00-00-${archived}.jsonl.zst`))
+    writeFileSync(archivedPath, zstdCompressSync(Buffer.from(records)))
+    const livePath = write(join(day, `rollout-2026-07-01T10-00-00-${live}.jsonl`))
+    write(`${livePath}.zst`)
+
+    expect(listAllSessionFiles(0).map((file) => [file.path, file.sessionId]).sort()).toEqual([
+      [archivedPath, archived],
+      [livePath, live],
+    ])
+    expect(await findSessionFile(archived)).toBe(realpathSync(archivedPath))
+    expect(await findSessionFile(live)).toBe(realpathSync(livePath))
+    expect(readTranscriptTextSync(archivedPath)).toBe(records)
   })
 
   it("takes a Copilot session id from its directory, never from `events`", () => {

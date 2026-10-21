@@ -138,7 +138,7 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => {
 
 // subagentWatcher pulls in fs — stub it out
 vi.mock("../subagentWatcher", () => ({
-  watchSubagents: vi.fn(() => ({ close: vi.fn() })),
+  watchSubagents: vi.fn(() => ({ close: vi.fn(), rescan: vi.fn() })),
 }))
 
 // Stream bus — spy on the wiring without exercising the real throttling
@@ -941,8 +941,8 @@ describe("sdk-session subagent watcher lifecycle", () => {
     const firstClose = vi.fn()
     const secondClose = vi.fn()
     watchSubagents
-      .mockReturnValueOnce({ close: firstClose })
-      .mockReturnValueOnce({ close: secondClose })
+      .mockReturnValueOnce({ close: firstClose, rescan: vi.fn() })
+      .mockReturnValueOnce({ close: secondClose, rescan: vi.fn() })
 
     const { createSDKSession, sendSDKMessage } = await loadModule()
     const state = createSDKSession({ sessionId: "watch-repeat", cwd: "/tmp", message: "first" })
@@ -969,7 +969,7 @@ describe("sdk-session subagent watcher lifecycle", () => {
     const watcherModule = await import("../subagentWatcher")
     const watchSubagents = vi.mocked(watcherModule.watchSubagents)
     const close = vi.fn()
-    watchSubagents.mockReturnValueOnce({ close })
+    watchSubagents.mockReturnValueOnce({ close, rescan: vi.fn() })
 
     const { attachSubagentWatcher, createSDKSession, sdkSessions, stopSDKSession } = await loadModule()
     const state = createSDKSession({ sessionId: "watch-stop", cwd: "/tmp", message: "hi" })
@@ -1499,51 +1499,33 @@ describe("sdk-session stream bus wiring", () => {
     expect(streamBus.completeMessage).not.toHaveBeenCalledWith("st6", "msg_sub")
   })
 
-  it("registers nested subagent Task calls so agents deeper than one level resolve", async () => {
-    // Claude Code 2.1.219 raised the default spawn depth from 1 to 3. A depth-2
-    // agent's opening prompt matches a Task call made INSIDE another subagent,
-    // so that call has to be a candidate or the nested agent can never bind to
-    // a parent and its transcript is dropped.
-    const taskBlock = { type: "tool_use", name: "Task", id: "toolu_main", input: { prompt: "main task" } }
-    const subagentTaskBlock = { type: "tool_use", name: "Task", id: "toolu_nested", input: { prompt: "nested task" } }
+  it("binds each subagent to its Agent call by task id, nested ones with their parent", async () => {
+    // Twins with identical prompts are the case prompt matching could not
+    // tell apart; the task id names each one's transcript exactly.
+    const started = (taskId: string, toolUseId: string, extra: Record<string, unknown> = {}) => ({
+      type: "system", subtype: "task_started", task_id: taskId, tool_use_id: toolUseId,
+      task_type: "local_agent", subagent_type: "general-purpose", description: taskId,
+      prompt: "Reply with PONG.", ...extra,
+    })
     scriptedMessages = [
-      { type: "assistant", message: { id: "msg_1", content: [taskBlock] } },
-      { type: "assistant", message: { id: "msg_2", content: [subagentTaskBlock] }, parent_tool_use_id: "toolu_main" },
+      started("a-twin1", "toolu_1"),
+      started("a-twin2", "toolu_2"),
+      started("a-inner", "toolu_inner", { parent_task_id: "a-twin1", spawn_depth: 2 }),
+      // A resumed subagent reports its task id again under another call.
+      started("a-twin1", "toolu_send", { is_backgrounded: true }),
       { type: "result", is_error: false },
     ]
 
     const { createSDKSession } = await loadModule()
     const state = createSDKSession({ sessionId: "st5", cwd: "/tmp", message: "hi" })
-    await waitUntil(() => captured.length === 1)
     await captured[0].completed
-    await waitUntil(() => state.pendingTaskCalls.size >= 2)
+    await waitUntil(() => state.subagentTasks.size === 3)
 
-    expect(state.pendingTaskCalls.get("toolu_main")).toBe("main task")
-    expect(state.pendingTaskCalls.get("toolu_nested")).toBe("nested task")
-  })
-
-  it("still publishes subagent text to the bus while registering its nested Task calls", async () => {
-    // Registering must not cost the live-transcript publish, nor start treating
-    // a subagent message as a main-thread completion.
-    const nested = { type: "tool_use", name: "Agent", id: "toolu_nested2", input: { prompt: "deep task" } }
-    const text = { type: "text", text: "spawning a helper" }
-    scriptedMessages = [
-      { type: "assistant", message: { id: "msg_s", content: [text, nested] }, parent_tool_use_id: "toolu_p" },
-      { type: "result", is_error: false },
-    ]
-
-    const streamBus = await import("../lib/streamBus")
-    const { createSDKSession } = await loadModule()
-    const state = createSDKSession({ sessionId: "st7", cwd: "/tmp", message: "hi" })
-    await waitUntil(() => vi.mocked(streamBus.publishCompleteMessage).mock.calls.length >= 1)
-
-    expect(streamBus.publishCompleteMessage).toHaveBeenCalledWith("st7", {
-      messageId: "msg_s",
-      parentToolUseId: "toolu_p",
-      blocks: [{ blockType: "text", text: "spawning a helper" }],
+    expect(state.subagentTasks.get("a-twin1")).toEqual({
+      toolUseId: "toolu_1", parentTaskId: undefined, subagentType: "general-purpose", forwardedBytes: 0,
     })
-    expect(streamBus.completeMessage).not.toHaveBeenCalledWith("st7", "msg_s")
-    await waitUntil(() => state.pendingTaskCalls.has("toolu_nested2"))
+    expect(state.subagentTasks.get("a-twin2")?.toolUseId).toBe("toolu_2")
+    expect(state.subagentTasks.get("a-inner")).toMatchObject({ toolUseId: "toolu_inner", parentTaskId: "a-twin1" })
   })
 })
 

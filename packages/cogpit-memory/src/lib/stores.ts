@@ -28,6 +28,7 @@ import {
 } from "./agent-descriptors"
 import { dirs } from "./dirs"
 import { instanceSessionId, splitInstanceSessionId } from "./instances"
+import { isListableTranscript, uncompressedTranscriptName } from "./transcriptFile"
 
 /** One transcript on disk, plus what an index needs to file it under. */
 export interface SessionFile {
@@ -182,18 +183,20 @@ function walkClaude(root: string, cutoffMs: number): SessionFile[] {
   return found
 }
 
-// ── Codex: <root>/YYYY/MM/DD/rollout-<ts>-<sessionId>.jsonl ──────────────────
+// ── Codex: <root>/YYYY/MM/DD/rollout-<ts>-<sessionId>.jsonl[.zst] ────────────
 
 function walkCodex(root: string, cutoffMs: number, dir = root, depth = 0): SessionFile[] {
   if (depth > MAX_WALK_DEPTH) return []
   const found: SessionFile[] = []
-  for (const entry of readDirSafe(dir)) {
+  const entries = readDirSafe(dir)
+  const names = new Set(entries.map((entry) => entry.name))
+  for (const entry of entries) {
     const filePath = join(dir, entry.name)
     if (entry.isDirectory()) {
       found.push(...walkCodex(root, cutoffMs, filePath, depth + 1))
       continue
     }
-    if (!entry.name.endsWith(".jsonl")) continue
+    if (!isListableTranscript(entry.name, names)) continue
     const mtimeMs = mtimeOf(filePath)
     if (mtimeMs === null || mtimeMs < cutoffMs) continue
     found.push({
@@ -269,14 +272,18 @@ const WALKERS: Record<AgentKind, Walker> = {
     find(root, sessionId) {
       const walk = (dir: string, depth: number): string | null => {
         if (depth > MAX_WALK_DEPTH) return null
-        for (const entry of readDirSafe(dir)) {
+        const entries = readDirSafe(dir)
+        const names = new Set(entries.map((entry) => entry.name))
+        for (const entry of entries) {
           const filePath = join(dir, entry.name)
           if (entry.isDirectory()) {
             const match = walk(filePath, depth + 1)
             if (match) return match
             continue
           }
-          if (entry.name.endsWith(`${sessionId}.jsonl`)) return filePath
+          if (uncompressedTranscriptName(entry.name).endsWith(`${sessionId}.jsonl`) && isListableTranscript(entry.name, names)) {
+            return filePath
+          }
         }
         return null
       }

@@ -4,6 +4,8 @@ import type { Stats } from "node:fs"
 
 vi.mock("../../sessionPaths", () => ({ findJsonlPath: vi.fn() }))
 
+vi.mock("../../agents/transcriptFile", () => import("../transcriptFileThroughHelpers"))
+
 vi.mock("../../helpers", () => ({
   readFile: vi.fn(),
   stat: vi.fn(),
@@ -460,6 +462,39 @@ describe("parseSessionFileChanges", () => {
     expect(changes[0].hasEdit).toBe(true)
     expect(changes[0].content?.originalStr).toContain("const x = 1")
     expect(changes[0].content?.currentStr).toContain("const x = 2")
+  })
+
+  it("attributes Codex patches to turns whose prompts are only response items", async () => {
+    const userItem = (text: string, timestamp: string) => JSON.stringify({
+      type: "response_item",
+      timestamp,
+      payload: { type: "message", role: "user", content: [{ type: "input_text", text }] },
+    })
+    const patch = (callId: string, path: string, timestamp: string) => [
+      JSON.stringify({
+        type: "response_item",
+        timestamp,
+        payload: { type: "custom_tool_call", call_id: callId, name: "apply_patch", input: `*** Begin Patch\n*** Add File: ${path}\n+x\n*** End Patch` },
+      }),
+      JSON.stringify({
+        type: "response_item",
+        timestamp,
+        payload: { type: "custom_tool_call_output", call_id: callId, output: JSON.stringify({ output: "ok", metadata: { exit_code: 0 } }) },
+      }),
+    ]
+    const jsonl = makeJsonl(
+      JSON.stringify({ type: "session_meta", timestamp: "2026-10-18T10:00:00.000Z", payload: { id: "s1", cwd: "/proj" } }),
+      userItem("<environment_context>\n  <cwd>/proj</cwd>\n</environment_context>", "2026-10-18T10:00:00.000Z"),
+      JSON.stringify({ type: "turn_context", timestamp: "2026-10-18T10:00:01.000Z", payload: { turn_id: "t1", model: "gpt-5.5" } }),
+      userItem("add a", "2026-10-18T10:00:01.000Z"),
+      ...patch("cp1", "/a.ts", "2026-10-18T10:00:02.000Z"),
+      JSON.stringify({ type: "turn_context", timestamp: "2026-10-18T10:01:00.000Z", payload: { turn_id: "t1", model: "gpt-5.5" } }),
+      userItem("add b", "2026-10-18T10:01:00.000Z"),
+      ...patch("cp2", "/b.ts", "2026-10-18T10:01:02.000Z"),
+    )
+
+    const { changes } = await parseSessionFileChanges(jsonl, false)
+    expect(changes.map((c) => [c.filePath, c.turnIndex])).toEqual([["/a.ts", 0], ["/b.ts", 1]])
   })
 
   it("parses Codex multi-file apply_patch", async () => {

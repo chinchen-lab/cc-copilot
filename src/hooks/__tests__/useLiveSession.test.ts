@@ -5,6 +5,7 @@ import { useLiveSession } from "../useLiveSession"
 import type { SessionSource } from "../useLiveSession"
 import type { ParsedSession } from "../../../shared/session/types"
 import { SESSION_ACCESS_LOST_EVENT } from "@/lib/sessionAccessEvents"
+import { sessionCache } from "@/lib/sessionCache"
 
 // Mock auth
 vi.mock("@/lib/auth", () => ({
@@ -583,6 +584,29 @@ describe("useLiveSession", () => {
     await act(async () => { await Promise.resolve() })
     act(() => { flushRAF() })
     expect(onUpdate).not.toHaveBeenCalled()
+  })
+
+  it("advances its resume offset over lines the server left out", async () => {
+    const source: SessionSource = { dirName: "dir", fileName: "file.jsonl", rawText: "{}", watchOffset: 100 }
+    const { result } = renderHook(() => useLiveSession(source, onUpdate, workerParse, workerAppend))
+
+    act(() => {
+      getLastEventSource().simulateMessage({ type: "lines", lines: [], skippedBytes: 500 })
+    })
+    expect(result.current.isLive).toBe(false)
+
+    act(() => {
+      getLastEventSource().simulateMessage({ type: "lines", lines: ["{}"], skippedBytes: 20 })
+    })
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    // 100 + 500 + 20 + "{}\n"
+    expect(sessionCache.update).toHaveBeenLastCalledWith("dir", "file.jsonl", expect.objectContaining({
+      source: expect.objectContaining({ watchOffset: 623 }),
+    }))
   })
 
   it("closes EventSource on unmount", () => {

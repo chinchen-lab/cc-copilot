@@ -27,10 +27,12 @@ const CODEX_ULTRA_EFFORTS: EffortOption[] = [
   ...CODEX_STANDARD_EFFORTS,
   { value: "ultra", label: "Ultra", description: "Maximum reasoning with automatic task delegation" },
 ]
-const CODEX_XHIGH_EFFORTS: EffortOption[] = CODEX_STANDARD_EFFORTS.slice(0, 4)
 const CODEX_FAST_TIER_VALUE = descriptorFor("codex").serviceTier?.appServerValue ?? "priority"
 const CODEX_FAST_TIER: ServiceTierOption[] = [
   { value: CODEX_FAST_TIER_VALUE, label: "Fast", description: "1.5× speed with increased usage" },
+]
+const CODEX_FAST_TIER_SPEED_ONLY: ServiceTierOption[] = [
+  { value: CODEX_FAST_TIER_VALUE, label: "Fast", description: "1.5× speed" },
 ]
 const CODEX_FASTER_TIER: ServiceTierOption[] = [
   { value: CODEX_FAST_TIER_VALUE, label: "Fast", description: "2× speed with increased usage" },
@@ -44,17 +46,16 @@ const CODEX_CAPABILITIES: Partial<ModelOption> = {
   serviceTiers: CODEX_FAST_TIER,
 }
 
-// Mirrors `model/list` from Codex CLI 0.159.3.
+// Mirrors `model/list` from Codex CLI 0.163.0.
 const CODEX_MODELS: readonly ModelOption[] = [
   { value: "", label: "Default", description: "Use the model configured in Codex" },
   { value: "gpt-6.1-sol", label: "GPT-6.1 Sol", description: "Latest workhorse model for coding and everyday work", ...CODEX_CAPABILITIES, defaultReasoningEffort: "low", serviceTiers: CODEX_FASTER_TIER },
   { value: "gpt-6-astra", label: "GPT-6 Astra", description: "Frontier intelligence for the most demanding work", ...CODEX_CAPABILITIES, serviceTiers: CODEX_FASTER_TIER },
-  { value: "gpt-6-sol", label: "GPT-6 Sol", description: "Previous generation workhorse model", ...CODEX_CAPABILITIES },
-  { value: "gpt-6-luna", label: "GPT-6 Luna", description: "Fast and affordable model for easier tasks", ...CODEX_CAPABILITIES, supportedReasoningEfforts: CODEX_STANDARD_EFFORTS },
+  { value: "gpt-6-sol", label: "GPT-6 Sol", description: "Previous generation workhorse model", ...CODEX_CAPABILITIES, serviceTiers: CODEX_FAST_TIER_SPEED_ONLY },
+  { value: "gpt-6-luna", label: "GPT-6 Luna", description: "Fast and affordable model for easier tasks", ...CODEX_CAPABILITIES, supportedReasoningEfforts: CODEX_STANDARD_EFFORTS, serviceTiers: CODEX_FAST_TIER_SPEED_ONLY },
   { value: "gpt-5.6-sol", label: "GPT-5.6 Sol", description: "Older generation workhorse model", ...CODEX_CAPABILITIES, defaultReasoningEffort: "low" },
   { value: "gpt-5.6-terra", label: "GPT-5.6 Terra", description: "Older balanced model for straightforward work", ...CODEX_CAPABILITIES },
   { value: "gpt-5.6-luna", label: "GPT-5.6 Luna", description: "Older fast and efficient model", ...CODEX_CAPABILITIES, supportedReasoningEfforts: CODEX_STANDARD_EFFORTS },
-  { value: "gpt-5.5", label: "GPT-5.5", description: "Legacy coding model", ...CODEX_CAPABILITIES, supportedReasoningEfforts: CODEX_XHIGH_EFFORTS },
 ]
 
 const COPILOT_MODELS: readonly ModelOption[] = [

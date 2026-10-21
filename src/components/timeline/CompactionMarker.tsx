@@ -13,9 +13,15 @@ interface Props {
   meta?: CompactionMeta
 }
 
+const TRIGGER_LABELS: Partial<Record<string, string>> = {
+  auto: "auto",
+  manual: "manual",
+  idle: "while idle",
+}
+
 function describe(meta?: CompactionMeta): string | null {
   if (!meta) return null
-  const trigger = meta.trigger === "manual" ? "manual" : "auto"
+  const trigger = TRIGGER_LABELS[meta.trigger] ?? "auto"
   if (meta.postTokens != null) {
     return `${trigger} · ${formatTokenCount(meta.preTokens)} → ${formatTokenCount(meta.postTokens)}`
   }

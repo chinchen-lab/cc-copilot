@@ -33,6 +33,8 @@ const mocks = vi.hoisted(() => {
   }
 })
 
+vi.mock("../../agents/transcriptFile", () => import("../transcriptFileThroughHelpers"))
+
 vi.mock("../../helpers", () => ({
   dirs: {
     PROJECTS_DIR: "/tmp/test-projects",

@@ -44,6 +44,12 @@ describe("readRateLimitBlock", () => {
     })
   })
 
+  it("says whether extra usage is on only when the report does", () => {
+    expect(readRateLimitBlock("claude", { ...rejected, overageEnabled: false })?.extraUsage).toBe(false)
+    expect(readRateLimitBlock("claude", { ...rejected, overageEnabled: true })?.extraUsage).toBe(true)
+    expect(readRateLimitBlock("claude", { ...rejected, overageEnabled: "yes" })).not.toHaveProperty("extraUsage")
+  })
+
   it("ignores a non-finite reset rather than passing NaN to a date", () => {
     const block = readRateLimitBlock("claude", { ...rejected, resetsAt: Number.NaN })
     expect(block?.resetsAt).toBeNull()

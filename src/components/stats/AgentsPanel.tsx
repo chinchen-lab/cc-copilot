@@ -9,6 +9,7 @@ import type { BgAgent } from "@/hooks/useBackgroundAgents"
 import { authFetch } from "@/lib/auth"
 import { useStreamingOverlay } from "@/contexts/StreamingOverlayContext"
 import type { StreamingOverlay } from "@/lib/streamingOverlay"
+import { orderAgentsByParent } from "@/components/timeline/agent-utils"
 
 // ── Inline Agent Extraction ─────────────────────────────────────────────────
 
@@ -22,6 +23,7 @@ interface InlineAgent {
   durationMs?: number
   toolUseCount?: number
   parentToolUseId?: string
+  parentAgentId?: string
 }
 
 function normalizeStatus(status: string | undefined, isActive = false): AgentStatus {
@@ -58,6 +60,7 @@ function extractInlineAgents(session: ParsedSession, streamingOverlay: Streaming
           durationMs: msg.durationMs ?? existing?.durationMs,
           toolUseCount: msg.toolUseCount ?? existing?.toolUseCount,
           parentToolUseId: msg.parentToolUseId ?? existing?.parentToolUseId,
+          parentAgentId: msg.parentAgentId ?? existing?.parentAgentId,
         })
       }
     }
@@ -178,11 +181,12 @@ export function AgentsPanel({
     [sessionBgAgents]
   )
 
-  // Reverse inline-only agents so the latest-spawned appear first
-  const sortedInlineAgents = useMemo(
-    () => [...inlineOnlyAgents].reverse(),
-    [inlineOnlyAgents]
-  )
+  // Latest-spawned first, each followed by the agents it launched
+  const sortedInlineAgents = useMemo(() => {
+    const latestFirst = [...inlineOnlyAgents].reverse()
+    const byId = new Map(latestFirst.map((agent) => [agent.agentId, agent]))
+    return orderAgentsByParent(latestFirst).map(({ agentId, depth }) => ({ ...byId.get(agentId)!, depth }))
+  }, [inlineOnlyAgents])
 
   const totalCount = sessionBgAgents.length + inlineOnlyAgents.length
   if (totalCount === 0) return null
@@ -253,6 +257,7 @@ export function AgentsPanel({
               status={agent.status}
               durationMs={agent.durationMs}
               toolUseCount={agent.toolUseCount}
+              depth={agent.depth}
               disabled={!canNavigate}
               onClick={() => {
                 if (!canNavigate) return

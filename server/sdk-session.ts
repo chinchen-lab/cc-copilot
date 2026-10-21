@@ -19,7 +19,7 @@ import type {
 import type { MessageParam } from "@anthropic-ai/sdk/resources"
 import type { PermissionRequest } from "../shared/contracts/permissions"
 import { presentTurnError } from "../shared/session/agent-errors"
-import { watchSubagents, type SubagentWatcher } from "./subagentWatcher"
+import { watchSubagents, type SubagentTask, type SubagentWatcher } from "./subagentWatcher"
 import { claudeCliPath } from "./agents/claudeExecutable"
 import { appendToSystemPrompt, withControlQuery } from "./agents/sdk"
 import { readSdkRateLimit } from "./agents/rateLimit"
@@ -121,7 +121,8 @@ export interface SDKSessionState {
   onResult: ((msg: Record<string, unknown>) => void) | null
   onInit: (() => void) | null
   jsonlPath: string | null
-  pendingTaskCalls: Map<string, string>
+  /** Subagents the CLI reported starting, by task id (= transcript file id). */
+  subagentTasks: Map<string, SubagentTask>
   /** Watches sub-agent JSONL files and synthesizes progress into parent JSONL */
   subagentWatcher: SubagentWatcher | null
   permissionMode: string
@@ -192,7 +193,7 @@ export function attachSubagentWatcher(state: SDKSessionState): void {
   state.subagentWatcher = watchSubagents(
     state.jsonlPath,
     state.sessionId,
-    state.pendingTaskCalls,
+    state.subagentTasks,
   )
 }
 
@@ -570,6 +571,20 @@ function processSDKEvent(state: SDKSessionState, msg: SDKMessage): void {
     )
   }
 
+  if (msg.type === "system" && msg.subtype === "task_started") {
+    // A resumed subagent reports the same task id again; its transcript stays
+    // filed under the call that first launched it.
+    if (msg.tool_use_id && !state.subagentTasks.has(msg.task_id)) {
+      state.subagentTasks.set(msg.task_id, {
+        toolUseId: msg.tool_use_id,
+        parentTaskId: msg.parent_task_id,
+        subagentType: msg.subagent_type,
+        forwardedBytes: 0,
+      })
+      state.subagentWatcher?.rescan()
+    }
+  }
+
   if (msg.type === "system" && msg.subtype === "task_progress") {
     // `summary` is absent until the first ~30s fork completes, and the UI keys
     // on the tool_use id of the card it decorates — without either there is
@@ -595,13 +610,8 @@ function processSDKEvent(state: SDKSessionState, msg: SDKMessage): void {
 
     // With forwardSubagentText enabled, subagents' own COMPLETE messages flow
     // through here (the SDK emits no token-level stream events for subagents).
-    // Publish them to the bus for the live transcript, and register any Task
-    // call they make: since CC 2.1.219 agents spawn up to three levels deep, so
-    // a nested call is the only candidate a depth-2 agent's prompt can match.
-    // The watcher's exact-match-first resolution and its proven/provisional
-    // claim system are what keep the extra candidates from mis-binding.
+    // Publish them to the bus for the live transcript.
     if (parentToolUseId !== null) {
-      registerTaskCalls(state, message?.content)
       const content = message?.content as Array<{ type: string; text?: string; thinking?: string }> | undefined
       if (message?.id && Array.isArray(content)) {
         const textBlocks: Array<{ blockType: "text" | "thinking"; text: string }> = []
@@ -628,28 +638,6 @@ function processSDKEvent(state: SDKSessionState, msg: SDKMessage): void {
     if (message?.id) {
       streamBus.completeMessage(state.sessionId, message.id)
     }
-
-    registerTaskCalls(state, message?.content)
-  }
-}
-
-/**
- * Records every Task/Agent tool call in an assistant message as a candidate
- * parent for a subagent transcript, keyed by tool_use id.
- *
- * Called for main-thread and subagent messages alike — see the depth note at
- * the subagent branch above.
- */
-function registerTaskCalls(state: SDKSessionState, content: unknown): void {
-  const blocks = content as
-    | Array<{ type: string; name?: string; id?: string; input?: { prompt?: string } }>
-    | undefined
-  if (!Array.isArray(blocks)) return
-  for (const block of blocks) {
-    if (block.type !== "tool_use") continue
-    if (block.name !== "Task" && block.name !== "Agent") continue
-    if (!block.id) continue
-    state.pendingTaskCalls.set(block.id, block.input?.prompt ?? "")
   }
 }
 
@@ -879,7 +867,7 @@ function initSDKSessionState(opts: SDKSessionInitOpts): SDKSessionState {
     onResult: null,
     onInit: null,
     jsonlPath: null,
-    pendingTaskCalls: new Map(),
+    subagentTasks: new Map(),
     subagentWatcher: null,
     permissionMode: opts.permissionMode || "default",
     allowedTools: opts.allowedTools ? [...opts.allowedTools] : [],

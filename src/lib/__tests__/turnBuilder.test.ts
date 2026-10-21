@@ -925,6 +925,30 @@ describe("local command output", () => {
     ])
   })
 
+  it("carries the structured twin a /context or /usage reply records beside its text", () => {
+    const contextUsage = {
+      model: "claude-opus-5-5[1m]",
+      total_tokens: 17955,
+      raw_max_tokens: 1_000_000,
+      percentage: 2,
+      categories: [{ name: "Messages", tokens: 1725, kind: "used" as const }],
+    }
+    const usageReport = {
+      session: { total_cost_usd: 0, total_api_duration_ms: 0, total_duration_ms: 1972, total_lines_added: 0, total_lines_removed: 0 },
+      rate_limits: { limits: [{ kind: "session", group: "session", percent: 6, resets_at: null, severity: "normal", is_active: true }] },
+    }
+    const session = parseSession(toJsonl([
+      userMsg("<command-name>/context</command-name>"),
+      { ...localCommandMsg, contextUsage },
+      { ...localCommandMsg, uuid: "local-command-2", usageReport },
+    ]))
+
+    expect(session.turns[0].contentBlocks).toEqual([
+      { kind: "local_command", content: stdout, timestamp: "2025-01-15T10:00:00.500Z", contextUsage },
+      { kind: "local_command", content: stdout, timestamp: "2025-01-15T10:00:00.500Z", usageReport },
+    ])
+  })
+
   it("never opens a turn, so turn boundaries stay on user and assistant records", () => {
     const session = parseSession(toJsonl([
       localCommandMsg,

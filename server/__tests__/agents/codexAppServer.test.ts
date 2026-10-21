@@ -514,12 +514,14 @@ describe("CodexAppServer threads and goals", () => {
     const set = harness.server.setGoal("thread-1", {
       objective: "Ship it",
       tokenBudget: 40_000,
+      origin: "user",
     })
     const setRequest = requestFor(child, "thread/goal/set")
     expect(setRequest.params).toEqual({
       threadId: "thread-1",
       objective: "Ship it",
       tokenBudget: 40_000,
+      origin: "user",
     })
     child.send({ id: setRequest.id, result: { goal: null } })
     await set
@@ -529,8 +531,9 @@ describe("CodexAppServer threads and goals", () => {
     child.send({ id: getRequest.id, result: { goal: null } })
     await expect(get).resolves.toEqual({ goal: null })
 
-    const clear = harness.server.clearGoal("thread-1")
+    const clear = harness.server.clearGoal("thread-1", "user")
     const clearRequest = requestFor(child, "thread/goal/clear")
+    expect(clearRequest.params).toEqual({ threadId: "thread-1", origin: "user" })
     child.send({ id: clearRequest.id, result: { cleared: true } })
     await expect(clear).resolves.toEqual({ cleared: true })
   })

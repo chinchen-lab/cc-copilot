@@ -1,5 +1,4 @@
-import { open, readFile, stat } from "node:fs/promises"
-import { formatForRecords } from "../shared/session/agents"
+import { formatForRecords, isAnyAgentNoiseLine } from "../shared/session/agents"
 import { deriveSessionStatus, type SessionStatusInfo } from "../shared/session/sessionStatus"
 import type { RawRecord } from "../shared/session/types"
 import { storeFor } from "./agents"
@@ -9,6 +8,7 @@ import {
   type AgentTailFormat,
   type TailMatch,
 } from "./agents/tailRecords"
+import { openTranscript, readTranscriptText, statTranscript } from "./agents/transcriptFile"
 import { readTranscriptHead } from "./agents/transcriptHead"
 import type { SessionMeta } from "./agents/types"
 
@@ -53,14 +53,14 @@ const NEWLINE_BYTE = 0x0a
  * module — resolving here would make the cycle.
  */
 export async function readTranscriptEffort(filePath: string): Promise<string | null> {
-  let fileStat: Awaited<ReturnType<typeof stat>>
+  let fileStat: { size: number }
   try {
-    fileStat = await stat(filePath)
+    fileStat = await statTranscript(filePath)
   } catch {
     return null
   }
 
-  const fh = await open(filePath, "r")
+  const fh = await openTranscript(filePath)
   try {
     let cursor = fileStat.size
     // Held as bytes, not text: a chunk boundary can fall inside a multi-byte
@@ -123,15 +123,19 @@ export async function readTranscriptEffort(filePath: string): Promise<string | n
  * cannot tell "done" from "waiting on background agents", so it names the agent
  * and switches the scan into a filtered phase that keeps reading — up to the
  * cap — but only collects lines that could still change that verdict.
+ *
+ * Noise lines are skipped unparsed and their bytes do not count toward the
+ * scan cap, up to a hard limit on what is read.
  */
 export async function getSessionStatus(filePath: string): Promise<SessionStatusInfo> {
   const CHUNK = 4096
-  const MAX_CHUNKS = 64 // safety cap: 256KB max scan
+  const MAX_SCAN_BYTES = 256 * 1024
+  const MAX_READ_BYTES = 1024 * 1024
   try {
-    const fileStat = await stat(filePath)
+    const fileStat = await statTranscript(filePath)
     if (fileStat.size === 0) return { status: "idle" }
 
-    const fh = await open(filePath, "r")
+    const fh = await openTranscript(filePath)
     try {
       const meaningful: RawRecord[] = []
       let cursor = fileStat.size
@@ -144,9 +148,11 @@ export async function getSessionStatus(filePath: string): Promise<SessionStatusI
         format.markers.some((marker) => line.includes(marker))
         || (needUserActivity && line.includes('"type":"user"'))
 
-      for (let chunk = 0; chunk < MAX_CHUNKS && cursor > 0; chunk++) {
+      let scanned = 0
+      while (cursor > 0 && scanned < MAX_SCAN_BYTES && fileStat.size - cursor < MAX_READ_BYTES) {
         const readSize = Math.min(CHUNK, cursor)
         cursor -= readSize
+        scanned += readSize
         const buf = Buffer.alloc(readSize)
         const { bytesRead } = await fh.read(buf, 0, readSize, cursor)
         const text = buf.subarray(0, bytesRead).toString("utf-8") + leftover
@@ -160,6 +166,10 @@ export async function getSessionStatus(filePath: string): Promise<SessionStatusI
         for (let i = lines.length - 1; i >= startIdx; i--) {
           const line = lines[i]
           if (!line) continue
+          if (isAnyAgentNoiseLine(line)) {
+            scanned -= line.length
+            continue
+          }
           // Filtered phase: skip lines that cannot change the verdict before
           // paying for a JSON parse.
           if (turnEnded && !isTailCandidate(line, turnEnded)) continue
@@ -233,7 +243,7 @@ export async function searchSessionMessages(
 
   let content: string
   try {
-    content = await readFile(filePath, "utf-8")
+    content = await readTranscriptText(filePath)
   } catch {
     return null
   }

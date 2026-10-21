@@ -27,9 +27,12 @@ export function forwardCodexStreamNotification(notification: CodexNotification):
 
     case "item/started": {
       const item = params.item
-      if (isObject(item) && item.type === "contextCompaction") {
-        streamBus.publishCompacting(threadId, true)
-      }
+      if (!isObject(item)) return
+      if (item.type === "contextCompaction") streamBus.publishCompacting(threadId, true)
+      // A steer cancels the response being streamed. Its message never
+      // completes and never reaches the rollout, so drop it when the steer
+      // lands in the turn.
+      if (item.type === "userMessage") streamBus.clear(threadId)
       return
     }
 

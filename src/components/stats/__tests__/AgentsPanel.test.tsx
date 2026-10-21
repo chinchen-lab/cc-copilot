@@ -108,4 +108,32 @@ describe("AgentsPanel", () => {
 
     expect(screen.queryByRole("button", { name: /^Stop / }) !== null).toBe(canStop)
   })
+
+  it("indents an agent another agent launched beneath its parent", () => {
+    const session = makeSession()
+    const block = session.turns[0].contentBlocks[0]
+    if (block.kind !== "sub_agent") throw new Error("fixture")
+    block.messages.push({
+      ...block.messages[0],
+      agentId: "a0000inner000000",
+      parentAgentId: "ad663a1cf11922085",
+      parentToolUseId: "tool-inner",
+      agentName: null,
+      prompt: "Nested check",
+    })
+
+    render(
+      <AgentsPanel
+        session={session}
+        sessionSource={{ dirName: "project", fileName: "main-session.jsonl" }}
+        bgAgents={[]}
+        canStop
+        onLoadSession={vi.fn()}
+      />,
+    )
+
+    const previews = screen.getAllByText(/Build the E2E|Nested check/).map((node) => node.textContent)
+    expect(previews).toEqual(["Build the E2E sim harness for the project", "Nested check"])
+    expect(screen.getByText("Nested check").closest(".motion-list-item")).toHaveClass("pl-4")
+  })
 })

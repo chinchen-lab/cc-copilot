@@ -12,6 +12,8 @@ vi.mock("../../lib/rateLimit", () => ({ isRateLimited: vi.fn(() => false) }))
 vi.mock("../../lib/sessionArchive", () => ({
   forgetSessions: vi.fn().mockResolvedValue(undefined),
 }))
+vi.mock("../../agents/transcriptFile", () => import("../transcriptFileThroughHelpers"))
+
 vi.mock("../../helpers", () => ({
   activeProcesses: new Map(),
   persistentSessions: new Map(),

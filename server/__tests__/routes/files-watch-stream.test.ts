@@ -25,6 +25,14 @@ vi.mock("../../helpers", () => ({
   resolve: (p: string) => p,
 }))
 
+// Plain transcripts read straight through the mocked fs helpers.
+vi.mock("../../agents/transcriptFile", () => ({
+  isCompressedTranscript: (filePath: string) => filePath.endsWith(".zst"),
+  uncompressedTranscriptName: (fileName: string) => fileName.replace(/\.zst$/, ""),
+  statTranscript: (filePath: string) => mockStat(filePath),
+  openTranscript: (filePath: string) => mockOpen(filePath, "r"),
+}))
+
 vi.mock("../../sessionPaths", () => ({
   resolveSessionFilePath: vi.fn(
     async (dirName: string, fileName: string) => `/tmp/projects/${dirName}/${fileName}`,
@@ -53,6 +61,7 @@ vi.mock("../../agents/runtimes", () => ({
 
 import { __resetEditionForTest, installEdition, PERSONAL_EDITION, type EditionSessionAccess } from "../../edition"
 import { registerFileWatchRoutes } from "../../routes/files-watch"
+import { resolveSessionFilePath } from "../../sessionPaths"
 import { publish, clear, publishRateLimit, _resetForTests } from "../../lib/streamBus"
 import type { UseFn, Middleware } from "../../helpers"
 
@@ -327,6 +336,60 @@ describe("/api/watch stream-bus forwarding", () => {
     const { frames, closeConnection } = await connect(`/codex__proj/${SESSION}.jsonl?offset=0`)
     const events = parseFrames(frames)
     expect(events).toContainEqual({ type: "lines", lines: [line.trimEnd()] })
+    closeConnection()
+  })
+
+  it("follows a compressed rollout into the plain file resuming it writes", async () => {
+    const old = '{"n":1}\n'
+    const added = '{"n":2}\n'
+    const plain = `/tmp/projects/codex__proj/${SESSION}.jsonl`
+    const resolvePath = vi.mocked(resolveSessionFilePath)
+    const resolveDefault = resolvePath.getMockImplementation()
+    resolvePath.mockResolvedValue(`${plain}.zst`)
+    let materialized = false
+    mockStat.mockImplementation(async (path: string) => {
+      if (path.endsWith(".zst") && materialized) throw Object.assign(new Error("gone"), { code: "ENOENT" })
+      if (path === plain && !materialized) throw Object.assign(new Error("missing"), { code: "ENOENT" })
+      return { size: Buffer.byteLength(materialized ? old + added : old), mtimeMs: Date.now() }
+    })
+    mockOpen.mockImplementation(async (path: string) => ({
+      read: vi.fn(async (buffer: Buffer, offset: number, length: number, position: number) => {
+        const source = Buffer.from(path === plain ? old + added : old)
+        return { bytesRead: source.copy(buffer, offset, position, position + length) }
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    }))
+
+    try {
+      const { frames, closeConnection } = await connect(`/codex__proj/${SESSION}.jsonl?offset=${Buffer.byteLength(old)}`)
+      materialized = true
+      await vi.waitFor(() => {
+        expect(parseFrames(frames)).toContainEqual({ type: "lines", lines: [added.trimEnd()] })
+      }, { timeout: 3000 })
+      expect(mockWatch).toHaveBeenLastCalledWith(plain, expect.any(Function))
+      closeConnection()
+    } finally {
+      resolvePath.mockImplementation(resolveDefault!)
+    }
+  })
+
+  it("leaves out Claude's api-request records but reports their bytes", async () => {
+    const noise = '{"type":"api-request-blob","hash":"h","message":{"role":"user","content":"é"}}'
+    const real = '{"type":"user","message":{"role":"user","content":"hi"}}'
+    const text = `${noise}\n${real}\n${noise}\n`
+    mockStat.mockResolvedValue({ size: Buffer.byteLength(text), mtimeMs: Date.now() })
+    mockOpen.mockResolvedValue({
+      read: vi.fn(async (buffer: Buffer) => ({ bytesRead: buffer.write(text) })),
+      close: vi.fn().mockResolvedValue(undefined),
+    })
+
+    const { frames, closeConnection } = await connect(`/proj-a/${SESSION}.jsonl?offset=0`)
+    const events = parseFrames(frames)
+    expect(events).toContainEqual({
+      type: "lines",
+      lines: [real],
+      skippedBytes: 2 * (Buffer.byteLength(noise) + 1),
+    })
     closeConnection()
   })
 
