@@ -16,7 +16,7 @@ describe("durable delegated results", () => {
     let allowed = true
     let release!: (value: unknown) => void
     const result = vi.fn(() => new Promise((resolve) => { release = resolve }))
-    const send = vi.fn(async () => ({ receipt: acceptedReceipt }))
+    const send = vi.fn(async (_id: string, _message: string) => ({ receipt: acceptedReceipt }))
     const host = { state: async () => ({ outcome: "completed" }), result, send, stop: async () => true }
     attachTaskAuthority("owner", "parent", { authorize: async (id) => id !== "child" || allowed, host: async () => host })
     await until(() => result.mock.calls.length === 1)
@@ -32,7 +32,7 @@ describe("durable delegated results", () => {
     const task = store.putTask("owner", { sourceId: "ack-during-host", parentSessionId: "parent", childSessionId: "child" })
     store.updateTask("owner", task.id, { state: "completed", result: { reply: "Done" } })
     let release!: () => void
-    const send = vi.fn(async () => ({ receipt: acceptedReceipt }))
+    const send = vi.fn(async (_id: string, _message: string) => ({ receipt: acceptedReceipt }))
     const host = { state: async () => ({ outcome: "completed" }), result: async () => null, send, stop: async () => true }
     const resolveHost = vi.fn(() => new Promise<typeof host>((resolve) => { release = () => resolve(host) }))
     attachTaskAuthority("owner", "parent", { authorize: async () => true, host: resolveHost })
@@ -47,7 +47,7 @@ describe("durable delegated results", () => {
     const task = store.putTask("owner", { sourceId: "deleted-during-host", parentSessionId: "parent", childSessionId: "child" })
     store.updateTask("owner", task.id, { state: "completed", result: { reply: "Deleted child result" } })
     let release!: () => void
-    const send = vi.fn(async () => ({ receipt: acceptedReceipt }))
+    const send = vi.fn(async (_id: string, _message: string) => ({ receipt: acceptedReceipt }))
     const host = { state: async () => ({ outcome: "completed" }), result: async () => null, send, stop: async () => true }
     const resolveHost = vi.fn(() => new Promise<typeof host>((resolve) => { release = () => resolve(host) }))
     attachTaskAuthority("owner", "parent", { authorize: async () => true, host: resolveHost })
@@ -61,7 +61,7 @@ describe("durable delegated results", () => {
   it("suppresses wakeups while a blocking caller owns the result and recovers an abandoned wait", async () => {
     const store = orchestrationStore()
     const task = store.putTask("owner", { sourceId: "blocking-task", parentSessionId: "parent", childSessionId: "child", deliveryDisposition: "blocking", blockingDeadline: Date.now() + 10000 })
-    const send = vi.fn(async () => ({ receipt: acceptedReceipt }))
+    const send = vi.fn(async (_id: string, _message: string) => ({ receipt: acceptedReceipt }))
     const host = { state: async () => ({ outcome: "completed" }), result: async () => ({ reply: "Done" }), send, stop: async () => true }
     attachTaskAuthority("owner", "parent", { authorize: async () => true, host: async () => host } as TaskAuthority)
     await until(() => store.tasks("owner")[0]?.state === "completed")
@@ -107,7 +107,7 @@ describe("durable delegated results", () => {
     const task = store.putTask("owner", { sourceId: "follow-up-turn", parentSessionId: "follow-parent", childSessionId: "child", commandId: "follow-up" })
     let delivery: CommandReceipt["state"] = "queued"
     const receipt = vi.fn(async () => ({ ...acceptedReceipt, id: "follow-up", state: delivery }))
-    const send = vi.fn(async () => ({ receipt: acceptedReceipt }))
+    const send = vi.fn(async (_id: string, _message: string) => ({ receipt: acceptedReceipt }))
     const host = { state: async () => ({ outcome: "completed" }), result: async () => ({ turn: { reply: "Follow-up done" } }), receipt, send, stop: async () => true }
     attachTaskAuthority("owner", "follow-parent", { authorize: async () => true, host: async () => host })
     await refreshUntil(() => receipt.mock.calls.length > 0)
@@ -123,7 +123,7 @@ describe("durable delegated results", () => {
     const store = orchestrationStore()
     store.putTask("owner", { sourceId: "asks-question", parentSessionId: "asking-parent", childSessionId: "asking-child" })
     const question = { kind: "question" as const, requestId: "q-1", questions: [{ question: "Which colour?", multiSelect: false, options: ["Blue", "Red"] }] }
-    const send = vi.fn(async () => ({ receipt: acceptedReceipt }))
+    const send = vi.fn(async (_id: string, _message: string) => ({ receipt: acceptedReceipt }))
     const state = vi.fn(async () => ({ outcome: "needs_input", waiting: [question] }))
     const host = { state, result: async () => null, send, stop: async () => true }
     attachTaskAuthority("owner", "asking-parent", { authorize: async () => true, host: async () => host })
@@ -152,7 +152,7 @@ describe("durable delegated results", () => {
     const store = orchestrationStore()
     store.putTask("owner", { sourceId: "held-follow-up", parentSessionId: "held-parent", childSessionId: "held-child", commandId: "held-message" })
     let delivery: CommandReceipt["state"] = "held"
-    const send = vi.fn(async () => ({ receipt: acceptedReceipt }))
+    const send = vi.fn(async (_id: string, _message: string) => ({ receipt: acceptedReceipt }))
     const host = { state: async () => ({ outcome: "completed" }), result: async () => null, receipt: async () => ({ ...acceptedReceipt, id: "held-message", state: delivery, error: "Host restarted; resume this queue after reviewing it." }), send, stop: async () => true }
     attachTaskAuthority("owner", "held-parent", { authorize: async () => true, host: async () => host })
     await refreshUntil(() => send.mock.calls.length === 1)
