@@ -488,6 +488,8 @@ export interface ToolCall {
    * answered here.
    */
   asyncQuestion?: boolean
+  /** The reader's reply to an async question, once the transcript holds one. */
+  asyncAnswer?: string
   /** Set by parser when a PostToolUse hook replaced this tool's output */
   outputReplacedByHook?: boolean
   /** Total duration of PostToolUse hooks attached to this call, summed in ms */
@@ -679,6 +681,13 @@ export interface Turn {
    * must be stitched onto the previous turn once the older page arrives.
    */
   isFragment?: boolean
+  /**
+   * Set when the parse window opened on this turn's prompt record, with no turn
+   * context before it. An older CLI's echo of a prompt steered into the previous
+   * page's last turn looks exactly like this, so the page stitcher may fold it
+   * back into that steer.
+   */
+  opensOnPrompt?: boolean
 }
 
 export interface SessionStats {

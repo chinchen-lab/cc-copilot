@@ -1,3 +1,5 @@
+import { linkAsyncAnswers } from "../../shared/session/asyncAnswers"
+import { getUserMessageText } from "../../shared/session/parser"
 import { pairAgentMessageReplies } from "../../shared/session/turnBuilder"
 import type { Turn } from "../../shared/session/types"
 import type { AgentKind } from "@/lib/agents"
@@ -59,6 +61,29 @@ function isCutFragment(head: Turn, agentKind?: AgentKind): boolean {
   return head.userMessage === null
 }
 
+/** Image tags in a prompt record, and the attachment links the parser appends to an echo. */
+const ATTACHMENT_FRAMING = /<image\b[^>]*>[\s\S]*?<\/image>|!\[image\]\(<[^>]*>\)|\[audio attachment\]\(<[^>]*>\)/g
+
+function promptBody(text: string): string {
+  return text.replace(ATTACHMENT_FRAMING, "").trim()
+}
+
+/**
+ * Drops the steered prompt the older page ends on when the newer page opens on
+ * its echo. A CLI that echoes a steer as a later prompt record would otherwise
+ * show it twice when a page cut falls between the two. Only a page that opened
+ * on a bare prompt record can hold such an echo, and the two copies frame
+ * attachments differently, so they are compared without that framing.
+ */
+function dropSeamEcho(older: Turn[], head: Turn | undefined): Turn[] {
+  const last = older[older.length - 1]
+  const block = last?.contentBlocks[last.contentBlocks.length - 1]
+  if (!head?.opensOnPrompt || block?.kind !== "queued_prompt") return older
+  const prompt = promptBody(block.content)
+  if (!prompt || prompt !== promptBody(getUserMessageText(head.userMessage))) return older
+  return [...older.slice(0, -1), { ...last, contentBlocks: last.contentBlocks.slice(0, -1) }]
+}
+
 /**
  * How far apart the two copies of one message can be stamped. Across every peer
  * message on disk, 4 of the 6 enqueue/attachment pairs agree to the millisecond
@@ -118,9 +143,10 @@ function dedupeAgentMessages(turns: readonly Turn[]): Turn[] {
  *
  * Each page arrives from its own `parseSession` call, so whatever `buildTurns`
  * reconciles within one page has to be re-run over the join: the duplicate copy
- * of a peer message, and the pairing between a message and the `SendMessage`
- * that answered it. Without that, a message answered seconds later reads
- * "Never answered" purely because the pages happened to split between them.
+ * of a peer message, the pairing between a message and the `SendMessage` that
+ * answered it, and between an async question and the reader's reply. Without
+ * that, a message answered seconds later reads "Never answered" purely because
+ * the pages happened to split between them.
  */
 export function prependTurns(
   existing: Turn[],
@@ -128,10 +154,11 @@ export function prependTurns(
   agentKind?: AgentKind,
 ): Turn[] {
   const existingIds = new Set(existing.map((t) => t.id))
-  const unique = older.filter((t) => !existingIds.has(t.id))
+  const fresh = older.filter((t) => !existingIds.has(t.id))
   // Returns the input array unchanged when there is nothing to prepend, so
   // callers can detect no-ops by reference.
-  if (unique.length === 0) return existing
+  if (fresh.length === 0) return existing
+  const unique = dropSeamEcho(fresh, existing[0])
 
   const head = existing[0]
   const lastOlder = unique[unique.length - 1]
@@ -139,7 +166,7 @@ export function prependTurns(
     ? [...unique.slice(0, -1), mergeTurnFragments(lastOlder, head), ...existing.slice(1)]
     : [...unique, ...existing]
 
-  return pairAgentMessageReplies(dedupeAgentMessages(merged))
+  return linkAsyncAnswers(pairAgentMessageReplies(dedupeAgentMessages(merged)))
 }
 
 /**

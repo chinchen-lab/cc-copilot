@@ -1132,6 +1132,28 @@ describe("ToolCallCard async questions", () => {
     expect(screen.getByText("What is your budget?")).toBeTruthy()
     expect(screen.getByText("No answer recorded")).toBeTruthy()
   })
+
+  it("shows the reader's reply as the answer once the transcript holds one", () => {
+    mockPendingInteraction = null
+    const toolCall: ToolCall = {
+      ...makeAsyncQuestionCall(),
+      input: { questions: [{ question: "Wait for designs?", options: [{ label: "Use existing UI" }, { label: "Wait" }] }] },
+      asyncAnswer: "Use existing UI",
+    }
+    render(<ToolCallCard toolCall={toolCall} isAgentActive={false} />)
+
+    expect(screen.getByText("Answered")).toBeTruthy()
+    expect(screen.queryByText("Send answer")).toBeNull()
+    expect(screen.getByText("Selected")).toBeTruthy()
+  })
+
+  it("shows a written reply that matches no option", () => {
+    mockPendingInteraction = null
+    render(<ToolCallCard toolCall={{ ...makeAsyncQuestionCall(), asyncAnswer: "About 900 a month" }} isAgentActive={false} />)
+
+    expect(screen.getByText("Answered")).toBeTruthy()
+    expect(screen.getByText("About 900 a month")).toBeTruthy()
+  })
 })
 
 describe("ToolCallCard AskUserQuestion history", () => {

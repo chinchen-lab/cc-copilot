@@ -1,4 +1,5 @@
 import { isRecord } from "../objects"
+import { TASK_WAKEUP_START_RE } from "../session/automatedPrompts"
 import type { DelegatedTask } from "./orchestration"
 
 /**
@@ -15,7 +16,6 @@ export interface TaskWakeup {
 
 const RESULT_LIMIT = 24000
 const WAKEUP_RE = /^Delegated task (\S+) (running|completed|error|cancelled)\. Child session: (\S+)\. Result: ([\s\S]*)\nAcknowledge receipt with cogpit-session tasks \S+ --ack \S+\.$/
-const WAKEUP_START_RE = /^Delegated task \S+ (?:running|completed|error|cancelled|needs attention)\. Child session: /
 const ATTENTION_RE = /^Delegated task \S+ needs attention\. Child session: (\S+)\./
 
 /** Room a long reply keeps before the changed files give way. */
@@ -86,5 +86,5 @@ export function parseTaskWakeup(text: string): TaskWakeup | null {
 
 /** Whether a prompt, possibly cut short, is a wakeup rather than something a person wrote. */
 export function isTaskWakeup(text: string): boolean {
-  return WAKEUP_START_RE.test(text.trim())
+  return TASK_WAKEUP_START_RE.test(text.trim())
 }

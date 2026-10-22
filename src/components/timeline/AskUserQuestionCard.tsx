@@ -60,9 +60,30 @@ function inferOptionAnswer(question: AskUserQuestion, result: string): string | 
   return matches.length === 1 ? matches[0].label : undefined
 }
 
+/**
+ * What answered the question. An async question's result is only an acceptance
+ * receipt, so its answer is the reader's later reply.
+ */
+function recordedResponse(toolCall: ToolCall): string | null {
+  return toolCall.asyncQuestion ? toolCall.asyncAnswer ?? null : toolCall.result
+}
+
+/** Splits a reply to several async questions, sent as each question followed by its answer. */
+function parseAsyncAnswer(reply: string, questions: AskUserQuestion[]): Record<string, string> {
+  if (questions.length === 1) return { [questions[0].question]: reply }
+
+  const starts = questions.map((question) => reply.indexOf(`${question.question}\n`))
+  if (starts.some((start, index) => start === -1 || (index > 0 && start <= starts[index - 1]))) return {}
+  return Object.fromEntries(questions.map((question, index) => [
+    question.question,
+    reply.slice(starts[index] + question.question.length + 1, starts[index + 1]).trim(),
+  ]))
+}
+
 function getAnswers(toolCall: ToolCall, questions: AskUserQuestion[]): Record<string, string> {
-  // An async question's result is an acceptance receipt, never an answer.
-  if (toolCall.asyncQuestion) return {}
+  if (toolCall.asyncQuestion) {
+    return toolCall.asyncAnswer === undefined ? {} : parseAsyncAnswer(toolCall.asyncAnswer, questions)
+  }
 
   const inputAnswers = toolCall.input.answers
   if (typeof inputAnswers === "object" && inputAnswers !== null && !Array.isArray(inputAnswers)) {
@@ -181,9 +202,8 @@ export function AskUserQuestionCard({
   const questions = useMemo(() => getQuestions(toolCall), [toolCall])
   const answers = useMemo(() => getAnswers(toolCall, questions), [toolCall, questions])
   const showRawDetails = expandToolPayloads || detailsOpen
-  // An async question is never answered by its own result, so it stays open
-  // until the reader replies — which the card reports through isAwaitingAnswer.
-  const isAnswered = toolCall.result !== null && !toolCall.isError && !toolCall.asyncQuestion
+  const response = recordedResponse(toolCall)
+  const isAnswered = response !== null && !toolCall.isError
   // questions.length guards the form branch from rendering an empty body:
   // AskUserAnswerForm returns null when it has nothing to ask.
   const isWaiting = !isAnswered && !toolCall.isError
@@ -246,7 +266,7 @@ export function AskUserQuestionCard({
               question={question}
               answer={answers[question.question]}
               index={index}
-              completed={toolCall.result !== null && !toolCall.asyncQuestion}
+              completed={response !== null}
             />
           ))
         ) : (
@@ -255,7 +275,7 @@ export function AskUserQuestionCard({
           </p>
         )}
 
-        {toolCall.result !== null && !toolCall.asyncQuestion && !hasStructuredAnswers && (
+        {response !== null && !hasStructuredAnswers && (
           <div className={cn(
             "border-t border-border py-3",
             toolCall.isError
@@ -266,7 +286,7 @@ export function AskUserQuestionCard({
               Recorded response
             </div>
             <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-              {toolCall.result}
+              {response}
             </p>
           </div>
         )}

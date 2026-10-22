@@ -26,6 +26,8 @@ const FILES = [
   "codex-tool-normalization.ts",
   "turnBuilder.ts",
   "agentEnvelope.ts",
+  "automatedPrompts.ts",
+  "asyncAnswers.ts",
   "types.ts",
   "instances.ts",
   "messageTypeGuards.ts",
