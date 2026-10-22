@@ -26,6 +26,7 @@ import { useCopyWithFeedback } from "@/hooks/useCopyWithFeedback"
 import { authFetch } from "@/lib/auth"
 import { formatAge } from "@/lib/format"
 import { cn } from "@/lib/utils"
+import { revealSessionPath, sessionPath } from "@/lib/revealSession"
 import type {
   ActivityMetric,
   ElectronPerformanceSnapshot,
@@ -58,7 +59,7 @@ function formatBytesPerSecond(value: number): string | null {
   return `${value.toFixed(0)} B/s`
 }
 
-function SystemProcessRow({ metric, onKill }: { metric: SystemProcessMetric; onKill?: (pid: number) => void }) {
+function SystemProcessRow({ metric, onStop, stopping, onNavigate }: { metric: SystemProcessMetric; onStop: (metric: SystemProcessMetric) => void; stopping: boolean; onNavigate: () => void }) {
   const { t } = useTranslation()
   return (
     <div className="flex items-start gap-3 py-2.5">
@@ -66,21 +67,36 @@ function SystemProcessRow({ metric, onKill }: { metric: SystemProcessMetric; onK
         <div className="flex flex-wrap items-center gap-2">
           <span className="truncate text-sm font-medium">{metric.label}</span>
           <Badge variant="outline">PID {metric.pid}</Badge>
-          {metric.suspectedLeak && <Badge variant="destructive">{t("possible leak")}</Badge>}
+          {metric.suspectedLeak && <Badge variant="destructive">{t(metric.warning === "sustained-cpu" ? "sustained high CPU" : "possible leak")}</Badge>}
           {metric.orphaned && !metric.suspectedLeak && <Badge variant="secondary">{t("orphaned")}</Badge>}
         </div>
         <p className="mt-1 truncate font-mono text-xs text-muted-foreground" title={metric.command}>
           {metric.command}
         </p>
+        {metric.owner ? (
+          <div className="mt-1 text-xs text-muted-foreground">
+            {metric.owner.dirName && metric.owner.fileName ? (
+              <a className="underline" href={sessionPath(metric.owner.dirName, metric.owner.fileName)} onClick={(event) => {
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+                event.preventDefault()
+                revealSessionPath(sessionPath(metric.owner!.dirName!, metric.owner!.fileName!))
+                onNavigate()
+              }}>{metric.owner.title || t("Originating session")}</a>
+            ) : <span>{t("Originating session")}</span>}
+            <div className="break-all">{metric.owner.sessionId} · task {metric.owner.taskId}</div>
+          </div>
+        ) : metric.kind !== "cogpit" && <p className="mt-1 text-xs text-muted-foreground">{t("Session ownership unknown")}</p>}
       </div>
-      {metric.suspectedLeak && onKill && (
+      {metric.canStop && metric.identity && (
         <Button
           variant="destructive"
           size="xs"
           className="shrink-0"
-          onClick={() => onKill(metric.pid)}
+          onClick={() => onStop(metric)}
+          disabled={stopping}
+          aria-label={t("Stop process {0}", { "0": metric.pid })}
         >
-          {t("Kill")}
+          {t(stopping ? "Stopping…" : "Stop")}
         </Button>
       )}
       <div className="shrink-0 text-right">
@@ -109,8 +125,8 @@ function processHint(metric: ElectronProcessMetric): string {
 function diagnosis(totalCpu: number, hottest?: ElectronProcessMetric, systemLeaks = 0): string {
   if (systemLeaks > 0) {
     return systemLeaks === 1
-      ? '1 agent process outside CC-Copilot looks leaked. See "Agent processes" below.'
-      : `${systemLeaks} agent processes outside CC-Copilot look leaked. See "Agent processes" below.`
+      ? '1 process needs review. See "Agent and runtime processes" below.'
+      : `${systemLeaks} processes need review. See "Agent and runtime processes" below.`
   }
   if (totalCpu < 5) return "CC-Copilot is currently idle. Leave this open while the power spike happens."
   if (!hottest) return "The server is active. The lists below show its busiest recent work."
@@ -225,7 +241,9 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
   const [serverSnapshot, setServerSnapshot] = useState<ServerPerformanceSnapshot | null>(null)
   const [history, setHistory] = useState<number[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [stopError, setStopError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [stoppingPid, setStoppingPid] = useState<number | null>(null)
   const refreshInFlight = useRef(false)
   const [copied, copy] = useCopyWithFeedback()
 
@@ -262,9 +280,11 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
 
   useEffect(() => {
     if (!open) return
-    void refresh()
-    const interval = window.setInterval(() => void refresh(), POLL_INTERVAL_MS)
-    return () => window.clearInterval(interval)
+    const whenVisible = () => { if (document.visibilityState === "visible") void refresh() }
+    whenVisible()
+    const interval = window.setInterval(whenVisible, POLL_INTERVAL_MS)
+    document.addEventListener("visibilitychange", whenVisible)
+    return () => { window.clearInterval(interval); document.removeEventListener("visibilitychange", whenVisible) }
   }, [open, refresh])
 
   const processes = [...(electronSnapshot?.processes ?? [])]
@@ -277,18 +297,25 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
   const systemLeaks = serverSnapshot?.system?.suspectedLeakCount ?? 0
   const status = systemLeaks > 0 || totalCpu >= 80 ? "High" : totalCpu >= 15 ? "Active" : "Idle"
 
-  const handleKillProcess = async (pid: number) => {
+  const handleStopProcess = async (metric: SystemProcessMetric) => {
+    if (!metric.identity || stoppingPid !== null) return
+    setStopError(null)
+    setStoppingPid(metric.pid)
     try {
-      await authFetch("/api/system-processes/kill", {
+      const response = await authFetch("/api/system-processes/kill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pids: [pid] }),
+        body: JSON.stringify({ processes: [{ pid: metric.pid, identity: metric.identity }] }),
       })
-      await new Promise((resolve) => setTimeout(resolve, 1_000))
+      if (!response.ok) throw new Error("Could not stop this process.")
+      const result = await response.json() as { killed: number[] }
+      if (!result.killed.includes(metric.pid)) throw new Error("The process changed or is no longer eligible. Refresh and review it again.")
+      await refresh()
     } catch {
-      // Best-effort; the refresh below shows the real state.
+      setStopError("Process was not stopped. Refresh and review its current identity and access.")
+    } finally {
+      setStoppingPid(null)
     }
-    void refresh()
   }
 
   const handleCopy = () => {
@@ -331,9 +358,9 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
 
         <ScrollArea className="min-h-0 min-w-0 flex-1">
           <div className="flex flex-col gap-4 p-5">
-            {error && (
+            {(error || stopError) && (
               <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>{stopError || error}</AlertDescription>
               </Alert>
             )}
 
@@ -383,16 +410,16 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
             {systemProcesses.length > 0 && (
               <Card size="sm">
                 <CardHeader>
-                  <CardTitle>{t("Agent processes")}</CardTitle>
+                  <CardTitle>{t("Agent and runtime processes")}</CardTitle>
                   <CardDescription>
-                    {t("Claude sessions, browsers, and scripts running outside CC-Copilot.")}
+                    {t("Agent sessions, browsers, and long-running scripts. Unknown runtimes are flagged after sustained high CPU; stopping them is manual.")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {systemProcesses.map((metric, index) => (
                     <div key={metric.pid}>
                       {index > 0 && <Separator />}
-                      <SystemProcessRow metric={metric} onKill={(pid) => void handleKillProcess(pid)} />
+                      <SystemProcessRow metric={metric} onStop={(metric) => void handleStopProcess(metric)} stopping={stoppingPid !== null} onNavigate={() => onOpenChange(false)} />
                     </div>
                   ))}
                 </CardContent>

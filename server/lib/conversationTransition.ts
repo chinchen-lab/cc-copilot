@@ -1,6 +1,5 @@
 import { nativeBinding } from "../agents/nativeBindings"
 import type { IncomingMessage } from "node:http"
-import { readFile } from "node:fs/promises"
 import { AGENT_KINDS, descriptorFor, type AgentKind } from "../../shared/session/agent-descriptors"
 import { parseSession } from "../../shared/session/parser"
 import { splitInstanceSessionId } from "../../shared/session/instances"
@@ -8,6 +7,7 @@ import { runtimeFor, resolveSessionAgent } from "../agents/runtimes"
 import { accessLevelOf, startTurn } from "../edition"
 import { accessAtLeast } from "../../shared/contracts/sessionAccess"
 import { commandScope } from "./durableSend"
+import { readTranscriptText } from "../agents/transcriptFile"
 import { orchestrationStore } from "../orchestration/storage"
 import { fingerprint, OrchestrationError } from "../orchestration/store"
 
@@ -46,7 +46,7 @@ export async function transitionConversation(req: IncomingMessage, input: Transi
     return store.completeTransition(scope, id, conversation.id, input.expectedRevision, binding, { mode: input.mode })
   }
   if (!sourceBinding.filePath) throw new OrchestrationError(404, "Native history must be available before a context handoff")
-  const parsed = parseSession(await readFile(sourceBinding.filePath, "utf8"))
+  const parsed = parseSession(await readTranscriptText(sourceBinding.filePath))
   const cwd = parsed.cwd
   if (!cwd) throw new OrchestrationError(400, "The source session has no working directory")
   const context = parsed.turns.slice(-12).map((turn) => {
@@ -86,7 +86,7 @@ export async function resolveConversationTransition(req: IncomingMessage, resolu
   if (!target.filePath) throw new OrchestrationError(404, "Recovered native history is unavailable")
   const runtime = runtimeFor(target.kind, target.instanceId)
   if (runtime.activity(targetId).running) throw new OrchestrationError(409, "Wait for the recovered session to finish before attaching it")
-  const parsed = parseSession(await readFile(target.filePath, "utf8"))
+  const parsed = parseSession(await readTranscriptText(target.filePath))
   const descriptor = descriptorFor(target.kind)
   const { instanceDirName } = await import("../../shared/session/instances")
   return store.completeTransition(scope, id, conversation.id, input.expectedRevision, await nativeBinding(targetId, target.kind, target.filePath, parsed.cwd), { mode: "handoff", sessionId: targetId, dirName: instanceDirName(target.instanceId ?? "default", descriptor.dirName.encode(parsed.cwd || "")), fileName: descriptor.sessionFile.name(splitInstanceSessionId(targetId).nativeId) })

@@ -21,10 +21,6 @@ vi.mock("@/contexts/SessionContext", () => ({
   }),
 }))
 
-vi.mock("@/hooks/useNearViewport", () => ({
-  useNearViewport: () => ({ ref: { current: null }, isNear: true }),
-}))
-
 vi.mock("@/hooks/useSkillMetadata", () => ({ useSkillMetadata: () => new Map() }))
 
 vi.mock("../../../../shared/session/sessionStatus", () => ({ deriveSessionStatus: () => ({ status: "thinking" }) }))

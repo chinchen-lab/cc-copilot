@@ -120,6 +120,7 @@ const codexTail: AgentTailFormat = {
     "interrupt_agent",
     "interruptAgent",
     "sub_agent_activity",
+    "SubAgentActivity",
     "agent_message",
     "function_call_output",
   ],

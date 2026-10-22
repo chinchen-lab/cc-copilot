@@ -1,5 +1,6 @@
 import { sendJson, type UseFn } from "../http"
-import { readFile, stat } from "../helpers"
+import { stat } from "../helpers"
+import { readTranscriptText } from "../agents/transcriptFile"
 import { findJsonlPath } from "../sessionPaths"
 import type { ToolCall, ToolUseBlock } from "../../shared/session/types"
 import { computeNetDiff, type EditOp } from "../../shared/diff-utils"
@@ -149,12 +150,19 @@ export async function parseSessionFileChanges(
   const rmPaths: Array<{ path: string; turnIndex: number; isDir: boolean }> = []
 
   // The first record's shape names the format the rest of the file is in.
-  const isCodex = formatForRecords(records.slice(0, 1)).kind === "codex"
+  const format = formatForRecords(records.slice(0, 1))
+  // The format's own turn starts, so indexes match the parsed session's turns.
+  const turnStarts = format.kind === "codex" ? format.turnBoundaries(records) : null
+  let nextTurnStart = 0
 
-  for (const obj of records) {
+  for (const [index, obj] of records.entries()) {
 
-    if (isCodex) {
+    if (turnStarts) {
       // ── Codex format ──
+      while (nextTurnStart < turnStarts.length && turnStarts[nextTurnStart] <= index) {
+        lastHumanTurnIndex = nextTurnStart++
+      }
+
       const payload = typeof obj.payload === "object" && obj.payload !== null
         ? obj.payload as Record<string, unknown>
         : undefined
@@ -163,12 +171,6 @@ export async function parseSessionFileChanges(
       // Extract cwd from session_meta or turn_context
       if (obj.type === "session_meta" || obj.type === "turn_context") {
         if (typeof payload.cwd === "string" && !cwd) cwd = payload.cwd
-      }
-
-      // Track turns from user messages
-      if (obj.type === "event_msg" && payload.type === "user_message") {
-        lastHumanTurnIndex = humanMessageCount
-        humanMessageCount++
       }
 
       if (obj.type !== "response_item") continue
@@ -396,7 +398,7 @@ export function registerSessionFileChangesRoutes(use: UseFn) {
         const jsonlPath = await findJsonlPath(sessionId)
         if (!jsonlPath) return sendJson(res, 404, { error: "Session not found" })
 
-        const jsonlContent = await readFile(jsonlPath, "utf-8")
+        const jsonlContent = await readTranscriptText(jsonlPath)
         const { changes } = await parseSessionFileChanges(jsonlContent, true)
 
         const change = changes.find((c) => c.toolCallIds.includes(toolCallId))
@@ -416,7 +418,7 @@ export function registerSessionFileChangesRoutes(use: UseFn) {
         const jsonlPath = await findJsonlPath(sessionId)
         if (!jsonlPath) return sendJson(res, 404, { error: "Session not found" })
 
-        const jsonlContent = await readFile(jsonlPath, "utf-8")
+        const jsonlContent = await readTranscriptText(jsonlPath)
         const { changes, cwd } = await parseSessionFileChanges(jsonlContent, includeContent)
 
         sendJson(res, 200, { sessionId, cwd, changes })

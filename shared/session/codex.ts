@@ -1,6 +1,7 @@
 // SHARED SESSION CORE: edit shared/session only; cogpit-memory copies are generated.
 import { computeStats, createEmptySessionStats, mergeTokenUsage } from "./sessionStats"
 import { appendAssistantText } from "./turnContent"
+import { awaitingAgentsStatus, type AgentLaunch } from "./backgroundAgents"
 import {
   findFailedNestedPatchCallIds,
   parseCodexToolPatches,
@@ -38,6 +39,10 @@ export { parseCustomToolOutput } from "./codex-tool-normalization"
 
 interface CodexRecord {
   timestamp?: string
+  /** Position in the rollout, written by Codex 0.16x; `session_meta` is 0. */
+  ordinal?: number
+  /** On the `session_meta` a transcript page carries: the last ordinal in the whole rollout. */
+  rolloutLastOrdinal?: number
   type?: string
   payload?: Record<string, unknown>
 }
@@ -103,6 +108,85 @@ export function codexParentId(payload: Record<string, unknown>): string | null {
     if (typeof candidate === "string" && candidate) return candidate
   }
   return null
+}
+
+/**
+ * A sub-agent rollout opens with a copy of its parent's history, which the
+ * child's own `session_meta` bounds with `subagent_history_start_ordinal`.
+ * Returns a test for those copied records, or null when nothing was copied.
+ *
+ * Rollouts Codex converted from older versions carry a boundary at the end of
+ * the file, which would hide the child's own work along with the copy, so a
+ * boundary counts only once the rollout runs past it. A page of the rollout
+ * learns how far it runs from `rolloutLastOrdinal` (see `codexPageHeaderLine`).
+ */
+function inheritedHistoryFilter(records: readonly CodexRecord[]): ((record: CodexRecord) => boolean) | null {
+  const meta = records.find((record) => record?.type === "session_meta")
+  const start = meta?.payload?.subagent_history_start_ordinal
+  if (typeof start !== "number") return null
+  const reachesPast = (ordinal: unknown) => typeof ordinal === "number" && ordinal >= start
+  if (!reachesPast(meta?.rolloutLastOrdinal) && !records.some((record) => reachesPast(record?.ordinal))) return null
+  return (record) => typeof record.ordinal === "number" && record.ordinal > 0 && record.ordinal < start
+}
+
+/**
+ * A rollout's first line as a page of it carries it: a sub-agent's
+ * `session_meta` gains the ordinal of the rollout's last record, so a page
+ * holding only copied history still knows its history boundary is real.
+ */
+export async function codexPageHeaderLine(
+  firstLine: string,
+  lastLines: () => Promise<readonly string[]>,
+): Promise<string> {
+  if (!firstLine.includes('"subagent_history_start_ordinal"')) return firstLine
+  const meta = safeParseLine(firstLine)
+  if (meta?.type !== "session_meta") return firstLine
+  const lines = await lastLines()
+  for (let index = lines.length - 1; index >= 0; index--) {
+    const ordinal = safeParseLine(lines[index])?.ordinal
+    if (typeof ordinal === "number") return JSON.stringify({ ...meta, rolloutLastOrdinal: ordinal })
+  }
+  return firstLine
+}
+
+interface SubAgentActivity {
+  agentId: string
+  agentPath: string
+  kind: string
+  eventId: string
+  model: string | null
+  effort: string | null
+}
+
+function subAgentActivitySource(record: CodexRecord): Record<string, unknown> | null {
+  const payload = record.payload
+  if (record.type !== "event_msg" || !isObject(payload)) return null
+  if (payload.type === "sub_agent_activity") return payload
+  if (payload.type === "item_completed" && isObject(payload.item) && payload.item.type === "SubAgentActivity") return payload.item
+  return null
+}
+
+/**
+ * A sub-agent lifecycle event, from either the `sub_agent_activity` event or
+ * the `SubAgentActivity` item later CLIs complete in its place.
+ */
+function readSubAgentActivity(record: CodexRecord): SubAgentActivity | null {
+  const source = subAgentActivitySource(record)
+  if (!source || typeof source.agent_thread_id !== "string" || typeof source.agent_path !== "string") return null
+  return {
+    agentId: source.agent_thread_id,
+    agentPath: source.agent_path,
+    kind: typeof source.kind === "string" ? source.kind : "started",
+    eventId: findString(source.event_id, source.id) ?? "",
+    model: findString(source.model) || null,
+    effort: findString(source.reasoning_effort) || null,
+  }
+}
+
+/** The message a failed turn's `task_complete` carries (Codex 0.160.1+). */
+function turnErrorMessage(payload: Record<string, unknown>): string {
+  if (payload.type !== "task_complete" || !isObject(payload.error)) return ""
+  return typeof payload.error.message === "string" ? payload.error.message.trim() : ""
 }
 
 function isCodexRecord(record: CodexRecord | null): record is CodexRecord {
@@ -396,14 +480,43 @@ function createTurn(turnId: string | null, timestamp: string, model: string | nu
   }
 }
 
-function extractPromptFromRecord(record: CodexRecord): string {
-  if (record.type === "event_msg" && isObject(record.payload) && record.payload.type === "user_message" && typeof record.payload.message === "string") {
-    return normalizePromptText(record.payload.message)
+/**
+ * The prompt a record carries, or "" for any other record, including the
+ * AGENTS.md, environment and other context Codex injects as user messages.
+ */
+export function codexPromptText(record: { type?: unknown; payload?: unknown }): string {
+  const payload = isObject(record.payload) ? record.payload : null
+  if (record.type === "event_msg" && payload?.type === "user_message" && typeof payload.message === "string") {
+    return normalizePromptText(payload.message)
   }
-  if (record.type === "response_item" && isObject(record.payload) && record.payload.type === "message" && record.payload.role === "user") {
-    return normalizePromptText(extractMessageText(record.payload, "input_text"))
+  if (record.type === "response_item" && payload?.type === "message" && payload.role === "user") {
+    return normalizePromptText(extractMessageText(payload, "input_text"))
   }
   return ""
+}
+
+/**
+ * Reads each prompt in a rollout once, fed its records in order.
+ *
+ * Codex 0.15x+ writes a prompt only as a `response_item` user message. Older
+ * CLIs follow that record with an `event_msg` `user_message` echo of it, which
+ * this skips.
+ */
+export function createCodexPromptReader(): (record: { type?: unknown; payload?: unknown }) => string {
+  let echoPending = false
+  return (record) => {
+    const payload = isObject(record.payload) ? record.payload : null
+    if (record.type === "event_msg" && payload?.type === "user_message") {
+      const isEcho = echoPending
+      echoPending = false
+      return isEcho ? "" : codexPromptText(record)
+    }
+    if (record.type !== "response_item") return ""
+    const prompt = codexPromptText(record)
+    if (prompt) echoPending = true
+    else if (payload?.type !== "message" || payload.role !== "user") echoPending = false
+    return prompt
+  }
 }
 
 /**
@@ -421,7 +534,7 @@ function recordOpensTurn(record: CodexRecord, payload: Record<string, unknown> |
   if (record.type === "response_item" && payload?.type === "message") {
     if (payload.role === "developer" || payload.role === "system") return false
     if (payload.role === "user") {
-      return extractPromptFromRecord(record) !== ""
+      return codexPromptText(record) !== ""
         || extractResponseMessageImages(payload).length > 0
         || extractResponseMessageAudio(payload).length > 0
     }
@@ -445,10 +558,11 @@ function extractMetadataFromRecords(records: CodexRecord[]): CodexMetadata {
   let parentSessionId: string | null = null
   let agentPath = "/root"
 
-  let previousPrompt = ""
+  const readPrompt = createCodexPromptReader()
+  const isInherited = inheritedHistoryFilter(records)
 
   for (const record of records) {
-    if (!isObject(record.payload)) continue
+    if (!isObject(record.payload) || isInherited?.(record)) continue
     if (record.type === "session_meta") {
       sessionId ||= typeof record.payload.id === "string" ? record.payload.id : ""
       version ||= typeof record.payload.cli_version === "string" ? record.payload.cli_version : ""
@@ -484,13 +598,11 @@ function extractMetadataFromRecords(records: CodexRecord[]): CodexMetadata {
       cwd ||= typeof record.payload.cwd === "string" ? record.payload.cwd : ""
     }
 
-    const prompt = extractPromptFromRecord(record)
+    const prompt = readPrompt(record)
     if (!prompt) continue
-    if (prompt === previousPrompt) continue
 
     if (!firstUserMessage) firstUserMessage = prompt
     lastUserMessage = prompt
-    previousPrompt = prompt
     turnCount++
     if (!timestamp) timestamp = record.timestamp ?? ""
     lastTimestamp = record.timestamp ?? lastTimestamp
@@ -588,6 +700,7 @@ function walkCodexRecords(
     agentPath: string | null
     message: string
     model: string | null
+    effort?: string | null
     agentType: string | null
     timestamp: string
     parentToolCallId: string
@@ -623,6 +736,7 @@ function walkCodexRecords(
         timestamp: info?.timestamp ?? eventTimestamp,
         tokenUsage: null,
         model: info?.model ?? null,
+        ...(info?.effort ? { effort: info.effort } : {}),
         isBackground: false,
         prompt: info?.message || undefined,
         status: update.status ?? "running",
@@ -644,6 +758,7 @@ function walkCodexRecords(
       agentMessage.agentName = info.nickname ?? (info.agentPath ? agentNameFromPath(info.agentPath) : agentMessage.agentName)
       agentMessage.subagentType = info.agentType
       agentMessage.model = info.model
+      if (info.effort) agentMessage.effort = info.effort
       agentMessage.prompt = info.message || agentMessage.prompt
     }
 
@@ -742,9 +857,11 @@ function walkCodexRecords(
     appendToolCall(targetTurn, toolCall, timestamp)
   }
 
+  const isInherited = inheritedHistoryFilter(records as readonly CodexRecord[])
+
   for (let index = 0; index < records.length; index++) {
     const record = records[index] as CodexRecord
-    if (!isCodexRecord(record)) continue
+    if (!isCodexRecord(record) || isInherited?.(record)) continue
     recordIndex = index
     const payload = isObject(record.payload) ? record.payload : undefined
     const timestamp = record.timestamp ?? ""
@@ -852,17 +969,19 @@ function walkCodexRecords(
       continue
     }
 
-    if (
-      record.type === "event_msg"
-      && payload?.type === "sub_agent_activity"
-      && typeof payload.agent_thread_id === "string"
-      && typeof payload.agent_path === "string"
-    ) {
-      const agentId = payload.agent_thread_id
-      const eventId = typeof payload.event_id === "string" ? payload.event_id : ""
-      const kind = typeof payload.kind === "string" ? payload.kind : "started"
+    if (record.type === "event_msg" && payload) {
+      const turnError = turnErrorMessage(payload)
+      if (turnError) {
+        appendAssistantText(current, turnError, timestamp)
+        continue
+      }
+    }
+
+    const activity = readSubAgentActivity(record)
+    if (activity) {
+      const { agentId, agentPath, eventId, kind } = activity
       const spawnInfo = eventId ? spawnAgentCalls.get(eventId) : undefined
-      const existingId = agentIdByPath.get(payload.agent_path)
+      const existingId = agentIdByPath.get(agentPath)
       const existing = agentRegistry.get(agentId) ?? (existingId ? agentRegistry.get(existingId) : undefined)
 
       // An `interacted` event may point back at the parent/root agent. Only a
@@ -881,19 +1000,20 @@ function walkCodexRecords(
 
       const info: AgentInfo = {
         agentId,
-        nickname: existing?.nickname ?? agentNameFromPath(payload.agent_path) ?? spawnInfo?.taskName ?? null,
-        agentPath: payload.agent_path,
+        nickname: existing?.nickname ?? agentNameFromPath(agentPath) ?? spawnInfo?.taskName ?? null,
+        agentPath,
         message: existing?.message ?? spawnInfo?.message ?? "",
-        model: existing?.model ?? spawnInfo?.model ?? null,
+        model: activity.model ?? existing?.model ?? spawnInfo?.model ?? null,
+        effort: activity.effort ?? existing?.effort ?? null,
         agentType: existing?.agentType ?? spawnInfo?.agentType ?? null,
         timestamp: existing?.timestamp ?? (timestamp || spawnInfo?.timestamp || ""),
         parentToolCallId: existing?.parentToolCallId ?? eventId,
       }
       agentRegistry.set(agentId, info)
-      agentIdByPath.set(payload.agent_path, agentId)
+      agentIdByPath.set(agentPath, agentId)
       if (eventId && (kind === "started" || spawnInfo)) agentIdBySpawnCall.set(eventId, agentId)
 
-      const status = kind === "interrupted" ? "interrupted" : "running"
+      const status = kind === "interrupted" || kind === "completed" ? kind : "running"
       upsertAgentMessage(agentId, current, timestamp, { status })
       continue
     }
@@ -1084,6 +1204,7 @@ function walkCodexRecords(
               agentPath: agentPath ?? existing?.agentPath ?? null,
               message: existing?.message ?? spawnInfo?.message ?? "",
               model: existing?.model ?? spawnInfo?.model ?? null,
+              effort: existing?.effort ?? null,
               agentType: existing?.agentType ?? spawnInfo?.agentType ?? null,
               timestamp: existing?.timestamp ?? spawnInfo?.timestamp ?? timestamp,
               parentToolCallId: existing?.parentToolCallId ?? toolCall.id,
@@ -1234,9 +1355,11 @@ export function parseCodexSession(jsonlText: string, options?: ParseSessionOptio
     .filter(Boolean)
     .map(safeParseLine)
     .filter(isCodexRecord)
+  const isInherited = inheritedHistoryFilter(records)
+  const ownRecords = isInherited ? records.filter((record) => !isInherited(record)) : records
 
   const { turnStartIndices: _starts, ...session } = walkCodexRecords(
-    records as readonly unknown[] as readonly Record<string, unknown>[],
+    ownRecords as readonly unknown[] as readonly Record<string, unknown>[],
     options,
   )
   return session
@@ -1257,7 +1380,7 @@ export function appendCodexSession(existing: ParsedSession, newJsonlText: string
 // ── Background-agent signals (collab) ───────────────────────────────────────
 //
 // Collaboration agents are spawned with spawn_agent, tracked through
-// sub_agent_activity events, and finish via wait_agent results, FINAL_ANSWER
+// sub-agent activity events, and finish via wait_agent results, FINAL_ANSWER
 // inter-agent messages, or interruption. A task_complete with spawned agents
 // still running means the session is waiting on agents, not on the user.
 // This mirrors the lifecycle rules in the full parser above, reduced to
@@ -1284,49 +1407,58 @@ function parseJsonObject(value: unknown): Record<string, unknown> | null {
   }
 }
 
-function collectCodexPendingAgents(rawMessages: readonly RawRecord[]): string[] {
-  const alive = new Map<string, string>() // agentId → description
-  const done = new Set<string>()
+function collectCodexBackgroundAgents(rawMessages: readonly RawRecord[]): AgentLaunch[] {
+  // agentId → launch, kept after the agent finishes so the batch can count it
+  const launched = new Map<string, { launchedAt: number; description: string; startedAt?: string }>()
+  const alive = new Set<string>()
+  const endedAt = new Map<string, number>() // agentId → index of the record that ended it
   const agentIdByPath = new Map<string, string>()
   const spawnCalls = new Map<string, string>() // call_id → task name
   const waitCalls = new Set<string>()
   const interruptCalls = new Map<string, string[]>() // call_id → target agent ids
 
-  function markAlive(agentId: string, description: string) {
-    if (!done.has(agentId)) alive.set(agentId, alive.get(agentId) || description)
+  function markAlive(agentId: string, description: string, index: number, startedAt: string | undefined) {
+    if (endedAt.has(agentId)) return
+    alive.add(agentId)
+    const launch = launched.get(agentId)
+    if (!launch) launched.set(agentId, { launchedAt: index, description, startedAt })
+    else if (!launch.description) launch.description = description
   }
 
-  for (const msg of rawMessages) {
+  function markEnded(agentId: string, index: number) {
+    if (!endedAt.has(agentId)) endedAt.set(agentId, index)
+    alive.delete(agentId)
+  }
+
+  for (const [index, msg] of rawMessages.entries()) {
     const payload = isObject(msg.payload) ? msg.payload : null
     if (!payload) continue
+    const timestamp = typeof msg.timestamp === "string" ? msg.timestamp : undefined
 
-    if (msg.type === "event_msg" && payload.type === "sub_agent_activity"
-      && typeof payload.agent_thread_id === "string" && typeof payload.agent_path === "string") {
-      const agentId = payload.agent_thread_id
-      const kind = typeof payload.kind === "string" ? payload.kind : "started"
-      const eventId = typeof payload.event_id === "string" ? payload.event_id : ""
-      const existingId = agentIdByPath.get(payload.agent_path)
-      const known = alive.has(agentId) || done.has(agentId) || existingId !== undefined || spawnCalls.has(eventId)
+    const activity = readSubAgentActivity(msg as CodexRecord)
+    if (activity) {
+      const { agentId, agentPath, kind, eventId } = activity
+      const existingId = agentIdByPath.get(agentPath)
+      const known = alive.has(agentId) || endedAt.has(agentId) || existingId !== undefined || spawnCalls.has(eventId)
       // Only a `started` event (or a previously known agent) establishes a child.
       if (kind !== "started" && !known) continue
 
       // Agent-id renumbering: a provisional id from the spawn output is
       // superseded by the thread id once activity events arrive.
       if (existingId && existingId !== agentId) {
-        if (alive.has(existingId)) {
-          markAlive(agentId, alive.get(existingId) ?? "")
-          alive.delete(existingId)
-        }
-        if (done.has(existingId)) done.add(agentId)
+        const prior = launched.get(existingId)
+        launched.delete(existingId)
+        const current = launched.get(agentId)
+        if (prior && !current) launched.set(agentId, prior)
+        else if (prior && current && !current.description) current.description = prior.description
+        if (alive.delete(existingId)) markAlive(agentId, "", index, timestamp)
+        const priorEnd = endedAt.get(existingId)
+        if (priorEnd !== undefined) markEnded(agentId, priorEnd)
       }
-      agentIdByPath.set(payload.agent_path, agentId)
+      agentIdByPath.set(agentPath, agentId)
 
-      if (kind === "interrupted") {
-        done.add(agentId)
-        alive.delete(agentId)
-      } else {
-        markAlive(agentId, spawnCalls.get(eventId) ?? "")
-      }
+      if (kind === "interrupted" || kind === "completed") markEnded(agentId, index)
+      else markAlive(agentId, spawnCalls.get(eventId) ?? "", index, timestamp)
       continue
     }
 
@@ -1354,7 +1486,7 @@ function collectCodexPendingAgents(rawMessages: readonly RawRecord[]): string[] 
         const output = parseJsonObject(payload.output)
         const agentId = typeof output?.agent_id === "string" ? output.agent_id : ""
         if (agentId) {
-          markAlive(agentId, spawnCalls.get(callId) ?? "")
+          markAlive(agentId, spawnCalls.get(callId) ?? "", index, timestamp)
           const agentPath = typeof output?.task_name === "string" ? output.task_name : ""
           if (agentPath && !agentIdByPath.has(agentPath)) agentIdByPath.set(agentPath, agentId)
         }
@@ -1369,16 +1501,10 @@ function collectCodexPendingAgents(rawMessages: readonly RawRecord[]): string[] 
             || typeof statusValue.error === "string"
             || typeof statusValue.interrupted === "string"
             || lifecycle === "completed" || lifecycle === "failed" || lifecycle === "interrupted"
-          if (isTerminal) {
-            done.add(agentId)
-            alive.delete(agentId)
-          }
+          if (isTerminal) markEnded(agentId, index)
         }
       } else if (interruptCalls.has(callId)) {
-        for (const agentId of interruptCalls.get(callId) ?? []) {
-          done.add(agentId)
-          alive.delete(agentId)
-        }
+        for (const agentId of interruptCalls.get(callId) ?? []) markEnded(agentId, index)
       }
       continue
     }
@@ -1387,15 +1513,15 @@ function collectCodexPendingAgents(rawMessages: readonly RawRecord[]): string[] 
       const text = codexPayloadText(payload)
       const messageType = text.match(/^Message Type:\s*([^\r\n]+)/)?.[1]?.trim().toUpperCase() ?? ""
       if (!TERMINAL_INTER_AGENT_TYPES.has(messageType)) continue
-      const agentId = agentIdByPath.get(payload.author) ?? payload.author
-      done.add(agentId)
-      alive.delete(agentId)
+      markEnded(agentIdByPath.get(payload.author) ?? payload.author, index)
     }
   }
 
-  return [...alive.entries()]
-    .filter(([agentId]) => !done.has(agentId))
-    .map(([, description]) => description)
+  return [...launched.entries()].map(([agentId, { description, startedAt, launchedAt }]) => ({
+    agent: { description, startedAt },
+    launchedAt,
+    endedAt: alive.has(agentId) ? undefined : endedAt.get(agentId) ?? launchedAt,
+  }))
 }
 
 /** Derive status by walking backward through a rollout's records. */
@@ -1408,16 +1534,7 @@ export function deriveCodexSessionStatus(rawMessages: readonly RawRecord[]): Ses
       switch (payload?.type) {
         case "task_complete": {
           // The turn ended, but spawned collab agents may still be running.
-          const pending = collectCodexPendingAgents(rawMessages)
-          if (pending.length > 0) {
-            return {
-              status: "awaiting_agents",
-              pendingQueue: 0,
-              pendingAgents: pending.length,
-              pendingAgentDescriptions: pending.filter((description) => description.length > 0),
-            }
-          }
-          return { status: "completed" }
+          return awaitingAgentsStatus(collectCodexBackgroundAgents(rawMessages)) ?? { status: "completed" }
         }
         case "task_started":
           return { status: "processing" }

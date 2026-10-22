@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import type { UseFn, Middleware } from "../../helpers"
 
 // Mock helpers module
+vi.mock("../../agents/transcriptFile", () => import("../transcriptFileThroughHelpers"))
+
 vi.mock("../../helpers", () => ({
   dirs: {
     PROJECTS_DIR: "/tmp/test-projects",

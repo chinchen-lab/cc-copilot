@@ -234,6 +234,8 @@ export interface AgentCli {
   /** Environment variable overriding that directory, if the CLI has one. */
   readonly homeEnvVar: string | null
   readonly sdkHomeEnvVar?: string
+  /** The native session ID this CLI supplies to its shell commands. */
+  readonly sessionIdEnvVar?: string
   /**
    * Path inside the home whose existence proves the CLI has been used. Empty
    * when the home directory itself is the evidence.
@@ -456,9 +458,12 @@ function base64DirNameCodec(prefix: string): AgentDirNameCodec {
   }
 }
 
-/** The trailing-uuid grammar Claude and Codex transcripts share. */
+/**
+ * The trailing-uuid grammar Claude and Codex transcripts share, also matching
+ * the `.jsonl.zst` a transcript is compressed to.
+ */
 function sessionIdFromJsonlName(fileName: string): string | null {
-  const match = new RegExp(`(${SESSION_UUID})\\.jsonl$`, "i").exec(fileName)
+  const match = new RegExp(`(${SESSION_UUID})\\.jsonl(?:\\.zst)?$`, "i").exec(fileName)
   return match ? match[1] : null
 }
 
@@ -803,6 +808,7 @@ const codex: AgentDescriptor = {
     bundledBySdk: false,
     homeDirName: ".codex",
     homeEnvVar: "CODEX_HOME",
+    sessionIdEnvVar: "CODEX_THREAD_ID",
     installMarker: "",
     homeIsDiscoverable: true,
     process: {

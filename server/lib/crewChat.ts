@@ -62,6 +62,9 @@ export async function setCrewChatListening(sessionId: string, targetId: string, 
   return { rootId: context.rootId, sessionId: targetId, listening }
 }
 
+/** How long a post waits for its deliveries before answering with the ones still pending. */
+const POST_DELIVERY_WAIT_MS = 2_000
+
 export async function postCrewChat(sessionId: string, input: { text: string; commandId: string; senderSessionId?: string; mentions?: string[] }, req?: IncomingMessage) {
   const context = await crewChatContext(sessionId, req)
   if (!context.canPost) throw new OrchestrationError(403, "Posting to crew chat requires interaction access to the lead session")
@@ -75,7 +78,13 @@ export async function postCrewChat(sessionId: string, input: { text: string; com
   const recipients = context.members.filter((member) => member.sessionId !== sender?.sessionId && member.canInteract && (member.listening || mentions.includes(member.sessionId))).map((member) => ({ sessionId: member.sessionId, kind: mentions.includes(member.sessionId) ? "mention" as const : "notification" as const }))
   const message = orchestrationStore().postChat(commandScope(req), input.commandId, { rootId: context.rootId, author, text, mentions }, recipients)
   watchCrewChat(context.rootId, req)
-  await deliverCrewChat(context.rootId, req)
+  // A large crew, or a member on an unreachable device, must not hold the poster; the watcher keeps delivering.
+  let timer: ReturnType<typeof setTimeout> | undefined
+  await Promise.race([
+    deliverCrewChat(context.rootId, req).catch(() => {}),
+    new Promise<void>((resolve) => { timer = setTimeout(resolve, POST_DELIVERY_WAIT_MS) }),
+  ])
+  clearTimeout(timer)
   const pending = orchestrationStore().chatDeliveries(context.rootId, commandScope(req)).filter((delivery) => delivery.sequence === message.sequence)
   return { message, pending: pending.map((delivery) => ({ sessionId: delivery.sessionId, error: delivery.error })) }
 }

@@ -103,13 +103,13 @@ interface ContextBadgeProps {
 type ContextPressure = "critical" | "warning" | "healthy"
 
 /** One ladder for how much context is left, so every reading of it agrees. */
-function contextPressure(pctLeft: number): ContextPressure {
+export function contextPressure(pctLeft: number): ContextPressure {
   if (pctLeft < 10) return "critical"
   if (pctLeft < 30) return "warning"
   return "healthy"
 }
 
-const CONTEXT_STYLES: Record<ContextPressure, string> = {
+export const CONTEXT_STYLES: Record<ContextPressure, string> = {
   critical: "border-destructive/30 bg-destructive/10 text-destructive",
   warning: "border-warning/30 bg-warning/10 text-warning",
   healthy: "text-muted-foreground",

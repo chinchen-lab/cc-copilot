@@ -7,6 +7,7 @@ import { FOCUS_FILE_EVENT } from "@/components/FileChangesPanel"
 import { OpIndicator, SubAgentIndicator } from "@/components/FileChangesPanel/file-change-indicators"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
+import { changeBreakdownWithin } from "@/lib/changeBreakdown"
 import { ChangeBar, LineCounts } from "@/components/shared/ChangeCounts"
 import type { Turn, ToolCall } from "../../../shared/session/types"
 import { useCapability } from "@/hooks/useCapability"
@@ -232,34 +233,36 @@ export const TurnChangedFiles = memo(function TurnChangedFiles({ turn, turnIndex
       add += fc.additions
       del += fc.deletions
     }
-    return { add, del }
-  }, [fileChanges])
+    return { add, del, breakdown: changeBreakdownWithin(cwd, fileChanges) }
+  }, [fileChanges, cwd])
 
   if (fileChanges.length === 0) return null
 
   return (
     <Collapsible open={expanded} onOpenChange={setExpanded}>
-      <CollapsibleTrigger
-        className="group/files flex min-h-7 w-full cursor-pointer items-center gap-1.5 rounded-md px-1 text-left text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
-      >
-        <ChevronRight
-          data-icon="inline-start"
-          className={cn(
-            "size-3 shrink-0 transition-transform duration-150 motion-reduce:transition-none",
-            expanded && "rotate-90",
-          )}
-        />
-        <FileCode2 className="size-3.5 shrink-0" data-icon="inline-start" />
-        <span className="font-medium tabular-nums">
-          {fileChanges.length} {t(" file")}{fileChanges.length !== 1 ? "s" : ""}
-        </span>
-        <LineCounts add={totals.add} del={totals.del} className="opacity-80" />
+      <div className="group/files relative flex min-h-7 w-full items-center gap-1.5 px-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
+        <CollapsibleTrigger
+          className="flex cursor-pointer items-center gap-1.5 text-left outline-none after:absolute after:inset-0 after:rounded-md focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50"
+        >
+          <ChevronRight
+            data-icon="inline-start"
+            className={cn(
+              "size-3 shrink-0 transition-transform duration-150 motion-reduce:transition-none",
+              expanded && "rotate-90",
+            )}
+          />
+          <FileCode2 className="size-3.5 shrink-0" data-icon="inline-start" />
+          <span className="font-medium tabular-nums">
+            {fileChanges.length} {t(" file")}{fileChanges.length !== 1 ? "s" : ""}
+          </span>
+        </CollapsibleTrigger>
+        <LineCounts add={totals.add} del={totals.del} breakdown={totals.breakdown} className="relative opacity-80" />
         <ChangeBar add={totals.add} del={totals.del} />
         <span
           aria-hidden
           className="pointer-events-none ml-1 h-px flex-1 bg-border/40 transition-colors group-hover/files:bg-border/70"
         />
-      </CollapsibleTrigger>
+      </div>
 
       <CollapsibleContent className="ml-1 border-l border-border/40 pl-3">
         <div className="py-0.5">

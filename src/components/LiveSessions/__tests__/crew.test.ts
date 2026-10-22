@@ -73,6 +73,39 @@ describe("foldCrewRows", () => {
     const rows = [row("coordinator"), member("reviewer", "lane-a", 2)]
     expect(ids(foldCrewRows(rows).crewOf.get("coordinator")!)).toEqual(["reviewer"])
   })
+
+  it("keeps a descendant with its listed host across an omitted parent and root", () => {
+    const rows = [
+      member("lane-a", "coordinator", 1),
+      member("reviewer", "archived-auditor", 3, {
+        crew: { rootId: "coordinator", parentId: "archived-auditor", hostId: "lane-a", startedAt: 3 },
+      }),
+    ]
+    const { topLevel, crewOf } = foldCrewRows(rows)
+    expect(ids(topLevel)).toEqual(["lane-a"])
+    expect(ids(crewOf.get("lane-a")!)).toEqual(["reviewer"])
+  })
+
+  it.each([false, true])("ignores a host that is absent or archived (listed: %s)", (listed) => {
+    const reviewer = member("reviewer", "missing-auditor", 3, {
+      crew: { rootId: "coordinator", parentId: "missing-auditor", hostId: "lane-a", startedAt: 3 },
+    })
+    const rows = listed ? [row("lane-a", { archived: true }), reviewer] : [reviewer]
+    expect(foldCrewRows(rows).topLevel).toEqual(rows)
+  })
+
+  it("uses a higher ancestor loaded later instead of keeping a separate crew for the host", () => {
+    const rows = [
+      row("coordinator"),
+      member("lane-a", "coordinator", 1),
+      member("reviewer", "missing-auditor", 3, {
+        crew: { rootId: "coordinator", parentId: "missing-auditor", hostId: "lane-a", startedAt: 3 },
+      }),
+    ]
+    const { topLevel, crewOf } = foldCrewRows(rows)
+    expect(ids(topLevel)).toEqual(["coordinator"])
+    expect(ids(crewOf.get("coordinator")!)).toEqual(["lane-a", "reviewer"])
+  })
 })
 
 describe("memberStatus", () => {

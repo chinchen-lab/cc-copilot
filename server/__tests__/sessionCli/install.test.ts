@@ -7,6 +7,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { binDir } from "../../browser/paths"
+import { instanceSessionId } from "../../../shared/session/instances"
 import {
   ensureSessionCli,
   renderCmdLauncher,
@@ -20,6 +21,9 @@ let server: Server | null = null
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "cogpit-session-cli-"))
   vi.stubEnv("COGPIT_BROWSER_HOME", join(root, "browser"))
+  vi.stubEnv("COGPIT_SESSION_ID", undefined)
+  vi.stubEnv("CODEX_THREAD_ID", undefined)
+  vi.stubEnv("COGPIT_AGENT_INSTANCE_ID", undefined)
 })
 
 afterEach(async () => {
@@ -76,6 +80,24 @@ describe("ensureSessionCli", () => {
 })
 
 describe("the installed script", () => {
+  it.each(["", undefined])("uses the native thread ID when Cogpit's ID is %s", async (cogpitId) => {
+    ensureSessionCli()
+    const { port, bodies } = await fakeCogpit(200, { exitCode: 0, stdout: "", stderr: "" })
+    vi.stubEnv("COGPIT_SESSION_ID", cogpitId)
+
+    expect((await runScript(["children"], { COGPIT_PORT: String(port), CODEX_THREAD_ID: "first-turn-parent" })).code).toBe(0)
+    expect(bodies).toEqual([expect.objectContaining({ callerSessionId: "first-turn-parent" })])
+  })
+
+  it("qualifies a native thread ID with its provider account", async () => {
+    ensureSessionCli()
+    const { port, bodies } = await fakeCogpit(200, { exitCode: 0, stdout: "", stderr: "" })
+    await runScript(["children"], {
+      COGPIT_PORT: String(port), CODEX_THREAD_ID: "first-turn-parent", COGPIT_AGENT_INSTANCE_ID: "account-2",
+    })
+    expect(bodies).toEqual([expect.objectContaining({ callerSessionId: instanceSessionId("account-2", "first-turn-parent") })])
+  })
+
   it("forwards argv, cwd, caller and stdin, then prints the server's output and exit code", async () => {
     ensureSessionCli()
     const { port, bodies } = await fakeCogpit(200, { exitCode: 2, stdout: "{\"ok\":true}\n", stderr: "careful\n" })
@@ -83,6 +105,7 @@ describe("the installed script", () => {
     const result = await runScript(["send", "s1", "-"], {
       COGPIT_PORT: String(port),
       COGPIT_SESSION_ID: "parent-1",
+      CODEX_THREAD_ID: "native-parent",
     }, "message from stdin")
 
     expect(result).toEqual({ code: 2, stdout: "{\"ok\":true}\n", stderr: "careful\n" })

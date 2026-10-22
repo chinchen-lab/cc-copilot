@@ -20,7 +20,7 @@ vi.mock("node:fs/promises", () => ({
 vi.mock("node:fs", () => ({ watch }))
 vi.mock("../lib/activityMonitor", () => ({ recordActivity: vi.fn() }))
 
-import { watchSubagents } from "../subagentWatcher"
+import { watchSubagents, type SubagentTask } from "../subagentWatcher"
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -62,6 +62,10 @@ function mockFiles(files: Record<string, string>): void {
   }))
 }
 
+function tasks(entries: Record<string, Omit<SubagentTask, "forwardedBytes">>): Map<string, SubagentTask> {
+  return new Map(Object.entries(entries).map(([taskId, task]) => [taskId, { ...task, forwardedBytes: 0 }]))
+}
+
 /** agentId → parentToolUseID across every synthesized progress entry. */
 function forwardedAttribution(): Map<string, string> {
   const seen = new Map<string, string>()
@@ -71,10 +75,6 @@ function forwardedAttribution(): Map<string, string> {
   }
   return seen
 }
-
-// Sibling agents launched in one batch share a long prompt preamble; the head
-// comparison alone cannot tell them apart.
-const PREAMBLE = "Repo: /Users/dev/agent-window (branch worktree-mission-control). ".padEnd(140, "-")
 
 function userLine(content: string): string {
   return JSON.stringify({
@@ -116,6 +116,51 @@ describe("watchSubagents", () => {
     expect(readdir).toHaveBeenCalledTimes(2)
   })
 
+  it("uses file events and a slow backstop once the directory can be watched", async () => {
+    const close = vi.fn()
+    const on = vi.fn()
+    let changed!: () => void
+    watch.mockImplementation((_path, _options, callback) => {
+      changed = callback
+      return { close, on }
+    })
+    readdir.mockResolvedValue([])
+    const watcher = watchSubagents("/tmp/session.jsonl", "session", new Map())
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(readdir).toHaveBeenCalledTimes(1)
+    changed()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(readdir).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(readdir).toHaveBeenCalledTimes(3)
+    watcher.close()
+    expect(close).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(readdir).toHaveBeenCalledTimes(3)
+  })
+
+  it("starts watching a directory created after the session and recovers from watcher errors", async () => {
+    const close = vi.fn()
+    let failed!: () => void
+    const liveWatch = () => ({ close, on: (_event: string, callback: () => void) => { failed = callback } })
+    const watcher = watchSubagents("/tmp/session.jsonl", "session", new Map())
+    watch.mockImplementation(liveWatch)
+    readdir.mockResolvedValue([])
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(watch).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(readdir).toHaveBeenCalledTimes(2)
+    watch.mockImplementation(() => { throw new Error("unavailable") })
+    failed()
+    expect(close).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(readdir).toHaveBeenCalledTimes(3)
+    watch.mockImplementation(liveWatch)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(watch).toHaveBeenCalledTimes(4)
+    watcher.close()
+  })
+
   it("retains an unterminated record and forwards it once the newline arrives", async () => {
     const line = userLine("delegate 🙂")
     let source = Buffer.from(line)
@@ -124,7 +169,7 @@ describe("watchSubagents", () => {
     const watcher = watchSubagents(
       "/tmp/session.jsonl",
       "session",
-      new Map([["tool-1", "delegate 🙂"]]),
+      tasks({ a: { toolUseId: "tool-1" } }),
     )
 
     await vi.advanceTimersByTimeAsync(0)
@@ -153,7 +198,7 @@ describe("watchSubagents", () => {
     const watcher = watchSubagents(
       "/tmp/session.jsonl",
       "session",
-      new Map([["tool-large", content]]),
+      tasks({ large: { toolUseId: "tool-large" } }),
     )
 
     await vi.advanceTimersByTimeAsync(0)
@@ -186,140 +231,96 @@ describe("watchSubagents", () => {
     watcher.close()
   })
 
-  it("gives each sibling its own Task call when their prompts share a preamble", async () => {
-    const promptA = `${PREAMBLE} Simplify the streaming overlay.`
-    const promptB = `${PREAMBLE} Simplify the diff viewer.`
-    const promptC = `${PREAMBLE} Simplify the file-changes panel.`
+  it("binds twins with identical prompts to their own Agent calls by task id", async () => {
     mockFiles({
-      "agent-a.jsonl": `${userLine(promptA)}\n`,
-      "agent-b.jsonl": `${userLine(promptB)}\n`,
-      "agent-c.jsonl": `${userLine(promptC)}\n`,
+      "agent-a1.jsonl": `${userLine("Reply with PONG.")}\n`,
+      "agent-a2.jsonl": `${userLine("Reply with PONG.")}\n`,
     })
     const watcher = watchSubagents(
       "/tmp/session.jsonl",
       "session",
-      new Map([["tool-a", promptA], ["tool-b", promptB], ["tool-c", promptC]]),
+      tasks({ a1: { toolUseId: "tool-1" }, a2: { toolUseId: "tool-2" } }),
     )
 
     await vi.advanceTimersByTimeAsync(0)
 
     const attribution = forwardedAttribution()
-    expect(attribution.get("a")).toBe("tool-a")
-    expect(attribution.get("b")).toBe("tool-b")
-    expect(attribution.get("c")).toBe("tool-c")
-    expect(new Set(attribution.values()).size).toBe(3)
+    expect(attribution.get("a1")).toBe("tool-1")
+    expect(attribution.get("a2")).toBe("tool-2")
     watcher.close()
   })
 
-  it("never hands the same Task call to two agents", async () => {
-    const promptC = `${PREAMBLE} Simplify the file-changes panel.`
-    // a and b match no prompt exactly and both match every head — unresolvable.
-    mockFiles({
-      "agent-a.jsonl": `${userLine(`${PREAMBLE} unrelated tail one`)}\n`,
-      "agent-b.jsonl": `${userLine(`${PREAMBLE} unrelated tail two`)}\n`,
-      "agent-c.jsonl": `${userLine(promptC)}\n`,
-    })
-    const watcher = watchSubagents(
-      "/tmp/session.jsonl",
-      "session",
-      new Map([
-        ["tool-a", `${PREAMBLE} Simplify the streaming overlay.`],
-        ["tool-b", `${PREAMBLE} Simplify the diff viewer.`],
-        ["tool-c", promptC],
-      ]),
-    )
+  it("leaves a transcript unread until its task is bound, then forwards it on rescan", async () => {
+    mockFiles({ "agent-late.jsonl": `${userLine("hello")}\n` })
+    const bound = new Map<string, SubagentTask>()
+    const watcher = watchSubagents("/tmp/session.jsonl", "session", bound)
 
     await vi.advanceTimersByTimeAsync(0)
-
-    // Refusing to guess beats attributing both agents to one Task call — but
-    // the agent that can prove ownership is still forwarded.
-    const attribution = forwardedAttribution()
-    expect(attribution.has("a")).toBe(false)
-    expect(attribution.has("b")).toBe(false)
-    expect(attribution.get("c")).toBe("tool-c")
-    watcher.close()
-  })
-
-  it("holds a claim across scan cycles as later agent files appear", async () => {
-    const promptA = `${PREAMBLE} Simplify the streaming overlay.`
-    const promptB = `${PREAMBLE} Simplify the diff viewer.`
-    const pending = new Map([["tool-a", promptA], ["tool-b", promptB]])
-    mockFiles({ "agent-a.jsonl": `${userLine(promptA)}\n` })
-    const watcher = watchSubagents("/tmp/session.jsonl", "session", pending)
-
-    await vi.advanceTimersByTimeAsync(0)
-    expect(forwardedAttribution().get("a")).toBe("tool-a")
-
-    // b shows up only on a later scan; a's claim on tool-a must still stand.
-    mockFiles({
-      "agent-a.jsonl": `${userLine(promptA)}\n`,
-      "agent-b.jsonl": `${userLine(promptB)}\n`,
-    })
-    await vi.advanceTimersByTimeAsync(2_000)
-
-    const attribution = forwardedAttribution()
-    expect(attribution.get("a")).toBe("tool-a")
-    expect(attribution.get("b")).toBe("tool-b")
-    watcher.close()
-  })
-
-  it("lets a proven match take over a Task call a weak head match had guessed", async () => {
-    const promptA = `${PREAMBLE} Simplify the streaming overlay.`
-    // b resolves first, but only via the weak head comparison.
-    mockFiles({ "agent-b.jsonl": `${userLine(`${PREAMBLE} rewritten tail`)}\n` })
-    const pending = new Map([["tool-a", promptA]])
-    const watcher = watchSubagents("/tmp/session.jsonl", "session", pending)
-
-    await vi.advanceTimersByTimeAsync(0)
-    expect(forwardedAttribution().get("b")).toBe("tool-a")
-
-    mockFiles({
-      "agent-b.jsonl": `${userLine(`${PREAMBLE} rewritten tail`)}\n`,
-      "agent-a.jsonl": `${userLine(promptA)}\n`,
-    })
-    await vi.advanceTimersByTimeAsync(2_000)
-
-    // The agent that can prove ownership wins the id outright.
-    expect(forwardedAttribution().get("a")).toBe("tool-a")
-    watcher.close()
-  })
-
-  it("does not treat an empty Task prompt as a wildcard", async () => {
-    mockFiles({ "agent-a.jsonl": `${userLine("some subagent opening message")}\n` })
-    const watcher = watchSubagents("/tmp/session.jsonl", "session", new Map([["tool-empty", ""]]))
-
-    await vi.advanceTimersByTimeAsync(0)
-
+    expect(stat).not.toHaveBeenCalled()
     expect(appendFile).not.toHaveBeenCalled()
+
+    bound.set("late", { toolUseId: "tool-late", forwardedBytes: 0 })
+    watcher.rescan()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(forwardedAttribution().get("late")).toBe("tool-late")
     watcher.close()
   })
 
-  it("still matches on the prompt head when only one Task call can match", async () => {
-    mockFiles({ "agent-a.jsonl": `${userLine(`${PREAMBLE} tail rewritten by the CLI`)}\n` })
+  it("files a nested agent under the main-thread call it descends from", async () => {
+    mockFiles({ "agent-inner.jsonl": `${userLine("Reply with PING.")}\n` })
     const watcher = watchSubagents(
       "/tmp/session.jsonl",
       "session",
-      new Map([["tool-a", `${PREAMBLE} original tail`]]),
+      tasks({
+        outer: { toolUseId: "tool-outer" },
+        middle: { toolUseId: "tool-middle", parentTaskId: "outer" },
+        inner: { toolUseId: "tool-inner", parentTaskId: "middle", subagentType: "Explore" },
+      }),
     )
 
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(forwardedAttribution().get("a")).toBe("tool-a")
+    const progress = JSON.parse(String(appendFile.mock.calls[0][1]).trim())
+    expect(progress.parentToolUseID).toBe("tool-outer")
+    expect(progress.data).toMatchObject({
+      agentId: "inner",
+      toolUseId: "tool-inner",
+      parentAgentId: "middle",
+      subagentType: "Explore",
+    })
     watcher.close()
   })
 
-  it("prefers the most specific prompt when one is a prefix of another", async () => {
-    mockFiles({ "agent-a.jsonl": `${userLine(`${PREAMBLE} review the parser carefully`)}\n` })
+  it("treats a parent task it never saw as no parent", async () => {
+    mockFiles({ "agent-orphan.jsonl": `${userLine("hi")}\n` })
     const watcher = watchSubagents(
       "/tmp/session.jsonl",
       "session",
-      new Map([["tool-short", PREAMBLE], ["tool-long", `${PREAMBLE} review the parser`]]),
+      tasks({ orphan: { toolUseId: "tool-orphan", parentTaskId: "gone" } }),
     )
 
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(forwardedAttribution().get("a")).toBe("tool-long")
+    const progress = JSON.parse(String(appendFile.mock.calls[0][1]).trim())
+    expect(progress.parentToolUseID).toBe("tool-orphan")
+    expect(progress.data.parentAgentId).toBeUndefined()
     watcher.close()
+  })
+
+  it("does not forward a transcript again when a later watcher takes over", async () => {
+    mockFiles({ "agent-a.jsonl": `${userLine("once")}\n` })
+    const bound = tasks({ a: { toolUseId: "tool-a" } })
+    const first = watchSubagents("/tmp/session.jsonl", "session", bound)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(appendFile).toHaveBeenCalledOnce()
+    first.close()
+
+    const next = watchSubagents("/tmp/session.jsonl", "session", bound)
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(appendFile).toHaveBeenCalledOnce()
+    next.close()
   })
 
   it("retries a complete record when appending it to the parent fails", async () => {
@@ -333,7 +334,7 @@ describe("watchSubagents", () => {
     const watcher = watchSubagents(
       "/tmp/session.jsonl",
       "session",
-      new Map([["tool-retry", "retry me"]]),
+      tasks({ retry: { toolUseId: "tool-retry" } }),
     )
 
     await vi.advanceTimersByTimeAsync(0)

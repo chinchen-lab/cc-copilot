@@ -11,6 +11,7 @@ import { createSession } from "../lib/sessionCreate"
 import { sendToSession } from "../lib/sessionSend"
 import { withSessionSettings } from "../lib/sessionSettings"
 import { admitSessionCommand, commandDispatcher, commandScope } from "../lib/durableSend"
+import { applyQueueAction, cancelWaitingMessages, queueContext } from "../lib/sessionQueue"
 import { storeForPath } from "../agents"
 import { findJsonlPath } from "../sessionPaths"
 import { startFields, type SessionHost } from "./types"
@@ -72,8 +73,14 @@ export const localHost: SessionHost = {
     return runtimeFor(kind, instanceId).interrupt(sessionId)
   },
 
+  async queue(sessionId, action, req) {
+    const ctx = await queueContext(sessionId, req)
+    return action ? applyQueueAction(ctx, sessionId, action, req) : ctx.dispatcher.store.commands(ctx.conversation.id, ctx.scope)
+  },
+
   async stop(sessionId) {
     const { kind, instanceId } = await resolveSessionAgent(sessionId)
+    await cancelWaitingMessages(sessionId)
     return runtimeFor(kind, instanceId).stop(sessionId)
   },
 

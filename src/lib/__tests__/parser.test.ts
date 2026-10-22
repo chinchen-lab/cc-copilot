@@ -1907,6 +1907,52 @@ describe("sub-agent progress parsing", () => {
   })
 })
 
+describe("nested sub-agents", () => {
+  it("files a nested agent's progress under its root call, keeping its own call, parent and effort", () => {
+    const inner = agentProgressMsg("agent-inner", "task_outer", "assistant", [{ type: "text", text: "PING" }])
+    Object.assign(inner.data, { toolUseId: "task_inner", parentAgentId: "agent-outer", subagentType: "general-purpose" })
+    const jsonl = toJsonl([
+      userMsg("Nest"),
+      toolUseAssistant("Agent", { prompt: "Spawn one", effort: "low" }, "task_outer"),
+      agentProgressMsg("agent-outer", "task_outer", "assistant", [
+        { type: "tool_use", id: "task_inner", name: "Agent", input: { prompt: "Reply PING", effort: "high", subagent_type: "Explore" } },
+      ]),
+      inner,
+      toolResultMsg("task_outer", "PING"),
+      textAssistant("Done"),
+    ])
+
+    const turn = parseSession(jsonl).turns[0]
+    const blocks = turn.contentBlocks.filter((block) => block.kind === "sub_agent")
+    expect(blocks).toHaveLength(1)
+    const messages = blocks[0].kind === "sub_agent" ? blocks[0].messages : []
+    const outer = messages.find((m) => m.agentId === "agent-outer")
+    const nested = messages.find((m) => m.agentId === "agent-inner")
+    expect(outer).toMatchObject({ parentToolUseId: "task_outer", effort: "low" })
+    expect(outer?.parentAgentId).toBeUndefined()
+    expect(nested).toMatchObject({
+      parentToolUseId: "task_inner",
+      parentAgentId: "agent-outer",
+      effort: "high",
+      subagentType: "Explore",
+    })
+  })
+
+  it("falls back to the record's subagent type when the nested call was never seen", () => {
+    const inner = agentProgressMsg("agent-inner", "task_outer", "assistant", [{ type: "text", text: "PING" }])
+    Object.assign(inner.data, { toolUseId: "task_inner", parentAgentId: "agent-outer", subagentType: "general-purpose" })
+    const jsonl = toJsonl([
+      userMsg("Nest"),
+      toolUseAssistant("Agent", { prompt: "Spawn one" }, "task_outer"),
+      inner,
+    ])
+
+    const nested = parseSession(jsonl).turns[0].subAgentActivity.find((m) => m.agentId === "agent-inner")
+    expect(nested?.subagentType).toBe("general-purpose")
+    expect(nested?.effort).toBeUndefined()
+  })
+})
+
 // ── New Agent tool format (v2.1.63+) ─────────────────────────────────────
 
 describe("Agent tool with toolUseResult (new format)", () => {

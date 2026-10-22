@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => {
     sessionAddress: perKind(),
     listSessionFiles: perKind(),
     runtimeRunning: vi.fn(),
+    agentsRunning: vi.fn(),
     teamLeadFor: vi.fn(),
     getSessionPrSearchSnapshot: vi.fn(),
     archived: new Map<string, number>(),
@@ -31,6 +32,8 @@ const mocks = vi.hoisted(() => {
     setSessionsArchived: vi.fn(),
   }
 })
+
+vi.mock("../../agents/transcriptFile", () => import("../transcriptFileThroughHelpers"))
 
 vi.mock("../../helpers", () => ({
   dirs: {
@@ -102,6 +105,8 @@ vi.mock("../../agents/runtimes", () => ({
     activity: (sessionId: string) => ({ live: false, running: mocks.runtimeRunning(sessionId) === true }),
   }),
 }))
+
+vi.mock("../../agents/agentsRunning", () => ({ sessionAgentsRunning: mocks.agentsRunning }))
 
 vi.mock("../../agents/lineage", async (importOriginal) => ({
   ...await importOriginal<typeof import("../../agents/lineage")>(),
@@ -178,6 +183,7 @@ describe("project routes", () => {
       mocks.sessionAddress[kind].mockResolvedValue(null)
     }
     mocks.runtimeRunning.mockReturnValue(false)
+    mocks.agentsRunning.mockResolvedValue(false)
     mocks.teamLeadFor.mockResolvedValue("none")
     mocks.archived.clear()
     mocks.kept.clear()
@@ -772,6 +778,45 @@ describe("project routes", () => {
       expect(mocks.runtimeRunning).not.toHaveBeenCalled()
     })
 
+    it("marks a session waiting on agents active only while they still run", async () => {
+      const handler = getRouteHandler(handlers, "/api/active-sessions")
+      mocks.listTopLevelSessions.claude.mockResolvedValue([
+        claudeFile("proj-a", "waiting.jsonl", Date.now(), 500),
+        claudeFile("proj-a", "settled.jsonl", Date.now() - 1000, 500),
+      ])
+      mockedGetSessionMeta.mockImplementation(async (filePath: string) =>
+        makeSessionMeta({ sessionId: filePath.includes("waiting") ? "waiting" : "settled", cwd: "/code" }))
+      mockedGetSessionStatus.mockResolvedValue({ status: "awaiting_agents" as const, pendingAgents: 1 })
+      mockedProjectDirToReadableName.mockReturnValue({ path: "/proj/a", shortName: "a" })
+      mocks.agentsRunning.mockImplementation(async (_dirName: string, sessionId: string) => sessionId === "waiting")
+
+      const { req, res, next } = createMockReqRes("GET", "/")
+      await handler(req, res, next)
+
+      const rows = JSON.parse(res._getData()) as Array<{ sessionId: string; isActive: boolean }>
+      expect(rows.map(({ sessionId, isActive }) => ({ sessionId, isActive }))).toEqual([
+        { sessionId: "waiting", isActive: true },
+        { sessionId: "settled", isActive: false },
+      ])
+      expect(mocks.agentsRunning).toHaveBeenCalledWith("proj-a", "waiting")
+    })
+
+    it("does not look for running agents when the session is not waiting on any", async () => {
+      const handler = getRouteHandler(handlers, "/api/active-sessions")
+      mocks.listTopLevelSessions.claude.mockResolvedValue([
+        claudeFile("proj-a", "idle-agents.jsonl", Date.now(), 500),
+      ])
+      mockedGetSessionMeta.mockResolvedValueOnce(makeSessionMeta({ sessionId: "idle-agents", cwd: "/code" }))
+      mockedProjectDirToReadableName.mockReturnValueOnce({ path: "/proj/a", shortName: "a" })
+      mocks.agentsRunning.mockResolvedValue(true)
+
+      const { req, res, next } = createMockReqRes("GET", "/")
+      await handler(req, res, next)
+
+      expect(JSON.parse(res._getData())[0].isActive).toBe(false)
+      expect(mocks.agentsRunning).not.toHaveBeenCalled()
+    })
+
     it("names each row after the transcript listed, not the id its content opens with", async () => {
       const handler = getRouteHandler(handlers, "/api/active-sessions")
       const { req, res, next } = createMockReqRes("GET", "/")
@@ -959,8 +1004,8 @@ describe("project routes", () => {
           crewSummary: { size: 3, activityAt: new Date(NOW - MINUTE).toISOString() },
         })
         expect(rows[0]).not.toHaveProperty("crew")
-        expect(rows[2]!.crew).toEqual({ rootId: "coordinator", parentId: "coordinator", startedAt: 10, name: "w3-lane-a" })
-        expect(rows[4]!.crew).toEqual({ rootId: "coordinator", parentId: "lane-a", startedAt: 30 })
+        expect(rows[2]!.crew).toEqual({ rootId: "coordinator", parentId: "coordinator", hostId: "coordinator", startedAt: 10, name: "w3-lane-a" })
+        expect(rows[4]!.crew).toEqual({ rootId: "coordinator", parentId: "lane-a", hostId: "coordinator", startedAt: 30 })
       })
 
       it("brings a root's members along when the list is one project's", async () => {
@@ -991,6 +1036,24 @@ describe("project routes", () => {
         mocks.archived.set("lane-a", NOW + 5_000)
         const rows = await list("?limit=2")
         expect(rows.map((row) => row.sessionId)).toEqual(["other", "coordinator"])
+      })
+
+      it("identifies the listed host when the root and an intervening parent are absent", async () => {
+        listCrew()
+        mocks.archived.set("coordinator", NOW + 5_000)
+        mocks.sessionParents.mockResolvedValue(new Map([
+          ["lane-a", { parentSessionId: "coordinator", createdAt: 10 }],
+          ["lane-b", { parentSessionId: "coordinator", createdAt: 20 }],
+          ["missing-auditor", { parentSessionId: "lane-a", createdAt: 25 }],
+          ["reviewer", { parentSessionId: "missing-auditor", createdAt: 30 }],
+        ]))
+
+        const rows = await list("/")
+
+        expect(rows.map((row) => row.sessionId)).toEqual(["lane-a", "lane-b", "other", "reviewer"])
+        expect(rows.find((row) => row.sessionId === "reviewer")!.crew).toEqual({
+          rootId: "coordinator", parentId: "missing-auditor", hostId: "lane-a", startedAt: 30,
+        })
       })
 
       it("lists every match of a search on its own, each naming its crew", async () => {

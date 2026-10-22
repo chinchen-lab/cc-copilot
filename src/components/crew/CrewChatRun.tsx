@@ -9,7 +9,7 @@ import { MarkdownCodeBlock } from "@/components/timeline/MarkdownCodeBlock"
 import type { AgentKind } from "@/lib/agents"
 import { agentIcon } from "@/lib/agents/presentation"
 import { cn } from "@/lib/utils"
-import type { CrewChatMember, CrewChatMessage } from "../../../shared/contracts/crewChat"
+import type { CrewChatMember } from "../../../shared/contracts/crewChat"
 import { crewMemberTint, displayUrl, gitHubReference, remarkCrewChat, stripLeadingMentions, type CrewChatRole, type CrewChatRun, type StatusTone } from "./crewChatView"
 
 type Handles = ReadonlyMap<string, string>
@@ -82,7 +82,7 @@ export function CrewChatRunView({ run, members, handles, kinds, tints, rootId }:
             <Time at={message.createdAt} short className="pt-[3px] text-center text-[0.625rem] opacity-0 group-hover/message:opacity-100 group-focus-within/message:opacity-100" />
           )}
           <div className="col-start-2 min-w-0">
-            <CrewChatBody message={message} handles={handles} tints={tints} rootId={rootId} />
+            <CrewChatBody text={message.text} mentions={message.mentions} handles={handles} tints={tints} rootId={rootId} />
           </div>
         </article>
       ))}
@@ -98,8 +98,9 @@ function Time({ at, short, className }: { at: number; short?: boolean; className
   return <time dateTime={date.toISOString()} title={date.toLocaleString()} className={cn("shrink-0 tabular-nums text-muted-foreground", className)}>{label}</time>
 }
 
-const CrewChatBody = memo(function CrewChatBody({ message, handles, tints, rootId }: { message: CrewChatMessage; handles: Handles; tints: Tints; rootId: string }) {
-  const text = stripLeadingMentions(message.text, message.mentions, handles)
+/** A message's text as the chat shows it, without the opening mentions a header already names. */
+export const CrewChatBody = memo(function CrewChatBody({ text: source, mentions, handles, tints, rootId }: { text: string; mentions: readonly string[]; handles: Handles; tints: Tints; rootId: string }) {
+  const text = stripLeadingMentions(source, mentions, handles)
   const plugins = useMemo<NonNullable<Options["remarkPlugins"]>>(() => [remarkGfm, [remarkCrewChat, { handles }]], [handles])
   const components = useMemo(() => chatComponents(rootId, tints), [rootId, tints])
   return (

@@ -15,6 +15,7 @@ import { getOrLoadSessionMeta } from "./sessionMetaCache"
 import { SessionAlertTracker, type TrackedSessionSnapshot } from "./sessionAlertTracker"
 import { deliverNotification } from "./notificationDelivery"
 import { instanceDirName, instanceSessionId, splitInstanceSessionId } from "../../shared/session/instances"
+import { SessionFileMonitor } from "./sessionFileMonitor"
 
 /**
  * Server-owned notification source: watches every session transcript (Cogpit-
@@ -26,11 +27,9 @@ import { instanceDirName, instanceSessionId, splitInstanceSessionId } from "../.
  * itself by sweeping recently-modified transcripts and deriving their status
  * from the tail, exactly like /api/active-sessions does.
  *
- * Cost model: a sweep is stat-only for unchanged files — transcripts are read
- * (via the mtime-keyed session meta cache, shared with the routes) only when
- * their mtime moved since the last sweep. Every agent's storage goes through
- * the same gate: the stat-level listing is cheap, identity/status reads happen
- * per change, never per sweep.
+ * Filesystem events invalidate cached listings, with a periodic fallback.
+ * Transcripts are read through the shared mtime-keyed metadata cache only
+ * when they change; runtime liveness is checked on every sweep.
  *
  * Deliberate limits:
  * - A turn shorter than one sweep interval may never be observed "working" and
@@ -76,6 +75,7 @@ interface Candidate {
  * remembers "not notifiable" (subagent, unreadable) without re-parsing.
  */
 const known = new Map<string, { mtimeMs: number; snapshot: SessionSnapshot | null }>()
+const fileMonitor = new SessionFileMonitor()
 const tracker = new SessionAlertTracker()
 let started = false
 let sweeping = false
@@ -125,9 +125,11 @@ async function collectRecentCandidates(minMtimeMs: number): Promise<Candidate[]>
 
   // Stat-level listing only — never the session inventory, whose identity reads
   // would re-open every transcript on every sweep.
-  for (const store of allStores()) {
+  const stores = allStores()
+  fileMonitor.retain(stores)
+  for (const store of stores) {
     try {
-      for (const file of await store.listSessionFiles()) {
+      for (const file of await fileMonitor.list(store)) {
         if (file.mtimeMs < minMtimeMs) continue
         candidates.push({
           dirName: file.dirName,

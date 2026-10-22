@@ -27,12 +27,14 @@ import {
   claudeTurnBoundaries,
   deriveClaudeSessionStatus,
   extractClaudeMetadataFromLines,
+  isClaudeNoiseLine,
   isClaudeSessionText,
   parseClaudeSession,
 } from "./claude"
 import {
   appendCodexSession,
   brandCodexBranch,
+  codexPageHeaderLine,
   codexTurnBoundaries,
   deriveCodexSessionStatus,
   extractCodexMetadataFromLines,
@@ -115,6 +117,18 @@ export interface AgentFormat {
   /** Status derived from raw records. */
   status(records: readonly RawRecord[]): SessionStatusInfo
   /**
+   * True for a raw line the CLI writes for its own bookkeeping that no reader
+   * of the transcript uses. The server drops these before paging or streaming,
+   * so they never take a page's byte budget or line floor.
+   */
+  isNoiseLine(line: string): boolean
+  /**
+   * The transcript's first line as a page of it carries it, when a reader of
+   * one page needs facts about the rest of the file. `lastLines` reads the
+   * file's last complete lines.
+   */
+  pageHeaderLine?(firstLine: string, lastLines: () => Promise<readonly string[]>): Promise<string>
+  /**
    * The first record of a transcript, rewritten for a branch cut at
    * `branchedAt`: it now names `sessionId` and records the session and turn
    * it was cut from, and when, where the copied lines cannot otherwise be
@@ -149,6 +163,8 @@ export const TERMINAL_AGENT_KIND: AgentKind = AGENT_KINDS[AGENT_KINDS.length - 1
 
 // ── The table ───────────────────────────────────────────────────────────────
 
+const hasNoNoiseLines = (): boolean => false
+
 const codexFormat: AgentFormat = {
   kind: "codex",
   descriptor: descriptorFor("codex"),
@@ -158,6 +174,8 @@ const codexFormat: AgentFormat = {
   append: appendCodexSession,
   metadataFromLines: extractCodexMetadataFromLines,
   status: deriveCodexSessionStatus,
+  isNoiseLine: hasNoNoiseLines,
+  pageHeaderLine: codexPageHeaderLine,
   brandBranch: brandCodexBranch,
   turnBoundaries: codexTurnBoundaries,
 }
@@ -171,6 +189,7 @@ const copilotFormat: AgentFormat = {
   append: appendCopilotSession,
   metadataFromLines: extractCopilotMetadataFromLines,
   status: deriveCopilotSessionStatus,
+  isNoiseLine: hasNoNoiseLines,
   brandBranch: brandCopilotBranch,
   turnBoundaries: copilotTurnBoundaries,
 }
@@ -185,6 +204,7 @@ const claudeFormat: AgentFormat = {
   append: appendClaudeSession,
   metadataFromLines: extractClaudeMetadataFromLines,
   status: deriveClaudeSessionStatus,
+  isNoiseLine: isClaudeNoiseLine,
   brandBranch: brandClaudeBranch,
   turnBoundaries: claudeTurnBoundaries,
 }
@@ -221,6 +241,11 @@ export function formatForText(jsonlText: string): AgentFormat {
 
 export function formatForRecords(records: readonly { type?: unknown }[]): AgentFormat {
   return firstMatch((format) => format.detectsRecords(records))
+}
+
+/** `isNoiseLine` for a scan that reads lines before it knows which agent wrote them. */
+export function isAnyAgentNoiseLine(line: string): boolean {
+  return AGENT_KINDS.some((kind) => FORMATS[kind].isNoiseLine(line))
 }
 
 // ── Turn-boundary cut points ────────────────────────────────────────────────

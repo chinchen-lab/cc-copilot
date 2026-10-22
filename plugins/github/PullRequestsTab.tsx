@@ -27,6 +27,7 @@ import type {
   GitHubPullState,
   GitHubPullsResponse,
 } from "@cogpit/plugin-integrations"
+import { summarizeChanges } from "@cogpit/plugin-integrations/changedFileKind"
 import {
   Button,
   cn,
@@ -42,7 +43,9 @@ import {
   ClosedFold,
   CommentCount,
   FilterBar,
+  LineCounts,
   TabEmpty,
+  type LineCountsRow,
 } from "@cogpit/plugin-ui"
 import { toErrorResponse, useGitHubDetails } from "./githubStore.js"
 import { useExpandable, type LazyResourceState } from "./useExpandable.js"
@@ -221,16 +224,30 @@ function FileRow({ file }: { file: GitHubPullFile }) {
         <span className="text-muted-foreground">{directory}</span>
         <span className={cn(file.status === "removed" && "line-through text-muted-foreground")}>{name}</span>
       </span>
-      <span className="shrink-0 text-[10px] tabular-nums">
-        {file.additions > 0 && <span className="text-success">+{file.additions}</span>}
-        {file.additions > 0 && file.deletions > 0 && " "}
-        {file.deletions > 0 && <span className="text-destructive">−{file.deletions}</span>}
-      </span>
+      <LineCounts add={file.additions} del={file.deletions} className="text-[10px]" />
     </li>
   )
 }
 
 type FilesState = LazyResourceState<GitHubPullFilesResponse>
+
+/**
+ * Lines by kind of file, read from the file list: `null` while it loads,
+ * `undefined` when it failed. GitHub caps that list, so lines in files past
+ * the cap get a row of their own.
+ */
+function pullBreakdown(pull: GitHubPullRequest, files: FilesState): LineCountsRow[] | null | undefined {
+  if (!files.data) return files.error ? undefined : null
+  const rows: LineCountsRow[] = summarizeChanges(files.data.files)
+  if (files.data.truncated && pull.additions !== undefined && pull.deletions !== undefined) {
+    const additions = pull.additions - rows.reduce((sum, row) => sum + row.additions, 0)
+    const deletions = pull.deletions - rows.reduce((sum, row) => sum + row.deletions, 0)
+    if (additions > 0 || deletions > 0) {
+      rows.push({ label: "Not listed", additions: Math.max(0, additions), deletions: Math.max(0, deletions) })
+    }
+  }
+  return rows
+}
 
 function PullDetails({ pull, files }: { pull: GitHubPullRequest; files: FilesState }) {
   const body = pull.body.trim()
@@ -405,11 +422,12 @@ interface PullRowProps {
 function PullRow({ pull, projectKey, currentBranch, sessions, mergeMethods, openSession, onShowChecks, onMerged, now, expanded = false }: PullRowProps) {
   const openExternal = useGitHubNavigation()
   const { pullFiles: fetchGitHubPullFiles } = useGitHubDetails()
-  const { open, state: files, onOpenChange } = useExpandable(
+  const { open, state: files, onOpenChange, prefetch } = useExpandable(
     () => fetchGitHubPullFiles(projectKey, pull.number),
     "Unable to load changed files",
     false,
     expanded,
+    `${pull.baseBranch}:${pull.headSha}:${pull.additions}:${pull.deletions}`,
   )
   const [merging, setMerging] = useState(false)
   // Holds the row's look between the merge and the refreshed list that confirms it.
@@ -457,6 +475,15 @@ function PullRow({ pull, projectKey, currentBranch, sessions, mergeMethods, open
           </CollapsibleTrigger>
           <div className="mt-1 flex shrink-0 flex-col items-end gap-0.5">
             <div className="flex items-center gap-1">
+              {pull.additions !== undefined && pull.deletions !== undefined && (
+                <LineCounts
+                  add={pull.additions}
+                  del={pull.deletions}
+                  breakdown={pullBreakdown(pull, files)}
+                  onBreakdownRequest={prefetch}
+                  className="mr-0.5 text-[10px]"
+                />
+              )}
               <Signals pull={pull} onShowChecks={onShowChecks} />
               <Button
                 type="button"

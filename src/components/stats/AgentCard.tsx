@@ -17,6 +17,8 @@ interface AgentCardProps {
   status: AgentStatus
   durationMs?: number
   toolUseCount?: number
+  /** How many agents deep it was launched: 0 for one the main thread started. */
+  depth?: number
   disabled?: boolean
   onClick: () => void
   onStop?: () => void
@@ -32,6 +34,7 @@ export function AgentCard({
   status,
   durationMs,
   toolUseCount,
+  depth = 0,
   disabled,
   onClick,
   onStop,
@@ -55,6 +58,8 @@ export function AgentCard({
     <div
       className={cn(
         "motion-list-item flex w-full items-start border-b border-border text-left transition-colors last:border-b-0",
+        depth === 1 && "pl-4",
+        depth >= 2 && "pl-8",
         isViewing
           ? "bg-accent"
           : "hover:bg-muted/40"

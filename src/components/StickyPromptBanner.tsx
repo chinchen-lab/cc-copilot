@@ -10,7 +10,7 @@ import {
   extractCommandName,
   parseTaskNotifications,
   stripSystemTags,
-  taskWakeupSummary,
+  generatedPromptSummary,
 } from "@/lib/userMessageContent"
 import { useSessionNamer } from "@/hooks/useSessionNamer"
 
@@ -41,8 +41,8 @@ function promptPreview(turn: Turn, nameOf: SessionNamer): string | null {
   // space belongs to what the reader typed, so the report comes off first.
   const { remainingText } = parseTaskNotifications(unwrapped)
   const clean = stripSystemTags(remainingText)
-  const wakeup = taskWakeupSummary(clean, nameOf)
-  if (wakeup) return wakeup
+  const generated = generatedPromptSummary(clean, nameOf)
+  if (generated) return generated
 
   if (!clean) {
     const command = extractCommandName(raw)

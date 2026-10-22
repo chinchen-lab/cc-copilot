@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { formatTaskWakeup, isTaskWakeup, parseTaskWakeup } from "../../../shared/contracts/taskWakeup"
+import { formatTaskAttention, formatTaskWakeup, isTaskWakeup, parseTaskAttention, parseTaskWakeup } from "../../../shared/contracts/taskWakeup"
 
 const task = { id: "task-1", parentSessionId: "parent", childSessionId: "child", state: "completed" as const }
 
@@ -62,5 +62,14 @@ describe("task wakeup", () => {
 
   it("recognizes a wakeup from its opening alone", () => {
     expect(isTaskWakeup(formatTaskWakeup({ ...task, result: null }).slice(0, 120))).toBe(true)
+  })
+
+  it("writes an attention prompt that names the child and is not mistaken for a result", () => {
+    const text = formatTaskAttention(task, "It is waiting on you.", ["cogpit-session answer child --request q-1 \"<answer>\""])
+    expect(text).toBe("Delegated task task-1 needs attention. Child session: child. It is waiting on you.\ncogpit-session answer child --request q-1 \"<answer>\"")
+    expect(isTaskWakeup(text)).toBe(true)
+    expect(parseTaskAttention(text)).toEqual({ childSessionId: "child" })
+    expect(parseTaskWakeup(text)).toBeNull()
+    expect(parseTaskAttention(formatTaskWakeup({ ...task, result: null }))).toBeNull()
   })
 })

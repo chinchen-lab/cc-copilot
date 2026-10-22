@@ -184,6 +184,15 @@ describe("SessionCardList", () => {
       expect(screen.getByTestId("card-coordinator").dataset.crew).toBe("lane,reviewer")
     })
 
+    it("keeps a helper under its listed ancestor when its root and parent are omitted", () => {
+      const helper = {
+        ...reviewer,
+        crew: { ...reviewer.crew!, parentId: "missing-auditor", hostId: "lane" },
+      }
+      expect(renderCrews([solo, helper, lane])).toEqual(["card-lane", "card-solo"])
+      expect(screen.getByTestId("card-lane").dataset.crew).toBe("reviewer")
+    })
+
     it("names who started a member listed on its own, and its crew's root", () => {
       renderCrews([reviewer], { lineageSessions: [coordinator, lane, reviewer] })
       expect(screen.getByTestId("card-reviewer").dataset.lineage).toBe("w3-rooftop / Wave 3 coordinator")

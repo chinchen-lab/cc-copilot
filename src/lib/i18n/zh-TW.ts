@@ -1402,5 +1402,20 @@ export const zhTW: Readonly<Record<string, string>> = {
   "Side-by-side diff": "並排差異",
   "Unified": "統一",
   "Before": "修改前",
-  "After": "修改後"
+  "After": "修改後",
+  "Review {0} flagged process": "檢查 {0} 個標記的程序",
+  "Review {0} flagged processes": "檢查 {0} 個標記的程序",
+  "Leak monitor. No flagged processes": "程序監控：沒有標記的程序",
+  "Flagged processes · ": "標記的程序 · ",
+  "Review ownership and stop individual processes": "檢查程序所屬對話並個別停止程序",
+  "No flagged processes. Click to open the power monitor.": "沒有標記的程序。按一下開啟效能監控。",
+  "sustained high CPU": "CPU 持續高負載",
+  "Stop process {0}": "停止程序 {0}",
+  "Stopping…": "正在停止…",
+  "Agent and runtime processes": "代理與執行環境程序",
+  "Agent sessions, browsers, and long-running scripts. Unknown runtimes are flagged after sustained high CPU; stopping them is manual.": "代理對話、瀏覽器與長時間執行的腳本。未知執行環境若 CPU 持續高負載，會加上標記，供你手動停止。",
+  "Originating session": "來源對話",
+  "Session ownership unknown": "無法確認程序所屬對話",
+  "Extra usage is on but did not cover this. ": "已啟用額外用量，但無法涵蓋此次請求。 ",
+  "Extra usage is off for this account. ": "此帳號未啟用額外用量。 "
 }

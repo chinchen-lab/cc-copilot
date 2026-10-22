@@ -147,7 +147,7 @@ function CrewRoll({ crew, hereId, nameOf, onOpen }: CrewSectionProps & { hereId:
         </span>
       </div>
       {members.length > 0 && (
-        <div data-crew-strip className="mt-2.5 flex gap-[3px]" role="list" aria-label={t("One cell per session, in the order they were started")}>
+        <div data-crew-strip className="mt-2.5 grid grid-cols-[repeat(auto-fit,minmax(6px,1fr))] gap-[3px]" role="list" aria-label={t("One cell per session, in the order they were started")}>
           {members.map((member) => {
             const state = memberCellState(member)
             return (
@@ -160,7 +160,7 @@ function CrewRoll({ crew, hereId, nameOf, onOpen }: CrewSectionProps & { hereId:
                 aria-label={`${nameOf(member)}: ${memberActivity(member)}`}
                 onClick={() => document.querySelector(`[data-crew-row="${member.sessionId}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" })}
                 className={cn(
-                  "h-2.5 min-w-[3px] flex-1 rounded-[2px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "h-2.5 rounded-[2px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   CELL[state],
                   member.sessionId === hereId && "outline outline-[1.5px] outline-offset-2 outline-foreground",
                 )}

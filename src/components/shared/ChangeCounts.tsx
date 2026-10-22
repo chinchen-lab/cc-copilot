@@ -1,37 +1,10 @@
 /**
- * The +N / −M diffstat renderers.
- *
- * Previously duplicated file-locally in TurnChangedFiles and GroupedFileCard.
- * Shared so every surface that reports line changes looks identical.
+ * The +N / −M diffstat renderers, shared so every surface that reports line
+ * changes looks identical. `LineCounts` lives in the plugin UI package so the
+ * GitHub plugin renders the same stat and breakdown tooltip.
  */
 
-import { cn } from "@/lib/utils"
-
-/** Compact "+12 -3" line counts. Renders nothing for a zero-change entry. */
-export function LineCounts({
-  add,
-  del,
-  dimmed,
-  className,
-}: {
-  add: number
-  del: number
-  dimmed?: boolean
-  className?: string
-}) {
-  return (
-    <span
-      className={cn(
-        "flex shrink-0 items-center gap-1 font-mono text-xs tabular-nums",
-        dimmed && "opacity-40",
-        className,
-      )}
-    >
-      {add > 0 && <span className="text-success">+{add}</span>}
-      {del > 0 && <span className="text-destructive">-{del}</span>}
-    </span>
-  )
-}
+export { LineCounts } from "@cogpit/plugin-ui/line-counts"
 
 const CHANGE_BAR_BLOCKS = 5
 

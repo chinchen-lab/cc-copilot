@@ -31,6 +31,8 @@ export function startedLabel(at: number): string {
 }
 
 export function memberCellState(member: CrewMember): CrewCellState {
+  // A deferred permission waits on a reviewer, as the session list counts it.
+  if (member.status === "deferred") return "needs-you"
   switch (member.outcome) {
     case "needs_input": return "needs-you"
     case "running": return "working"
@@ -163,6 +165,7 @@ export function memberActivity(member: CrewMember): string {
     case "needs-you":
       if (first?.kind === "permission") return `Waiting on a permission · ${first.toolName}`
       if (first?.kind === "question") return "Asked a question"
+      if (!first && member.status === "deferred") return "Awaiting permission review"
       return "Plan to review"
     case "working":
       if (member.status === "tool_use" && member.toolName) return member.toolName

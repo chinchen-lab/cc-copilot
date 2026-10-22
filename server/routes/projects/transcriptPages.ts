@@ -1,5 +1,6 @@
 import type { ServerResponse } from "node:http"
-import { open, readFile } from "../../helpers"
+import type { AgentFormat } from "../../../shared/session/agents"
+import { openTranscript, readTranscriptText } from "../../agents/transcriptFile"
 import { sendJson } from "../../http"
 import { parseTailByteBudget, trimTailToByteBudget } from "./tailBudget"
 
@@ -15,6 +16,8 @@ const MIN_PAGE_LINES = 30
 const MAX_TAIL_WINDOW_BYTES = 2 * 1024 * 1024
 /** Hard cap when extending a `?before=` window to satisfy the min-line floor. */
 const MAX_BEFORE_WINDOW_BYTES = 4 * 1024 * 1024
+/** Initial window for reading a transcript's last lines on a `?before=` page. */
+const LAST_LINES_BYTES = 65536
 
 interface TailResult {
   lines: string[]
@@ -26,6 +29,14 @@ interface RangeResult {
   lines: string[]
   byteOffset: number
 }
+
+/** Names the raw lines a transcript's agent writes only for itself. */
+type NoiseTest = (line: string) => boolean
+
+type PageFormat = Pick<AgentFormat, "isNoiseLine" | "pageHeaderLine">
+
+const countLines = (lines: readonly string[], isNoise: NoiseTest): number =>
+  lines.reduce((count, line) => (isNoise(line) ? count : count + 1), 0)
 
 interface HeaderResult {
   lines: string[]
@@ -67,10 +78,10 @@ function extractCompleteLines(buf: Buffer, readStart: number, truncatedEnd: bool
  * discarded. If the window yields fewer than `minLines` complete lines it is
  * extended backward (doubling) until satisfied, the start of the file, or
  * `MAX_TAIL_WINDOW_BYTES` — so one fat line cannot reduce the tail to a
- * near-empty page.
+ * near-empty page. Noise lines are returned but not counted.
  */
-async function readTail(filePath: string, byteCount: number, minLines = 0): Promise<TailResult> {
-  const fh = await open(filePath, "r")
+async function readTail(filePath: string, byteCount: number, minLines: number, isNoise: NoiseTest): Promise<TailResult> {
+  const fh = await openTranscript(filePath)
   try {
     const fileStat = await fh.stat()
     const totalSize = fileStat.size
@@ -83,7 +94,7 @@ async function readTail(filePath: string, byteCount: number, minLines = 0): Prom
       const { lines, byteOffset } = extractCompleteLines(buf.subarray(0, bytesRead), readStart, false)
 
       const canGrow = readStart > 0 && window < MAX_TAIL_WINDOW_BYTES
-      if (lines.length >= minLines || !canGrow) {
+      if (!canGrow || countLines(lines, isNoise) >= minLines) {
         return { lines, byteOffset, totalSize }
       }
       window = Math.min(window * 2, MAX_TAIL_WINDOW_BYTES, totalSize)
@@ -96,22 +107,26 @@ async function readTail(filePath: string, byteCount: number, minLines = 0): Prom
 /**
  * Reads complete JSONL lines from a byte window ending at `endOffset`
  * (exclusive). Starts with `initialWindow` bytes and extends backward
- * (doubling) until the window yields at least `minLines` complete lines, the
- * start of the file, or `MAX_BEFORE_WINDOW_BYTES`. The returned `byteOffset`
- * is the exact byte position of the first returned line, so paging with
- * `?before=byteOffset` reconstructs the file with no gaps or duplicates.
+ * (doubling) until the window yields at least `minLines` complete lines other
+ * than noise, the start of the file, or `MAX_BEFORE_WINDOW_BYTES`. A full
+ * window with nothing but noise moves on to the bytes before it, so only a
+ * page that reaches the start of the file can come back empty. The returned
+ * `byteOffset` is the exact byte position of the first line in the window, so
+ * paging with `?before=byteOffset` reconstructs the file, less its noise, with
+ * no gaps or duplicates.
  */
 async function readRangeBefore(
   filePath: string,
   endOffset: number,
   initialWindow: number,
   minLines: number,
+  isNoise: NoiseTest,
 ): Promise<RangeResult> {
-  const fh = await open(filePath, "r")
+  const fh = await openTranscript(filePath)
   try {
     const fileStat = await fh.stat()
     const totalSize = fileStat.size
-    const end = Math.min(Math.max(endOffset, 0), totalSize)
+    let end = Math.min(Math.max(endOffset, 0), totalSize)
     if (end <= 0) return { lines: [], byteOffset: 0 }
 
     let window = Math.min(Math.max(initialWindow, 1), end)
@@ -121,11 +136,17 @@ async function readRangeBefore(
       const { bytesRead } = await fh.read(buf, 0, window, readStart)
       const view = buf.subarray(0, bytesRead)
       const truncatedEnd = end < totalSize && view[view.length - 1] !== NEWLINE
-      const result = extractCompleteLines(view, readStart, truncatedEnd)
+      const { lines, byteOffset } = extractCompleteLines(view, readStart, truncatedEnd)
+      const kept = lines.filter((line) => !isNoise(line))
 
-      const canGrow = readStart > 0 && window < MAX_BEFORE_WINDOW_BYTES
-      if (result.lines.length >= minLines || !canGrow) return result
-      window = Math.min(window * 2, MAX_BEFORE_WINDOW_BYTES, end)
+      if (readStart > 0 && window < MAX_BEFORE_WINDOW_BYTES && kept.length < minLines) {
+        window = Math.min(window * 2, MAX_BEFORE_WINDOW_BYTES, end)
+      } else if (readStart > 0 && kept.length === 0) {
+        end = byteOffset
+        window = Math.min(window, end)
+      } else {
+        return { lines: kept, byteOffset }
+      }
     }
   } finally {
     await fh.close()
@@ -139,7 +160,7 @@ async function readRangeBefore(
  * instructions, pushing its first line well past the initial read size.
  */
 export async function readSessionHeader(filePath: string): Promise<HeaderResult> {
-  const fh = await open(filePath, "r")
+  const fh = await openTranscript(filePath)
   try {
     const fileStat = await fh.stat()
     let readLen = Math.min(HEADER_BYTES, fileStat.size)
@@ -166,11 +187,35 @@ export async function readSessionHeader(filePath: string): Promise<HeaderResult>
 }
 
 /**
+ * Pages carry the transcript's first line as its format rewrites it for
+ * pages: in `headerLines`, and wherever a page itself starts at the top of the
+ * file, so readers still recognise it as the header line.
+ */
+async function firstLineForPages(
+  format: PageFormat,
+  header: HeaderResult,
+  lastLines: () => Promise<readonly string[]>,
+): Promise<(lines: string[], byteOffset: number) => string[]> {
+  const first = header.lines[0]
+  const rewritten = first !== undefined && format.pageHeaderLine ? await format.pageHeaderLine(first, lastLines) : first
+  if (rewritten === first) return (lines) => lines
+  return (lines, byteOffset) => (byteOffset === 0 && lines[0] === first ? [rewritten, ...lines.slice(1)] : lines)
+}
+
+/**
  * Serve a transcript the way the timeline pages through it: `?tail=N` for the
  * latest turns, `?before=offset&count=N` for the page above an offset, and
- * otherwise the whole file as text.
+ * otherwise the whole file as text. Pages leave out the format's noise lines;
+ * the whole file is sent byte for byte, because its readers count its lines
+ * and bytes against the file on disk (undo, the live stream's start offset).
  */
-export async function serveTranscript(res: ServerResponse, filePath: string, params: URLSearchParams): Promise<void> {
+export async function serveTranscript(
+  res: ServerResponse,
+  filePath: string,
+  params: URLSearchParams,
+  format: PageFormat,
+): Promise<void> {
+  const isNoise = format.isNoiseLine
   const tailParam = params.get("tail")
   const beforeParam = params.get("before")
   const countParam = params.get("count")
@@ -187,15 +232,16 @@ export async function serveTranscript(res: ServerResponse, filePath: string, par
 
       const [header, tail] = await Promise.all([
         readSessionHeader(filePath),
-        readTail(filePath, bytesToRead, minLines),
+        readTail(filePath, bytesToRead, minLines, isNoise),
       ])
 
-      const trimmed = trimTailToByteBudget(tail.lines, tail.byteOffset, byteBudget, minLines)
+      const trimmed = trimTailToByteBudget(tail.lines, tail.byteOffset, byteBudget, minLines, isNoise)
       const hasMore = trimmed.byteOffset > header.bytesRead
+      const forPage = await firstLineForPages(format, header, async () => tail.lines)
 
       sendJson(res, 200, {
-        headerLines: header.lines,
-        tailLines: trimmed.lines,
+        headerLines: forPage(header.lines, 0).filter((line) => !isNoise(line)),
+        tailLines: forPage(trimmed.lines, trimmed.byteOffset),
         byteOffset: trimmed.byteOffset,
         totalSize: tail.totalSize,
         hasMore,
@@ -210,18 +256,21 @@ export async function serveTranscript(res: ServerResponse, filePath: string, par
 
       const [header, range] = await Promise.all([
         readSessionHeader(filePath),
-        readRangeBefore(filePath, endOffset, initialWindow, minLines),
+        readRangeBefore(filePath, endOffset, initialWindow, minLines, isNoise),
       ])
 
+      const forPage = await firstLineForPages(format, header, async () =>
+        (await readTail(filePath, LAST_LINES_BYTES, 1, () => false)).lines)
+
       sendJson(res, 200, {
-        headerLines: header.lines,
-        lines: range.lines,
+        headerLines: forPage(header.lines, 0).filter((line) => !isNoise(line)),
+        lines: forPage(range.lines, range.byteOffset),
         byteOffset: range.byteOffset,
         hasMore: range.byteOffset > header.bytesRead,
       })
     } else {
       // Default: return full file as text/plain (original behavior)
-      const content = await readFile(filePath, "utf-8")
+      const content = await readTranscriptText(filePath)
       res.setHeader("Content-Type", "text/plain")
       res.end(content)
     }

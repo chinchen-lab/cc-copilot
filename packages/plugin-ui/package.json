@@ -42,6 +42,10 @@
       "types": "./dist/input.d.ts",
       "import": "./dist/input.js"
     },
+    "./line-counts": {
+      "types": "./dist/line-counts.d.ts",
+      "import": "./dist/line-counts.js"
+    },
     "./scroll-area": {
       "types": "./dist/scroll-area.d.ts",
       "import": "./dist/scroll-area.js"

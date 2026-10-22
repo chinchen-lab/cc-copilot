@@ -1,5 +1,6 @@
 import { relative, sep } from "node:path"
 import { inventoryFor, type SessionInventoryEntry } from "./sessionInventory"
+import { uncompressedTranscriptName } from "./transcriptFile"
 import { readTranscriptHead } from "./transcriptHead"
 import type {
   AgentProjectEntry,
@@ -77,6 +78,6 @@ export async function addressFromTranscript(
   const meta = await store.readSessionMeta(filePath, await readTranscriptHead(filePath))
   return {
     dirName: store.descriptor.dirName.encode(meta.cwd || ""),
-    fileName: relative(root, filePath).split(sep).join("/"),
+    fileName: uncompressedTranscriptName(relative(root, filePath)).split(sep).join("/"),
   }
 }

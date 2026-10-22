@@ -87,6 +87,7 @@ describe("Copilot durable session status", () => {
       pendingAgents: 1,
       pendingAgentDescriptions: ["Inspect the parser"],
       pendingQueue: 0,
+      backgroundAgents: [{ description: "Inspect the parser", startedAt: "2026-08-01T12:00:00.000Z", done: false }],
     })
     await expect(getSessionStatus(completed)).resolves.toEqual({ status: "processing" })
   })

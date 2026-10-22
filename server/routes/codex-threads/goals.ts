@@ -74,7 +74,7 @@ async function setGoal(
   receivedAt: number,
 ): Promise<ThreadGoalResponse> {
   const { objective, ...settings } = update
-  const set = () => client.setGoal(session.sessionId, update)
+  const set = () => client.setGoal(session.sessionId, { ...update, origin: "user" })
   const result = objective === undefined
     ? await set()
     : await handPrompt(req, { receivedAt, route: "goal", session, input: objective }, set, "started")
@@ -102,7 +102,7 @@ export async function handleGoal(
   }
   const session = await authorizeThread(req, res, threadId, "interact")
   if (!session) return
-  const result = await client.clearGoal(session.sessionId)
+  const result = await client.clearGoal(session.sessionId, "user")
   if (result.cleared) reportSessionEvent(req, "session.goal", session, { cleared: true })
   sendJson(res, 200, result)
 }

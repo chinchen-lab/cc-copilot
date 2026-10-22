@@ -31,6 +31,7 @@ import { registerDeleteSessionRoute } from "./session-manage/deleteSession"
 import { handleJsonBody } from "./session-manage/jsonBody"
 import { registerRunningProcessesRoute } from "./session-manage/processInventory"
 import { sendAgentError } from "./agentErrors"
+import { cancelWaitingMessages } from "../lib/sessionQueue"
 
 /**
  * Session lifecycle: interrupt, stop, kill-all, delete, and the process
@@ -203,6 +204,8 @@ export function registerSessionManageRoutes(use: UseFn) {
       const session = await interactiveSession(req, res, body)
       if (!session) return
 
+      // Undo stops a session only to reload it, so its queue stays unless the caller ends the session for good.
+      if ((body as { cancelQueued?: unknown }).cancelQueued === true) await cancelWaitingMessages(session.sessionId)
       const stopped = await session.runtime.stop(session.sessionId)
       if (stopped) reportSessionEvent(req, "session.stop", session.audit)
       sendJson(res, 200, stopped

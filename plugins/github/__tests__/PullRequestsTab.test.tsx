@@ -56,6 +56,8 @@ const pullsResponse: GitHubPullsResponse = {
       comments: 4,
       mergeState: "blocked",
       headSha,
+      additions: 72,
+      deletions: 3,
     },
     {
       number: 130,
@@ -110,6 +112,7 @@ const filesResponse: GitHubPullFilesResponse = {
   files: [
     { path: "src/checkout.ts", previousPath: null, status: "modified", additions: 12, deletions: 3 },
     { path: "src/cart/empty.ts", previousPath: null, status: "added", additions: 20, deletions: 0 },
+    { path: "src/checkout.test.ts", previousPath: null, status: "added", additions: 40, deletions: 0 },
   ],
 }
 
@@ -183,12 +186,57 @@ describe("GitHubPanel pull requests tab", () => {
     expect(storeMocks.fetchGitHubPullFiles).toHaveBeenCalledWith("/repo", 128)
     expect(screen.getByText(/Guards the empty cart case/)).toBeVisible()
     const files = await screen.findByRole("region", { name: "Files changed" })
-    expect(within(files).getByTitle("src/checkout.ts")).toHaveTextContent("+12 −3")
+    expect(within(files).getByTitle("src/checkout.ts")).toHaveTextContent("+12-3")
     expect(within(files).getByTitle("src/cart/empty.ts")).toHaveTextContent("+20")
     expect(screen.getByRole("link", { name: "Open pull request on GitHub" })).toHaveAttribute(
       "href",
       "https://github.com/acme/app/pull/128",
     )
+  })
+
+  it("splits a row's line totals by kind of file, reading the files only on hover", async () => {
+    const user = await renderPullsTab()
+
+    const checkout = screen.getByRole("article", { name: "Fix checkout flow" })
+    const stat = within(checkout).getByText("+72").parentElement!
+    expect(stat).toHaveTextContent("+72-3")
+    expect(storeMocks.fetchGitHubPullFiles).not.toHaveBeenCalled()
+
+    await user.hover(stat)
+    expect(storeMocks.fetchGitHubPullFiles).toHaveBeenCalledWith("/repo", 128)
+    const tooltip = await screen.findByText("Tests")
+    expect(tooltip.parentElement).toHaveTextContent("Code+32-3Tests+40-0Total+72-3")
+  })
+
+  it.each([
+    ["a new head commit", { headSha: "c".repeat(40) }],
+    ["a new base branch", { baseBranch: "release" }],
+  ])("reads a row's files again when a refresh brings %s", async (_change, change) => {
+    const user = userEvent.setup()
+    const view = render(<GitHubPanel context={context} active openExternal={openExternal} />)
+    await user.click(screen.getByRole("tab", { name: /Pull requests/ }))
+    await user.hover(within(screen.getByRole("article", { name: "Fix checkout flow" })).getByText("+72").parentElement!)
+    expect(await screen.findByText("Tests")).toBeInTheDocument()
+
+    const [checkout, ...rest] = pullsResponse.pulls
+    storeMocks.useGitHubPulls.mockReturnValue(withPulls([{ ...checkout, ...change, additions: 112 }, ...rest]))
+    storeMocks.fetchGitHubPullFiles.mockResolvedValue({
+      ...filesResponse,
+      files: [...filesResponse.files, { path: "README.md", previousPath: null, status: "modified", additions: 40, deletions: 0 }],
+    })
+    view.rerender(<GitHubPanel context={context} active openExternal={openExternal} />)
+
+    await waitFor(() => expect(storeMocks.fetchGitHubPullFiles).toHaveBeenCalledTimes(2))
+    expect((await screen.findByText("Docs")).parentElement).toHaveTextContent("Code+32-3Tests+40-0Docs+40-0Total+112-3")
+  })
+
+  it("gives lines in files past GitHub's file cap a row of their own", async () => {
+    storeMocks.fetchGitHubPullFiles.mockResolvedValue({ ...filesResponse, files: filesResponse.files.slice(0, 2), truncated: true })
+    const user = await renderPullsTab()
+
+    await user.hover(within(screen.getByRole("article", { name: "Fix checkout flow" })).getByText("+72").parentElement!)
+    const tooltip = await screen.findByText("Not listed")
+    expect(tooltip.parentElement).toHaveTextContent("Code+32-3Not listed+40-0Total+72-3")
   })
 
   it("surfaces checks, review, conflicts and comments as signals on each row", async () => {

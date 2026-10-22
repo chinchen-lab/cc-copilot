@@ -54,8 +54,7 @@ export class CommandDispatcher {
           this.active.delete(key)
         }
       }
-      for (const candidate of this.store.pending()) {
-        if (candidate.receipt.state !== "queued") continue
+      for (const candidate of this.store.queued()) {
         const authority = this.authorities.get(JSON.stringify([candidate.scope, candidate.receipt.conversationId]))
         if (!authority) continue
         if (!await authority.authorize(candidate).catch(() => false)) {

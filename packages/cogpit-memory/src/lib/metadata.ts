@@ -1,5 +1,6 @@
 import { readFile, stat, open } from "node:fs/promises"
-import { formatForText, type AgentFormat, type AgentSessionMetadata } from "./agents"
+import { formatForText, isAnyAgentNoiseLine, type AgentFormat, type AgentSessionMetadata } from "./agents"
+import { isCompressedTranscript, openTranscript, readTranscriptText } from "./transcriptFile"
 import { deriveSessionStatus, type SessionStatusInfo } from "./sessionStatus"
 import { storeForPath } from "./stores"
 import { instanceSessionId } from "./instances"
@@ -46,6 +47,7 @@ function scanClaudeMessages(lines: readonly string[]): ConversationMeta {
   }
 
   for (const line of lines) {
+    if (isAnyAgentNoiseLine(line)) continue
     let record: {
       type?: string
       isMeta?: boolean
@@ -85,8 +87,8 @@ async function readLines(filePath: string, size: number): Promise<{
   lines: string[]
   isPartialRead: boolean
 }> {
-  if (size <= FULL_READ_LIMIT) {
-    const content = await readFile(filePath, "utf-8")
+  if (size <= FULL_READ_LIMIT || isCompressedTranscript(filePath)) {
+    const content = await readTranscriptText(filePath)
     return { lines: content.split("\n").filter(Boolean), isPartialRead: false }
   }
 
@@ -167,11 +169,10 @@ export async function getSessionStatus(filePath: string): Promise<SessionStatusI
   const CHUNK = 4096
   const MAX_CHUNKS = 64 // safety cap: 256KB max scan
   try {
-    const fileStat = await stat(filePath)
-    if (fileStat.size === 0) return { status: "idle" }
-
-    const fh = await open(filePath, "r")
+    const fh = await openTranscript(filePath)
     try {
+      const fileStat = await fh.stat()
+      if (fileStat.size === 0) return { status: "idle" }
       const meaningful: Array<{ type: string; [key: string]: unknown }> = []
       let cursor = fileStat.size
       let leftover = ""
@@ -192,7 +193,7 @@ export async function getSessionStatus(filePath: string): Promise<SessionStatusI
 
         for (let i = lines.length - 1; i >= startIdx; i--) {
           const line = lines[i]
-          if (!line) continue
+          if (!line || isAnyAgentNoiseLine(line)) continue
           let obj: { type: string; [key: string]: unknown }
           try { obj = JSON.parse(line) } catch { continue }
 

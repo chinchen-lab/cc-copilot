@@ -111,6 +111,14 @@ function QuestionInput({ questions }: { questions: Record<string, unknown>[] }):
   )
 }
 
+/** A requested effort reads with the model it applies to, as one row. */
+function withEffortBesideModel(fields: Array<[string, unknown]>): Array<[string, unknown]> {
+  const effort = fields.find(([key]) => key === "effort")?.[1]
+  if (effort === undefined || !fields.some(([key]) => key === "model")) return fields
+  return fields.flatMap(([key, value]): Array<[string, unknown]> =>
+    key === "effort" ? [] : [[key, key === "model" ? `${value} · ${effort} effort` : value]])
+}
+
 export function ToolCallInput({ input }: { input: Record<string, unknown> }): React.ReactElement | null {
   const { t } = useTranslation()
   const steps = planSteps(input)
@@ -119,10 +127,10 @@ export function ToolCallInput({ input }: { input: Record<string, unknown> }): Re
       question !== null && typeof question === "object" &&
       typeof (question.question ?? question.title) === "string")
     : []
-  const fields = Object.entries(input).filter(([key, value]) =>
+  const fields = withEffortBesideModel(Object.entries(input).filter(([key, value]) =>
     key !== "raw" && key !== "type" &&
     (typeof value === "string" ? value.length > 0 : typeof value === "number" || typeof value === "boolean"),
-  )
+  ))
   if (steps.length === 0 && fields.length === 0 && questions.length === 0) return null
 
   return (

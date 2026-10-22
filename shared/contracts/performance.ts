@@ -45,6 +45,21 @@ export interface SystemProcessMetric {
   ageSeconds: number
   orphaned: boolean
   suspectedLeak: boolean
+  identity?: string
+  canStop?: boolean
+  warning?: "sustained-cpu"
+  owner?: {
+    sessionId: string
+    taskId: string
+    title?: string
+    dirName?: string
+    fileName?: string
+  }
+}
+
+export interface SystemProcessTarget {
+  pid: number
+  identity: string
 }
 
 export interface SystemProcessesSnapshot {

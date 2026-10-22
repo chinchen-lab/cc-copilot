@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/empty"
 import { cn } from "@/lib/utils"
 import { LineCounts } from "@/components/shared/ChangeCounts"
+import { summarizeChanges } from "../../shared/changedFileKind"
 import { formatRelativeTime } from "@/lib/format"
 import { authFetch } from "@/lib/auth"
 import { useCapability } from "@/hooks/useCapability"
@@ -340,14 +341,16 @@ export function WorktreePanel({
 
                 {fileCount > 0 && (
                   <Collapsible className="mt-2">
-                    <CollapsibleTrigger className="group flex w-full items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
-                      <ChevronRight data-icon="inline-start" className="size-3 transition-transform group-data-panel-open:rotate-90 motion-reduce:transition-none" />
-                      <FileCode2 data-icon="inline-start" className="size-3" />
-                      <span>
-                        {fileCount} {t(" file")}{fileCount !== 1 ? "s" : ""} {t(" changed")}
-                      </span>
-                      <LineCounts add={totalAdded} del={totalDeleted} className="ml-1" />
-                    </CollapsibleTrigger>
+                    <div className="relative flex w-full items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
+                      <CollapsibleTrigger className="group flex items-center gap-1.5 after:absolute after:inset-0">
+                        <ChevronRight data-icon="inline-start" className="size-3 transition-transform group-data-panel-open:rotate-90 motion-reduce:transition-none" />
+                        <FileCode2 data-icon="inline-start" className="size-3" />
+                        <span>
+                          {fileCount} {t(" file")}{fileCount !== 1 ? "s" : ""} {t(" changed")}
+                        </span>
+                      </CollapsibleTrigger>
+                      <LineCounts add={totalAdded} del={totalDeleted} breakdown={summarizeChanges(wt.changedFiles)} className="relative ml-1" />
+                    </div>
                     <CollapsibleContent>
                       <div className="mt-1.5 flex flex-col gap-px rounded-md bg-muted/40 p-1.5">
                         {wt.changedFiles.map((f) => (

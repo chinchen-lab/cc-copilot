@@ -66,6 +66,7 @@ export function foldCrewRows(rows: readonly ActiveSessionInfo[]): CrewFolding {
       chain.push(current)
       current = byId.get(current)?.crew?.parentId
     }
+    if (crew.hostId && crew.hostId !== value.sessionId && !chain.includes(crew.hostId)) chain.push(crew.hostId)
     if (crew.rootId !== value.sessionId && !chain.includes(crew.rootId)) chain.push(crew.rootId)
     const host = [...chain].reverse().find(canHost)
     if (!host) {

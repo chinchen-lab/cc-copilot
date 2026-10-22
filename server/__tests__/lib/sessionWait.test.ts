@@ -7,9 +7,11 @@ const mocks = vi.hoisted(() => ({
   listPendingInput: vi.fn(),
   activity: new Map<string, { live: boolean; running: boolean }>(),
   held: new Set<string>(),
+  agentsRunning: vi.fn(),
 }))
 
 const runtime = {
+  kind: "claude",
   descriptor: { capabilities: { activeNotifications: true } },
   activity: (id: string) => mocks.activity.get(id) ?? { live: false, running: false },
   hasSession: (id: string) => mocks.held.has(id),
@@ -17,13 +19,17 @@ const runtime = {
 
 vi.mock("../../sessionPaths", () => ({ findJsonlPath: mocks.findJsonlPath }))
 vi.mock("../../helpers", () => ({ getSessionStatus: mocks.getSessionStatus }))
-vi.mock("../../agents", () => ({ storeForPath: (path: string | null) => (path ? { kind: "k" } : null) }))
+vi.mock("../../agents", () => ({
+  storeForPath: (path: string | null) => (path ? { kind: "k", sessionAddress: async () => ({ dirName: "-work", fileName: "a.jsonl" }) } : null),
+}))
+vi.mock("../../agents/agentsRunning", () => ({ sessionAgentsRunning: mocks.agentsRunning }))
 vi.mock("../../agents/runtimes", () => ({
   runtimeFor: () => runtime,
   runtimeForSession: (id: string) => (mocks.held.has(id) ? runtime : null),
 }))
 vi.mock("../../agents/pendingInput", () => ({ listPendingInput: mocks.listPendingInput }))
 
+import { orchestrationStore } from "../../orchestration/storage"
 import {
   clearTurnError,
   parseWaitSeconds,
@@ -38,7 +44,10 @@ beforeEach(() => {
   mocks.findJsonlPath.mockReset().mockImplementation(async (id: string) => `/t/${id}.jsonl`)
   mocks.getSessionStatus.mockReset().mockResolvedValue({ status: "completed" })
   mocks.listPendingInput.mockReset().mockReturnValue([])
+  mocks.agentsRunning.mockReset().mockResolvedValue(false)
 })
+
+const written = (agoMs: number) => ({ filePath: "/t/a.jsonl", lastActivityMs: Date.now() - agoMs })
 
 afterEach(() => {
   clearTurnError("a")
@@ -70,9 +79,43 @@ describe("readSessionState", () => {
     expect((await readSessionState("a")).outcome).toBe("completed")
   })
 
-  it("reads an unmanaged session's progress from the tail", async () => {
+  it("reads an unmanaged session's progress from the tail while its transcript is being written", async () => {
     mocks.getSessionStatus.mockResolvedValue({ status: "thinking" })
+    expect((await readSessionState("a", written(5_000))).outcome).toBe("running")
+    expect(mocks.findJsonlPath).not.toHaveBeenCalled()
+  })
+
+  it("reads a mid-flight tail nothing holds and nothing writes as finished", async () => {
+    mocks.getSessionStatus.mockResolvedValue({ status: "tool_use", toolName: "Bash" })
+    expect((await readSessionState("a", written(2 * 24 * 60 * 60_000))).outcome).toBe("completed")
+    // A transcript it cannot stat has not been written lately either.
+    expect((await readSessionState("a")).outcome).toBe("completed")
+  })
+
+  it("keeps a session waiting on its agents running while it is held or its agents still write", async () => {
+    mocks.getSessionStatus.mockResolvedValue({ status: "awaiting_agents" })
+    mocks.activity.set("a", { live: true, running: false })
+    expect((await readSessionState("a", written(60 * 60_000))).outcome).toBe("running")
+
+    mocks.activity.clear()
+    expect((await readSessionState("a", written(60 * 60_000))).outcome).toBe("completed")
+    mocks.agentsRunning.mockResolvedValue(true)
+    expect((await readSessionState("a", written(60 * 60_000))).outcome).toBe("running")
+    expect(mocks.agentsRunning).toHaveBeenCalledWith("-work", "a")
+  })
+
+  it("keeps a session running while a message queued for it is about to start its next turn", async () => {
+    mocks.activity.set("a", { live: true, running: false })
+    const store = orchestrationStore()
+    const conversation = store.ensureConversation({ hostId: "local", agent: "claude", instanceId: "default", sessionId: "a", nativeSessionId: "a" })
+    store.admit("local", "notice-only", conversation.id, { message: "chat notice", onlyWhileRunning: true })
+    expect((await readSessionState("a")).outcome).toBe("completed")
+    store.admit("local", "follow-up", conversation.id, { message: "Now add a test" })
     expect((await readSessionState("a")).outcome).toBe("running")
+    // A restart holds queued messages, and a held message blocks the queue.
+    store.acquire("restarted-host")
+    expect(store.command("local", "follow-up")?.receipt.state).toBe("held")
+    expect((await readSessionState("a")).outcome).toBe("completed")
   })
 
   it("surfaces a recorded turn error until it is cleared", async () => {

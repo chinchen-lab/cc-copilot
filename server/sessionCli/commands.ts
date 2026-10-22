@@ -1,11 +1,12 @@
 import { accessLevelOf, editionModule } from "../edition"
 import { accessAtLeast } from "../../shared/contracts/sessionAccess"
-import { acknowledgeTask, cancelTask, refreshDelegatedTasks } from "../orchestration/delegatedTasks"
+import { acknowledgeTask, cancelTask, refreshDelegatedTasks, settleWaitedTasks } from "../orchestration/delegatedTasks"
 import { delegationAuthority } from "../lib/delegationAuthority"
 import { orchestrationStore } from "../orchestration/storage"
 import { resumeDelegations } from "../lib/delegationAuthority"
 import { hostname } from "node:os"
 import type { IncomingMessage } from "node:http"
+import type { CommandReceipt } from "../../shared/contracts/orchestration"
 import { isAbsolute, resolve } from "node:path"
 import { AGENT_KINDS, agentKindForDirName, descriptorFor, type AgentKind } from "../../shared/session/agent-descriptors"
 import { resolveSessionAgent } from "../agents/runtimes"
@@ -42,14 +43,13 @@ import {
 import type { WorkspaceEnvironmentMode } from "../../shared/contracts/workspaces"
 import { parseEnvPatterns } from "../workspaceTransfer/environment"
 import { crewChatContext, postCrewChat, readCrewChat, setCrewChatListening } from "../lib/crewChat"
+import { answerHints, CLI_NAME } from "./hints"
 
 /**
  * The `cogpit-session` CLI, run on the server. The script Cogpit installs in
  * `~/.cogpit/bin` only forwards argv here and prints what comes back, so the
  * commands can change with the server without the script going stale.
  */
-
-export const CLI_NAME = "cogpit-session"
 
 export interface CliInvocation {
   argv: string[]
@@ -109,8 +109,10 @@ Start and drive other agent sessions through Cogpit. Output is JSON unless noted
         the user in Cogpit (user, the default with --device); wait keeps
         waiting while the user has it.
   send ID MESSAGE [--command-id ID] [--steer|--interrupt] [--wait] [--timeout SECS]
-        Queue a follow-up and return a durable receipt. Reuse --command-id on
-        retries. --steer joins a supported running turn; --interrupt restarts it.
+        Queue a follow-up and return a durable receipt; ahead counts the
+        messages it waits behind. Reuse --command-id on retries. --steer joins
+        a supported running turn; --interrupt restarts it. Sent to your own
+        child, its result notifies you like the first turn's does.
   receipt COMMAND_ID --session ID [--wait] [--timeout SECS]
         Inspect one delivery. Unknown means inspect native history before retrying.
   tasks [PARENT_ID] [--ack TASK_ID|--cancel TASK_ID]
@@ -124,7 +126,11 @@ Start and drive other agent sessions through Cogpit. Output is JSON unless noted
   wait ID... [--any] [--timeout SECS]
         Block until the session(s) finish or need input (default ${DEFAULT_WAIT_SECONDS}s).
         Prints the final reply and changed files when a session is done.
-  status ID                 Current outcome and anything it is blocked on.
+  status ID                 Current outcome, anything it is blocked on, and
+                            messages still on their way to it.
+  queue ID [--resume | --cancel COMMAND_ID | --resolve COMMAND_ID --delivered|--not-delivered]
+        List messages still on their way to a session. --resume releases held
+        ones; --resolve settles an unknown delivery after you checked its history.
   result ID [--turn N] [--text]
         Final reply, changed files and tokens; --text prints only the reply.
   fetch ID                  Bring a handed-over session's work back as a local
@@ -137,7 +143,8 @@ Start and drive other agent sessions through Cogpit. Output is JSON unless noted
   answer ID ANSWER... [--request REQ] [--json '{"question":"answer"}']
         Answer a question the session asked; one ANSWER per question.
   interrupt ID              Stop the current turn, keep the session.
-  stop ID... | --children   End sessions; --children stops every session you started.
+  stop ID... | --children   End sessions and cancel messages still queued for them;
+                            --children stops every session you started.
   children [ID]             Sessions started by ID (default: you), with their state.
   board set YAML|-          Replace your board, the summary pinned above your crew's
                             composer: title, progress (DONE/TOTAL) and sections of
@@ -224,21 +231,6 @@ function timeoutArg(args: ParsedArgs): number {
 }
 
 // ── Reports ─────────────────────────────────────────────────────────────────
-
-/** How to answer each pending request, spelled as the command to run. */
-function answerHints(sessionId: string, waiting: PendingInput[]): string[] {
-  return waiting.map((request) => {
-    const target = `${CLI_NAME} %s ${sessionId} --request ${request.requestId}`
-    switch (request.kind) {
-      case "permission":
-        return `${target.replace("%s", "approve")}  |  ${target.replace("%s", "deny")}`
-      case "plan":
-        return `${target.replace("%s", "approve")}  |  ${target.replace("%s", "deny")} --feedback "..."`
-      case "question":
-        return `${target.replace("%s", "answer")} "<one answer per question>"`
-    }
-  })
-}
 
 function exitCodeFor(states: SessionState[], timedOut: boolean): number {
   if (timedOut) return EXIT.timedOut
@@ -356,6 +348,7 @@ async function waitAndDescribe(
     })
   }))
   const exitCode = exitCodeFor(mode === "any" && !timedOut ? sessions.filter(done) : sessions, timedOut)
+  if (inv.callerSessionId) settleWaitedTasks(inv.scope, inv.callerSessionId, reports.filter((_, i) => done(sessions[i]!)) as { sessionId: string; outcome: string }[])
   return sessionIds.length === 1
     ? json(reports[0], exitCode)
     : json({ timedOut, sessions: reports }, exitCode)
@@ -486,6 +479,7 @@ async function newCommand(inv: CliInvocation, rest: string[]): Promise<CliOutput
     ...deviceField(host),
     dirName: started.dirName,
     ...(sent ? { workspace: { cwd: sent.remoteCwd, branch: sent.remoteBranch, returnsTo: sent.handoff.branch, environment: sent.environment, run: sent.run } } : {}),
+    ...(inv.callerSessionId ? {} : { warning: "COGPIT_SESSION_ID is not set, so this session has no parent: nothing will notify you when it finishes or asks something. Keep a wait running on it." }),
     next: `${CLI_NAME} wait ${started.sessionId}`,
   })
 }
@@ -501,12 +495,22 @@ async function sendCommand(inv: CliInvocation, rest: string[]): Promise<CliOutpu
   const commandId = args.values.get("command-id") ?? inv.invocationId
   const { delivery, receipt } = await host.send(sessionId, message, { interrupt: args.switches.has("interrupt"), intent: args.switches.has("steer") ? "steer" : args.switches.has("interrupt") ? "restart" : "queue", commandId, req: inv.req })
   watchDelegatedRequestsOf(sessionId)
+  if (receipt && host.receipt && inv.callerSessionId && (await sessionOrigin(sessionId))?.parentSessionId === inv.callerSessionId) {
+    const store = orchestrationStore()
+    const task = store.putTask(inv.scope, { parentSessionId: inv.callerSessionId, childSessionId: sessionId, sourceId: `send:${sessionId}:${commandId}`, commandId, deliveryDisposition: "async" })
+    // The turn this one queues behind ends in its result, so only the newest task reports it.
+    for (const older of store.tasks(inv.scope, inv.callerSessionId)) {
+      if (older.id !== task.id && older.childSessionId === sessionId && older.state === "running" && !older.acknowledgedAt && older.createdAt <= task.createdAt) store.updateTask(inv.scope, older.id, { acknowledgedAt: Date.now() })
+    }
+    if (inv.req) resumeDelegations(inv.req, inv.callerSessionId)
+  }
   if (args.switches.has("wait")) {
     if (!host.receipt) throw new UsageError("This host cannot wait for durable command receipts; update it first")
     const settled = await host.receipt(commandId, inv.req, timeoutMs)
     return json({ sessionId, ...deviceField(host), receipt: settled }, settled?.state === "completed" ? EXIT.ok : settled && ["failed", "unknown", "held", "cancelled"].includes(settled.state) ? EXIT.error : EXIT.timedOut)
   }
-  return json({ sessionId, ...deviceField(host), delivery, receipt, next: `${CLI_NAME} receipt ${commandId} --session ${sessionId}` })
+  const ahead = receipt?.state === "queued" ? (await unsettledMessages(host, sessionId, inv.req).catch(() => null))?.filter((command) => command.position < receipt.position).length : undefined
+  return json({ sessionId, ...deviceField(host), delivery, receipt, ...(ahead !== undefined && { ahead }), next: `${CLI_NAME} receipt ${commandId} --session ${sessionId}` })
 }
 
 async function waitCommand(inv: CliInvocation, rest: string[]): Promise<CliOutput> {
@@ -543,6 +547,12 @@ async function statusCommand(inv: CliInvocation, rest: string[]): Promise<CliOut
   if (state.waiting.length > 0) {
     report.waiting = state.waiting
     report.next = answerHints(state.sessionId, state.waiting)
+  }
+  const queued = await unsettledMessages(host, sessionId, inv.req).catch(() => null)
+  if (queued?.length) {
+    report.queue = queued.map(queueEntry)
+    const hints = queueHints(sessionId, queued)
+    if (hints.length) report.next = [...(report.next as string[] | undefined) ?? [], ...hints]
   }
   return json(report, exitCodeFor([state], false))
 }
@@ -648,6 +658,50 @@ async function receiptCommand(inv: CliInvocation, rest: string[]): Promise<CliOu
   return json({ receipt, ...deviceField(host) })
 }
 
+/** Delivered messages are already the agent's; a long turn can hold a hundred steered notices. */
+const ON_THE_WAY = new Set<CommandReceipt["state"]>(["queued", "held", "dispatching", "unknown"])
+
+/** Messages still on their way to a session, oldest first; null when its host cannot list them. */
+async function unsettledMessages(host: SessionHost, sessionId: string, req?: IncomingMessage): Promise<CommandReceipt[] | null> {
+  if (!host.queue) return null
+  return (await host.queue(sessionId, null, req)).filter((command) => ON_THE_WAY.has(command.state)).sort((a, b) => a.position - b.position)
+}
+
+const queueEntry = (command: CommandReceipt) => ({
+  commandId: command.id,
+  state: command.state,
+  intent: command.intent,
+  ...(command.error && { error: command.error }),
+  ...(command.message && { message: command.message.slice(0, 160) }),
+})
+
+/** What unblocks a queue: held messages wait for a resume, and an unknown delivery blocks everything after it. */
+function queueHints(sessionId: string, commands: readonly CommandReceipt[]): string[] {
+  const hints = commands.filter((command) => command.state === "unknown").map((command) =>
+    `Check whether ${command.id} reached the session (cogpit-memory), then: ${CLI_NAME} queue ${sessionId} --resolve ${command.id} --delivered  |  --not-delivered`)
+  if (commands.some((command) => command.state === "held")) hints.push(`${CLI_NAME} queue ${sessionId} --resume`)
+  return hints
+}
+
+async function queueCommand(inv: CliInvocation, rest: string[]): Promise<CliOutput> {
+  const args = parseArgs(rest, ["cancel", "resolve"], ["resume", "delivered", "not-delivered"])
+  const sessionId = sessionIdArg(args, "queue")
+  const chosen = [args.switches.has("resume"), args.values.has("cancel"), args.values.has("resolve")].filter(Boolean).length
+  if (chosen > 1) throw new UsageError("Choose one of --resume, --cancel or --resolve")
+  if (args.values.has("resolve") && args.switches.has("delivered") === args.switches.has("not-delivered")) throw new UsageError("--resolve needs --delivered or --not-delivered")
+  const action = args.switches.has("resume") ? { action: "resume" }
+    : args.values.has("cancel") ? { action: "cancel", commandId: args.values.get("cancel") }
+    : args.values.has("resolve") ? { action: "resolve", commandId: args.values.get("resolve"), disposition: args.switches.has("delivered") ? "completed" : "failed" }
+    : null
+  await requireSessionAccess(inv, sessionId, action !== null)
+  const host = await hostForSession(sessionId)
+  if (!host.queue) throw new UsageError("Update this host to manage its queue")
+  if (action) await host.queue(sessionId, action, inv.req)
+  const queued = (await unsettledMessages(host, sessionId, inv.req)) ?? []
+  const hints = queueHints(sessionId, queued)
+  return json({ sessionId, ...deviceField(host), messages: queued.map(queueEntry), ...(hints.length && { next: hints }) })
+}
+
 async function interruptCommand(inv: CliInvocation, rest: string[]): Promise<CliOutput> {
   const sessionId = sessionIdArg(parseArgs(rest, [], []), "interrupt")
   await requireSessionAccess(inv, sessionId, true)
@@ -667,11 +721,11 @@ async function stopCommand(inv: CliInvocation, rest: string[]): Promise<CliOutpu
   if (ids.length === 0) throw new UsageError("stop needs a session id or --children")
   for (const id of ids) await requireSessionAccess(inv, id, true)
   const located = await locateSessions([...new Set(ids)])
-  const stopped = await Promise.all(located.map(async ({ host, sessionId }) => ({
-    sessionId,
-    ...deviceField(host),
-    stopped: await host.stop(sessionId).catch(() => false),
-  })))
+  const stopped = await Promise.all(located.map(async ({ host, sessionId }) => {
+    const ended = await host.stop(sessionId).catch(() => false)
+    const after = await host.state(sessionId).catch(() => null)
+    return { sessionId, ...deviceField(host), stopped: ended, running: after?.running ?? null }
+  }))
   return json({ sessions: stopped })
 }
 
@@ -900,6 +954,7 @@ const COMMANDS: Record<string, (inv: CliInvocation, rest: string[]) => Promise<C
   status: statusCommand,
   result: resultCommand,
   receipt: receiptCommand,
+  queue: queueCommand,
   tasks: tasksCommand,
   transition: transitionCommand,
   approve: (inv, rest) => approvalCommand(inv, rest, "approve"),

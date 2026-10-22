@@ -6,6 +6,7 @@ import { descriptorFor, isSessionUuid } from "../../shared/session/agent-descrip
 import { isWithinDir } from "../pathSafety"
 import { readCodexSessionIdentity, readCodexSessionMeta } from "./codexMetadata"
 import { transcriptRootWithin, resolveCanonicalFileWithinRoot, statContainedFile } from "./containment"
+import { isCompressedTranscript, isListableTranscript, uncompressedTranscriptName } from "./transcriptFile"
 import { inventoryFor } from "./sessionInventory"
 import {
   addressFromTranscript,
@@ -19,7 +20,9 @@ import type { AgentStore, SessionFileInfo, SubagentFileInfo } from "./types"
  * Codex writes one rollout per session into a date-nested tree:
  * `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-<ts>-<sessionId>.jsonl`. The project
  * a rollout belongs to appears only inside the file, so listings carry no
- * dirName.
+ * dirName. Codex compresses a rollout it has stopped writing to
+ * `<name>.jsonl.zst`; a listing names it by its plain `.jsonl` name, so its
+ * address survives compression and the resume that reverses it.
  *
  * The root is captured at module load from the environment, which the test
  * fixtures rely on: they set `CODEX_HOME` before re-importing the module.
@@ -42,6 +45,7 @@ export function createCodexStore(homeDir = process.env.CODEX_HOME || join(homedi
       return []
     }
 
+    const names = new Set(entries.map((entry) => entry.name))
     const results: SessionFileInfo[] = []
     for (const entry of entries) {
       const filePath = join(dir, entry.name)
@@ -49,14 +53,14 @@ export function createCodexStore(homeDir = process.env.CODEX_HOME || join(homedi
         if (depth < MAX_WALK_DEPTH) results.push(...await walk(filePath, depth + 1))
         continue
       }
-      if (!entry.name.endsWith(".jsonl")) continue
+      if (!isListableTranscript(entry.name, names)) continue
       const stats = await statContainedFile(SESSIONS_DIR, filePath)
       if (!stats) continue
       results.push({
         filePath,
         // Travels to the client and back as a URL path segment, so it stays
         // forward-slashed regardless of the host separator.
-        fileName: relative(SESSIONS_DIR, filePath).split(sep).join("/"),
+        fileName: uncompressedTranscriptName(relative(SESSIONS_DIR, filePath)).split(sep).join("/"),
         dirName: null,
         ...stats,
       })
@@ -98,7 +102,9 @@ export function createCodexStore(homeDir = process.env.CODEX_HOME || join(homedi
       }
       // Codex dirNames encode a cwd rather than a directory on disk, so the
       // fileName alone locates the rollout, relative to the sessions root.
-      return resolveCanonicalFileWithinRoot(SESSIONS_DIR, SESSIONS_DIR, join(SESSIONS_DIR, fileName))
+      const filePath = join(SESSIONS_DIR, fileName)
+      return await resolveCanonicalFileWithinRoot(SESSIONS_DIR, SESSIONS_DIR, filePath)
+        ?? (isCompressedTranscript(filePath) ? null : resolveCanonicalFileWithinRoot(SESSIONS_DIR, SESSIONS_DIR, `${filePath}.zst`))
     },
 
     findSessionFile,
@@ -130,6 +136,10 @@ export function createCodexStore(homeDir = process.env.CODEX_HOME || join(homedi
       }
       return listing
     },
+
+    // A child rollout is found only by the full inventory walk, too costly to
+    // poll; the app-server reports its children's turns directly instead.
+    agentsWroteSince: async () => false,
 
     sessionAddress: (filePath) => addressFromTranscript(codexStore, filePath),
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 import { PowerMonitor } from "@/components/PowerMonitor"
 import type {
@@ -84,5 +84,26 @@ describe("PowerMonitor", () => {
     expect(screen.getByText("50% CPU")).toBeInTheDocument()
 
     view.unmount()
+  })
+
+  it("shows proven old session ownership and sends a single identity-bound manual stop", async () => {
+    const metric = {
+      pid: 53013, kind: "script", label: "Python", command: "Python -", cpuPercent: 98, memoryMb: 40,
+      ageSeconds: 15 * 86400, orphaned: true, suspectedLeak: true, warning: "sustained-cpu", canStop: true, identity: "a".repeat(64),
+      owner: { sessionId: "58479731-3c68-489f-8327-bbad21533d66", taskId: "bt3fj0wjf", title: "HonestCMS code bloat cleanup", dirName: "-project", fileName: "58479731-3c68-489f-8327-bbad21533d66.jsonl" },
+    }
+    mocks.authFetch.mockImplementation(async (url: string) => response(url.endsWith("/kill") ? { killed: [53013] } : {
+      ...serverSnapshot, system: { capturedAt: 1, suspectedLeakCount: 2, processes: [metric, { ...metric, pid: 53014, owner: undefined, canStop: false }] },
+    }))
+    render(<PowerMonitor open onOpenChange={vi.fn()} />)
+    const link = await screen.findByRole("link", { name: "HonestCMS code bloat cleanup" })
+    expect(link.getAttribute("href")).toContain("58479731-3c68-489f-8327-bbad21533d66")
+    expect(screen.getAllByText(/task bt3fj0wjf/)).toHaveLength(1)
+    expect(screen.getByText("Session ownership unknown")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Stop process 53014" })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Stop process 53013" }))
+    await waitFor(() => expect(mocks.authFetch).toHaveBeenCalledWith("/api/system-processes/kill", expect.objectContaining({
+      method: "POST", body: JSON.stringify({ processes: [{ pid: 53013, identity: "a".repeat(64) }] }),
+    })))
   })
 })

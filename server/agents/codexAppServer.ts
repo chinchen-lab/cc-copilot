@@ -26,6 +26,7 @@ import type {
   PendingApproval,
   PendingElicitation,
   ThreadGoalClearResponse,
+  ThreadGoalMutationOrigin,
   ThreadGoalResponse,
   ThreadGoalSetParams,
   ThreadResponse,
@@ -437,12 +438,20 @@ export class CodexAppServer {
     return this.call("thread/goal/set", params)
   }
 
-  clearGoal(threadId: string): Promise<ThreadGoalClearResponse> {
-    return this.call("thread/goal/clear", { threadId })
+  clearGoal(threadId: string, origin?: ThreadGoalMutationOrigin): Promise<ThreadGoalClearResponse> {
+    return this.call("thread/goal/clear", origin ? { threadId, origin } : { threadId })
   }
 
   getActiveTurnId(threadId: string): string | undefined {
     return this.activeTurnIds.get(threadId)
+  }
+
+  /** Whether a thread spawned from this one, at any depth, has a turn in flight. */
+  hasActiveDescendantTurn(threadId: string): boolean {
+    for (const activeThreadId of this.activeTurnIds.keys()) {
+      if (activeThreadId !== threadId && this.isThreadOrDescendant(activeThreadId, threadId)) return true
+    }
+    return false
   }
 
   /** Snapshot every active native turn, including turns owned by subagents. */

@@ -1,4 +1,5 @@
-import { open, readFile, stat } from "node:fs/promises"
+import { readFile, stat } from "node:fs/promises"
+import { isCompressedTranscript, readTranscriptBuffer, readTranscriptStart } from "./transcriptFile"
 import type { TranscriptHead } from "./types"
 
 /** Bytes read from the head of a transcript, for metadata and for identity. */
@@ -11,19 +12,13 @@ const WHOLE_FILE_LIMIT = 65536
  * the buffer drops its trailing line, which may have been cut mid-record.
  */
 export async function readHeadLines(filePath: string, byteLimit: number): Promise<string[]> {
-  const fh = await open(filePath, "r")
-  try {
-    const buf = Buffer.allocUnsafe(byteLimit)
-    const { bytesRead } = await fh.read(buf, 0, byteLimit, 0)
-    let text = buf.subarray(0, bytesRead).toString("utf-8")
-    if (bytesRead === byteLimit) {
-      const lastNewline = text.lastIndexOf("\n")
-      if (lastNewline >= 0) text = text.slice(0, lastNewline)
-    }
-    return text.split("\n").filter(Boolean)
-  } finally {
-    await fh.close()
+  const buf = await readTranscriptStart(filePath, byteLimit)
+  let text = buf.toString("utf-8")
+  if (buf.length === byteLimit) {
+    const lastNewline = text.lastIndexOf("\n")
+    if (lastNewline >= 0) text = text.slice(0, lastNewline)
   }
+  return text.split("\n").filter(Boolean)
 }
 
 /**
@@ -31,6 +26,11 @@ export async function readHeadLines(filePath: string, byteLimit: number): Promis
  * first `HEAD_BYTES` (cut at a line boundary) when it is not.
  */
 export async function readTranscriptHead(filePath: string): Promise<TranscriptHead> {
+  // Only the whole of a compressed transcript is cheaper to have than its size.
+  if (isCompressedTranscript(filePath)) {
+    const content = await readTranscriptBuffer(filePath)
+    return { lines: content.toString("utf-8").split("\n").filter(Boolean), isPartialRead: false, size: content.length }
+  }
   const fileStat = await stat(filePath)
   if (fileStat.size <= WHOLE_FILE_LIMIT) {
     const content = await readFile(filePath, "utf-8")

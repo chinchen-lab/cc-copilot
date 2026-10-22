@@ -5,12 +5,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import type { ParsedSession } from "../../../shared/session/types"
+import type { ChangeBreakdownRow } from "../../../shared/changedFileKind"
 import { cn } from "@/lib/utils"
 import { GroupedFileCard, type DiffMode } from "./GroupedFileCard"
-import { useFileChangesData, buildGroupedFiles, buildGroupedFilesByAgent, type AgentGroup } from "./useFileChangesData"
+import { useFileChangesData, buildGroupedFiles, buildGroupedFilesByAgent, type AgentGroup, type GroupedFile } from "./useFileChangesData"
 import { OPEN_SUBAGENT_EVENT } from "./file-change-indicators"
 import { useLocalStorage } from "@/hooks/useLocalStorage"
 import { LineCounts } from "@/components/shared/ChangeCounts"
+import { changeBreakdownWithin } from "@/lib/changeBreakdown"
 
 /** Custom event name for cross-panel file focus. */
 export const FOCUS_FILE_EVENT = "cogpit:focus-file"
@@ -40,13 +42,19 @@ interface FileChangesPanelProps {
   sessionChangeKey: number
 }
 
+function groupedBreakdown(cwd: string, files: readonly GroupedFile[]): ChangeBreakdownRow[] {
+  return changeBreakdownWithin(cwd, files.map((file) => ({ filePath: file.filePath, additions: file.addCount, deletions: file.delCount })))
+}
+
 function AgentGroupSection({
   group,
+  cwd,
   allExpanded,
   highlightPath,
   diffMode,
 }: {
   group: AgentGroup
+  cwd: string
   allExpanded: boolean
   highlightPath: string | null
   diffMode: DiffMode
@@ -82,7 +90,7 @@ function AgentGroupSection({
           {group.files.length}
         </Badge>
         <div className="flex-1" />
-        <LineCounts add={group.totalAdd} del={group.totalDel} />
+        <LineCounts add={group.totalAdd} del={group.totalDel} breakdown={groupedBreakdown(cwd, group.files)} />
       </div>
       {group.files.map((file) => (
         <GroupedFileCard
@@ -256,22 +264,14 @@ export const FileChangesPanel = memo(function FileChangesPanel({ session, sessio
 
   if (fileChanges.length === 0) return null
 
+  const visibleFiles = groupByAgent ? agentGroups.flatMap((group) => group.files) : activeGrouped
   let groupedAdd = 0
   let groupedDel = 0
-  let totalFileCount = 0
-  if (groupByAgent) {
-    for (const ag of agentGroups) {
-      groupedAdd += ag.totalAdd
-      groupedDel += ag.totalDel
-      totalFileCount += ag.files.length
-    }
-  } else {
-    for (const g of activeGrouped) {
-      groupedAdd += g.addCount
-      groupedDel += g.delCount
-    }
-    totalFileCount = activeGrouped.length
+  for (const file of visibleFiles) {
+    groupedAdd += file.addCount
+    groupedDel += file.delCount
   }
+  const totalFileCount = visibleFiles.length
 
   function handleScopeToggle(): void {
     setScope(scope === "last" ? "all" : "last")
@@ -298,7 +298,7 @@ export const FileChangesPanel = memo(function FileChangesPanel({ session, sessio
           {totalFileCount} {t(" file")}{totalFileCount !== 1 ? "s" : ""}
         </Badge>
         <div className="flex-1" />
-        <LineCounts add={groupedAdd} del={groupedDel} />
+        <LineCounts add={groupedAdd} del={groupedDel} breakdown={groupedBreakdown(session.cwd, visibleFiles)} />
 
         <Tooltip>
           <TooltipTrigger render={<Button
@@ -432,6 +432,7 @@ export const FileChangesPanel = memo(function FileChangesPanel({ session, sessio
                   <AgentGroupSection
                     key={ag.agentId}
                     group={ag}
+                    cwd={session.cwd}
                     allExpanded={allExpanded}
                     highlightPath={highlightPath}
                     diffMode={diffMode}

@@ -162,6 +162,12 @@ export interface AgentStore {
    * files; null when the address is refused.
    */
   listSubagentFiles(dirName: string, sessionId: string): Promise<SubagentFileInfo[] | null>
+  /**
+   * Whether an agent the session started wrote its transcript at or after
+   * `sinceMs`. Polled while a session is watched, so an agent whose agent
+   * transcripts cannot be found cheaply answers false.
+   */
+  agentsWroteSince(dirName: string, sessionId: string, sinceMs: number): Promise<boolean>
   /** How the UI addresses the transcript at `filePath`, or null when it cannot. */
   sessionAddress(filePath: string): Promise<SessionAddress | null>
   /**

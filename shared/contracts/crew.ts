@@ -15,6 +15,8 @@ export interface ListedCrew {
   rootId: string
   /** The session that started this one. */
   parentId: string
+  /** The listed ancestor carrying this member, including across omitted parents. */
+  hostId?: string
   /** When it was started, in epoch milliseconds. */
   startedAt: number
   /** The name it was started with. */

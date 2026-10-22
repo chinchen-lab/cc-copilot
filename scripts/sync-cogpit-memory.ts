@@ -33,6 +33,7 @@ const FILES = [
   "turnContent.ts",
   "toolResults.ts",
   "sessionStatus.ts",
+  "backgroundAgents.ts",
   "interactiveState.ts",
 ] as const
 

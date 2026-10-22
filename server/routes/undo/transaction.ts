@@ -10,6 +10,7 @@ import {
 } from "./fileOperations"
 import { enqueueUndoMutation } from "./mutationQueue"
 import { resolveUndoSessionPath, resolveUndoStatePath } from "./paths"
+import { isCompressedTranscript, readTranscriptText, uncompressedTranscriptName } from "../../agents/transcriptFile"
 import type { UndoSessionMutation } from "../../../shared/contracts/undo"
 
 const MAX_TRANSACTION_BODY_BYTES = 64 * 1024 * 1024
@@ -52,16 +53,24 @@ async function readSnapshot(filePath: string): Promise<FileSnapshot> {
   }
 }
 
-async function restoreSnapshot(filePath: string, snapshot: FileSnapshot): Promise<void> {
-  if (snapshot.existed) {
-    await writeOwnerOnlyText(filePath, snapshot.content)
-    return
-  }
+async function removeIfPresent(filePath: string): Promise<void> {
   try {
     await unlink(filePath)
   } catch (error) {
     if (!isMissingPathError(error)) throw error
   }
+}
+
+async function restoreSnapshot(filePath: string, snapshot: FileSnapshot): Promise<void> {
+  if (snapshot.existed) await writeOwnerOnlyText(filePath, snapshot.content)
+  else await removeIfPresent(filePath)
+}
+
+/** The transcript as it stands: its plain file, else the compressed one beside it. */
+async function currentSessionContent(snapshot: FileSnapshot, compressedPath: string | null): Promise<string | null> {
+  if (snapshot.existed) return snapshot.content
+  if (compressedPath) return readTranscriptText(compressedPath).catch(() => null)
+  return null
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
@@ -139,12 +148,16 @@ function applySessionMutation(content: string, mutation: UndoSessionMutation): s
 }
 
 async function executeTransaction(request: UndoTransactionRequest): Promise<number> {
-  const sessionPath = await resolveUndoSessionPath(request.session.dirName, request.session.fileName)
+  const resolvedPath = await resolveUndoSessionPath(request.session.dirName, request.session.fileName)
   const statePath = resolveUndoStatePath(request.state.sessionId)
-  if (!sessionPath || !statePath) throw new UndoOperationError(403, "Access denied")
+  if (!resolvedPath || !statePath) throw new UndoOperationError(403, "Access denied")
+  // A compressed transcript is rewritten as the plain file beside it, which
+  // the CLI reads in preference to the compressed one.
+  const compressedPath = isCompressedTranscript(resolvedPath) ? resolvedPath : null
+  const sessionPath = compressedPath ? uncompressedTranscriptName(compressedPath) : resolvedPath
 
   const batch = await prepareFileOperations(request.operations, { allowEmpty: true })
-  if (batch.touchedPaths.has(sessionPath) || batch.touchedPaths.has(statePath)) {
+  if (batch.touchedPaths.has(resolvedPath) || batch.touchedPaths.has(sessionPath) || batch.touchedPaths.has(statePath)) {
     throw new UndoOperationError(400, "File operations cannot target managed undo files")
   }
 
@@ -152,8 +165,9 @@ async function executeTransaction(request: UndoTransactionRequest): Promise<numb
   // records, which would otherwise read as the transcript having moved on. The
   // write below replaces the file, so those records are dropped with it.
   const sessionSnapshot = await readSnapshot(sessionPath)
-  if (!sessionSnapshot.existed) throw new UndoOperationError(409, "Session file no longer exists")
-  const nextSessionContent = applySessionMutation(sessionSnapshot.content, request.session.mutation)
+  const currentContent = await currentSessionContent(sessionSnapshot, compressedPath)
+  if (currentContent === null) throw new UndoOperationError(409, "Session file no longer exists")
+  const nextSessionContent = applySessionMutation(currentContent, request.session.mutation)
   const stateSnapshot = await readSnapshot(statePath)
 
   let useCheckpoint = false
@@ -184,6 +198,7 @@ async function executeTransaction(request: UndoTransactionRequest): Promise<numb
     }
     await writeOwnerOnlyText(sessionPath, nextSessionContent)
     await writeOwnerOnlyJson(statePath, request.state)
+    if (compressedPath) await removeIfPresent(compressedPath)
     return useCheckpoint ? 0 : batch.operationCount
   } catch (error) {
     // Everything rolls back, including the batch a checkpoint never committed:

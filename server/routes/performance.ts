@@ -6,9 +6,10 @@ import {
   normalizeApiPath,
   recordRequest,
 } from "../lib/activityMonitor"
-import { captureSystemProcesses } from "../lib/systemProcesses"
-import { getRecentlyReaped, killPids, startLeakReaper } from "../lib/leakReaper"
+import { captureSystemProcesses, stopSystemProcesses } from "../lib/systemProcesses"
+import { getRecentlyReaped, startLeakReaper } from "../lib/leakReaper"
 import { mayActHostWide } from "../edition"
+import type { SystemProcessTarget } from "../../shared/contracts/performance"
 
 const requestMonitor: Middleware = (req, res, next) => {
   const label = normalizeApiPath(req.url ?? "/", req.method)
@@ -39,6 +40,7 @@ export function registerPerformanceRoutes(use: UseFn): void {
     const url = new URL(req.url ?? "/", "http://localhost")
 
     if (req.method === "GET" && url.pathname === "/") {
+      if (!mayActHostWide(req)) return sendJson(res, 403, { error: "Host access required" })
       void (async () => {
         try {
           const snapshot = await captureSystemProcesses()
@@ -51,38 +53,32 @@ export function registerPerformanceRoutes(use: UseFn): void {
     }
 
     if (req.method === "POST" && url.pathname === "/kill") {
+      if (!mayActHostWide(req)) return sendJson(res, 403, { error: "Host access required" })
       let body = ""
+      let tooLarge = false
       req.on("data", (chunk: string) => {
-        body += chunk
+        if (body.length + chunk.length > 16_384) tooLarge = true
+        if (!tooLarge) body += chunk
       })
       req.on("end", () => {
         void (async () => {
-          let requested: number[]
+          if (tooLarge) return sendJson(res, 413, { error: "Request too large" })
+          let requested: SystemProcessTarget[]
           try {
             const parsed = JSON.parse(body)
-            if (!Array.isArray(parsed.pids) || !parsed.pids.every((pid: unknown) => typeof pid === "number")) {
-              return sendJson(res, 400, { error: "Expected { pids: number[] }" })
+            if (!Array.isArray(parsed.processes) || parsed.processes.length > 20 || !parsed.processes.every((target: SystemProcessTarget | null) => target && Number.isSafeInteger(target.pid) && target.pid > 1 && typeof target.identity === "string" && /^[a-f0-9]{64}$/.test(target.identity))) {
+              return sendJson(res, 400, { error: "Expected processes with PID and start identity" })
             }
-            requested = parsed.pids
+            requested = parsed.processes
           } catch {
             return sendJson(res, 400, { error: "Invalid JSON body" })
           }
 
           try {
-            // Only pids the current scan flags as suspected leaks may be
-            // killed — the client's list is a request, not an authority.
-            // This can never target Cogpit itself or a live session.
-            const snapshot = await captureSystemProcesses()
-            const suspects = new Set(
-              (snapshot?.processes ?? [])
-                .filter((metric) => metric.suspectedLeak)
-                .map((metric) => metric.pid),
-            )
-            const targets = requested.filter((pid) => suspects.has(pid))
-            const killed = killPids(targets)
+            const killed = await stopSystemProcesses(requested)
             sendJson(res, 200, {
               killed,
-              skipped: requested.filter((pid) => !killed.includes(pid)),
+              skipped: requested.map((target) => target.pid).filter((pid) => !killed.includes(pid)),
             })
           } catch {
             sendJson(res, 500, { error: "Kill failed" })

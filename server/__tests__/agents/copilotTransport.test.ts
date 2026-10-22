@@ -841,6 +841,40 @@ describe("CopilotRuntime", () => {
     expect(harness.runtime.isTurnActive("session-1")).toBe(false)
   })
 
+  it("tracks subagents past the turn that started them until they or the session end", async () => {
+    const harness = createHarness()
+    harness.handle("session.create", (params) => ({
+      sessionId: objectParams(params).sessionId,
+    }))
+    harness.handle("session.destroy", () => null)
+    await harness.runtime.createSession({ sessionId: "session-1" })
+    const event = (type: string, agentId?: string) => harness.server.sendNotification("session.event", {
+      sessionId: "session-1",
+      event: { type, data: {}, ...(agentId ? { agentId } : {}) },
+    })
+
+    await event("subagent.started", "agent-1")
+    await event("subagent.started", "agent-2")
+    await event("session.idle")
+    await vi.waitFor(() => expect(harness.runtime.hasRunningSubagents("session-1")).toBe(true))
+
+    await event("subagent.completed", "agent-1")
+    await event("subagent.failed", "agent-2")
+    await vi.waitFor(() => expect(harness.runtime.hasRunningSubagents("session-1")).toBe(false))
+
+    for (const type of ["abort", "session.error", "session.shutdown"]) {
+      await event("subagent.started", "agent-3")
+      await vi.waitFor(() => expect(harness.runtime.hasRunningSubagents("session-1")).toBe(true))
+      await event(type)
+      await vi.waitFor(() => expect(harness.runtime.hasRunningSubagents("session-1")).toBe(false))
+    }
+
+    await event("subagent.started", "agent-4")
+    await vi.waitFor(() => expect(harness.runtime.hasRunningSubagents("session-1")).toBe(true))
+    await harness.runtime.destroySession("session-1")
+    expect(harness.runtime.hasRunningSubagents("session-1")).toBe(false)
+  })
+
   it("rejects overlapping send RPCs for one session without blocking another session", async () => {
     const harness = createHarness()
     harness.handle("session.create", (params) => ({

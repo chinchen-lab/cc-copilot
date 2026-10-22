@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 
 vi.mock("../../sessionPaths", () => ({ findJsonlPath: vi.fn() }))
 
+vi.mock("../../agents/transcriptFile", () => import("../transcriptFileThroughHelpers"))
+
 vi.mock("../../helpers", () => ({
   readFile: vi.fn(),
   readdir: vi.fn(),

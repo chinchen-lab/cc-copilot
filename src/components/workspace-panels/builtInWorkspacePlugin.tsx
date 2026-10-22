@@ -114,7 +114,7 @@ function BrowserActivityIndicator({ context }: WorkspacePanelIndicatorProps) {
     <span
       role="status"
       aria-label={t("The agent is using the browser")}
-      className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-emerald-500 motion-safe:animate-pulse"
+      className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-emerald-500"
     />
   )
 }

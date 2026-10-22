@@ -91,6 +91,24 @@ describe("readSessionCrew", () => {
     })
   })
 
+  it("reports every member of a crew of hundreds, the newest included", async () => {
+    const parents = links(Array.from({ length: 450 }, (_, index) => [`m${index}`, index < 260 ? "coordinator" : `m${index % 260}`, index] as [string, string, number]))
+    const crew = await readSessionCrew("coordinator", sources({ parents }))
+    expect(crew?.members).toHaveLength(451)
+    expect(crew?.members.at(-1)?.sessionId).toBe("m449")
+  })
+
+  it("leaves out members neither on disk nor held, keeping the root and the session asked about", async () => {
+    const gone = new Set(["coordinator", "lane-a", "reviewer"])
+    const describe = async (sessionId: string) => (gone.has(sessionId) ? null : sources().describe(sessionId))
+    const crew = await readSessionCrew("reviewer", sources({ describe }))
+    expect(crew?.members.map((member) => [member.sessionId, member.outcome])).toEqual([
+      ["coordinator", "not_found"],
+      ["lane-b", "completed"],
+      ["reviewer", "not_found"],
+    ])
+  })
+
   it("is null when the caller may not see the session asked about", async () => {
     expect(await readSessionCrew("lane-a", sources({ canView: async () => false }))).toBeNull()
   })

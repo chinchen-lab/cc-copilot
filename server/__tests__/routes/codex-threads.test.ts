@@ -95,6 +95,7 @@ describe("Codex thread routes", () => {
       objective: "Ship it",
       status: "active",
       tokenBudget: 40_000,
+      origin: "user",
     })
 
     const remove = await invoke(handler, {
@@ -102,7 +103,7 @@ describe("Codex thread routes", () => {
       url: "/thread-1",
     })
     expect(remove.response.json()).toEqual({ cleared: true })
-    expect(client.clearGoal).toHaveBeenCalledWith("thread-1")
+    expect(client.clearGoal).toHaveBeenCalledWith("thread-1", "user")
   })
 
   it("validates goal ids and payloads before calling app-server", async () => {

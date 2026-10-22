@@ -35,7 +35,12 @@ const targets: AuditTarget[] = [
     cwd: repoRoot,
     // Build-only @electron/get -> global-agent -> roarr uses fixed format strings.
     // No patched sprintf-js release exists for GHSA-hp3w-g68c-fv3c.
-    acceptedFindings: new Map<string, AcceptedSeverity>([["sprintf-js:1241202", "moderate"]]),
+    // Electron 41 has no patched release for GHSA-fw47-9c62-h3vw, and the app
+    // grants no HID or USB device permissions.
+    acceptedFindings: new Map<string, AcceptedSeverity>([
+      ["sprintf-js:1241202", "moderate"],
+      ["electron:1242756", "moderate"],
+    ]),
   },
   {
     label: "cogpit-memory",

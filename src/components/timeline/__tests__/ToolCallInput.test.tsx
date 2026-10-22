@@ -17,6 +17,18 @@ describe("ToolCallInput", () => {
     expect(screen.getByRole("img", { name: "Pending" })).toBeTruthy()
   })
 
+  it("shows an Agent call's requested effort beside its model", () => {
+    render(<ToolCallInput input={{ description: "twin A", model: "haiku", effort: "low", prompt: "Reply PONG" }} />)
+    expect(screen.getByText("haiku · low effort")).toBeTruthy()
+    expect(screen.queryByText("Effort")).toBeNull()
+  })
+
+  it("shows a requested effort on its own when the call names no model", () => {
+    render(<ToolCallInput input={{ description: "twin A", effort: "xhigh" }} />)
+    expect(screen.getByText("Effort")).toBeTruthy()
+    expect(screen.getByText("xhigh")).toBeTruthy()
+  })
+
   it("shows recipient and message fields without JSON syntax", () => {
     render(<ToolCallInput input={{ target: "renderer", message: "Please check the compact layout." }} />)
     expect(screen.getByText("Recipient")).toBeTruthy()

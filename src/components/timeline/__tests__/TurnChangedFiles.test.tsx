@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 import { makeEditToolCall, makeTurn } from "@/__tests__/fixtures"
 import { TurnChangedFiles } from "../TurnChangedFiles"
@@ -65,6 +66,36 @@ describe("TurnChangedFiles", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open sub-agent view" }))
     expect(onOpenAgent).toHaveBeenCalledTimes(1)
     window.removeEventListener(OPEN_SUBAGENT_EVENT, onOpenAgent)
+  })
+
+  it("splits the summary's line counts by kind of file on hover, relative to the project", async () => {
+    const cwd = "/home/me/tests/project"
+    const turn = makeTurn({
+      toolCalls: [
+        makeEditToolCall(`${cwd}/src/App.tsx`, "a", "b\nc"),
+        makeEditToolCall(`${cwd}/src/App.test.tsx`, "", "x\ny\nz"),
+        makeEditToolCall(`${cwd}/README.md`, "old", "new"),
+      ],
+    })
+    render(<TurnChangedFiles turn={turn} turnIndex={0} cwd={cwd} />)
+
+    await userEvent.hover(screen.getByText("+6"))
+    const tests = await screen.findByText("Tests")
+    expect(tests.parentElement).toHaveTextContent("Code+2-1Tests+3-0Docs+1-1Total+6-2")
+  })
+
+  it("opens the line-count split from the keyboard, after the summary's toggle", async () => {
+    const cwd = "/repo"
+    const turn = makeTurn({
+      toolCalls: [makeEditToolCall(`${cwd}/src/App.tsx`, "a", "b"), makeEditToolCall(`${cwd}/src/App.test.tsx`, "", "x")],
+    })
+    render(<TurnChangedFiles turn={turn} turnIndex={0} cwd={cwd} />)
+
+    const user = userEvent.setup()
+    await user.tab()
+    expect(screen.getByRole("button", { name: /2 files/ })).toHaveFocus()
+    await user.tab()
+    expect(await screen.findByText("Tests")).toBeInTheDocument()
   })
 })
 

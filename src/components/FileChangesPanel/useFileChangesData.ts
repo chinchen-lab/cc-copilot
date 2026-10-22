@@ -142,40 +142,53 @@ export function useFileChangesData(session: ParsedSession) {
   }, [totalToolCallCount, session.turns, bgToolCalls, isCodexSession])
 
   // Fetch actual file contents from disk for line number resolution
-  const filePaths = useMemo(() => {
-    const paths = new Set<string>()
-    for (const fc of fileChanges) {
-      const fp = getToolCallFilePath(fc.toolCall)
-      if (fp) paths.add(fp)
+  const fileRevisions = useMemo(() => {
+    const revisions = new Map<string, string>()
+    for (const { toolCall } of fileChanges) {
+      const path = getToolCallFilePath(toolCall)
+      if (path) revisions.set(path, JSON.stringify([toolCall.id, toolCall.input, toolCall.result]))
     }
-    return [...paths]
+    return JSON.stringify([...revisions])
   }, [fileChanges])
-
+  const scope = deviceScopedKey(JSON.stringify([dirName, session.sessionId, session.cwd]))
   const [fileContents, setFileContents] = useState<Map<string, string>>(new Map())
+  const fetchedFiles = useRef(new Map<string, { revision: string; text: string }>())
+  const [refreshVersion, setRefreshVersion] = useState(0)
+  useEffect(() => {
+    const refresh = () => setRefreshVersion((version) => version + 1)
+    window.addEventListener("focus", refresh)
+    return () => window.removeEventListener("focus", refresh)
+  }, [])
+  useEffect(() => { fetchedFiles.current = new Map() }, [scope, sessionSource?.rawText, refreshVersion])
 
   useEffect(() => {
-    if (!canAccessHostFiles || filePaths.length === 0) {
-      setFileContents(new Map())
+    const revisions = JSON.parse(fileRevisions) as [string, string][]
+    if (!canAccessHostFiles || revisions.length === 0) {
+      setFileContents((current) => current.size ? new Map() : current)
       return
     }
     let cancelled = false
-    Promise.all(
-      filePaths.map((p) =>
-        authFetch(`/api/file-content?path=${encodeURIComponent(p)}`)
-          .then((r) => (r.ok ? r.text() : null))
-          .then((text) => (text ? ([p, text] as const) : null))
-          .catch(() => null),
-      ),
-    ).then((results) => {
+    const cache = fetchedFiles.current
+    Promise.all(revisions.map(async ([path, revision]) => {
+      const cached = cache.get(path)
+      if (cached?.revision === revision) return [path, cached.text] as const
+      try {
+        const response = await authFetch(`/api/file-content?path=${encodeURIComponent(path)}`)
+        if (!response.ok) return null
+        const text = await response.text()
+        if (cancelled) return null
+        cache.set(path, { revision, text })
+        return [path, text] as const
+      } catch { return null }
+    })).then((results) => {
       if (cancelled) return
-      const map = new Map<string, string>()
-      for (const r of results) {
-        if (r) map.set(r[0], r[1])
-      }
-      setFileContents(map)
+      const next = new Map<string, string>()
+      for (const result of results) if (result) next.set(...result)
+      for (const path of cache.keys()) if (!next.has(path)) cache.delete(path)
+      setFileContents((current) => current.size === next.size && [...next].every(([path, text]) => current.get(path) === text) ? current : next)
     })
     return () => { cancelled = true }
-  }, [canAccessHostFiles, filePaths])
+  }, [canAccessHostFiles, fileRevisions, scope, sessionSource?.rawText, refreshVersion])
 
   const lastTurnIndex = session.turns.length - 1
 

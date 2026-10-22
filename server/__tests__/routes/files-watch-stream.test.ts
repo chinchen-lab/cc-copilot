@@ -10,11 +10,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-const { mockStat, mockOpen, mockWatch, mockIsCopilotTurnActive } = vi.hoisted(() => ({
+const { mockStat, mockOpen, mockWatch, mockIsCopilotTurnActive, mockAgentsRunning } = vi.hoisted(() => ({
   mockStat: vi.fn(),
   mockOpen: vi.fn(),
   mockWatch: vi.fn(),
   mockIsCopilotTurnActive: vi.fn(),
+  mockAgentsRunning: vi.fn(async (_dirName: string, _sessionId: string) => false),
 }))
 
 vi.mock("../../helpers", () => ({
@@ -22,6 +23,14 @@ vi.mock("../../helpers", () => ({
   open: mockOpen,
   watch: mockWatch,
   resolve: (p: string) => p,
+}))
+
+// Plain transcripts read straight through the mocked fs helpers.
+vi.mock("../../agents/transcriptFile", () => ({
+  isCompressedTranscript: (filePath: string) => filePath.endsWith(".zst"),
+  uncompressedTranscriptName: (fileName: string) => fileName.replace(/\.zst$/, ""),
+  statTranscript: (filePath: string) => mockStat(filePath),
+  openTranscript: (filePath: string) => mockOpen(filePath, "r"),
 }))
 
 vi.mock("../../sessionPaths", () => ({
@@ -42,6 +51,8 @@ vi.mock("../../agents", async () => {
   }
 })
 
+vi.mock("../../agents/agentsRunning", () => ({ sessionAgentsRunning: mockAgentsRunning }))
+
 vi.mock("../../agents/runtimes", () => ({
   runtimeForDirName: () => ({
     activity: (sessionId: string) => ({ live: false, running: mockIsCopilotTurnActive(sessionId) }),
@@ -50,6 +61,7 @@ vi.mock("../../agents/runtimes", () => ({
 
 import { __resetEditionForTest, installEdition, PERSONAL_EDITION, type EditionSessionAccess } from "../../edition"
 import { registerFileWatchRoutes } from "../../routes/files-watch"
+import { resolveSessionFilePath } from "../../sessionPaths"
 import { publish, clear, publishRateLimit, _resetForTests } from "../../lib/streamBus"
 import type { UseFn, Middleware } from "../../helpers"
 
@@ -134,6 +146,7 @@ beforeEach(() => {
   })
   mockWatch.mockReturnValue({ on: vi.fn(), close: vi.fn() })
   mockIsCopilotTurnActive.mockReturnValue(false)
+  mockAgentsRunning.mockResolvedValue(false)
 })
 
 afterEach(() => {
@@ -274,6 +287,41 @@ describe("/api/watch stream-bus forwarding", () => {
     harness.closeConnection()
   })
 
+  it("keeps a session live while its agents run, then lets it lapse", async () => {
+    vi.useFakeTimers()
+    mockAgentsRunning.mockResolvedValue(true)
+    const handler = getHandler("/api/watch/")
+    const harness = makeReqRes(`/proj-a/${SESSION}.jsonl`)
+    const announcements = () => parseFrames(harness.frames)
+      .filter((event) => event.type === "subagent_activity").length
+
+    await handler(harness.req as never, harness.res as never, harness.next)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockAgentsRunning).toHaveBeenCalledWith("proj-a", SESSION)
+    expect(announcements()).toBe(1)
+
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(announcements()).toBe(2)
+
+    mockAgentsRunning.mockResolvedValue(false)
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(announcements()).toBe(2)
+
+    harness.closeConnection()
+  })
+
+  it("says nothing about agents for a session that has none running", async () => {
+    vi.useFakeTimers()
+    const handler = getHandler("/api/watch/")
+    const harness = makeReqRes(`/proj-a/${SESSION}.jsonl`)
+
+    await handler(harness.req as never, harness.res as never, harness.next)
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(parseFrames(harness.frames).some((event) => event.type === "subagent_activity")).toBe(false)
+
+    harness.closeConnection()
+  })
+
   it("replays lines written after the client snapshot offset", async () => {
     const line = '{"n":1}\n'
     mockStat.mockResolvedValue({ size: Buffer.byteLength(line), mtimeMs: Date.now() })
@@ -288,6 +336,60 @@ describe("/api/watch stream-bus forwarding", () => {
     const { frames, closeConnection } = await connect(`/codex__proj/${SESSION}.jsonl?offset=0`)
     const events = parseFrames(frames)
     expect(events).toContainEqual({ type: "lines", lines: [line.trimEnd()] })
+    closeConnection()
+  })
+
+  it("follows a compressed rollout into the plain file resuming it writes", async () => {
+    const old = '{"n":1}\n'
+    const added = '{"n":2}\n'
+    const plain = `/tmp/projects/codex__proj/${SESSION}.jsonl`
+    const resolvePath = vi.mocked(resolveSessionFilePath)
+    const resolveDefault = resolvePath.getMockImplementation()
+    resolvePath.mockResolvedValue(`${plain}.zst`)
+    let materialized = false
+    mockStat.mockImplementation(async (path: string) => {
+      if (path.endsWith(".zst") && materialized) throw Object.assign(new Error("gone"), { code: "ENOENT" })
+      if (path === plain && !materialized) throw Object.assign(new Error("missing"), { code: "ENOENT" })
+      return { size: Buffer.byteLength(materialized ? old + added : old), mtimeMs: Date.now() }
+    })
+    mockOpen.mockImplementation(async (path: string) => ({
+      read: vi.fn(async (buffer: Buffer, offset: number, length: number, position: number) => {
+        const source = Buffer.from(path === plain ? old + added : old)
+        return { bytesRead: source.copy(buffer, offset, position, position + length) }
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    }))
+
+    try {
+      const { frames, closeConnection } = await connect(`/codex__proj/${SESSION}.jsonl?offset=${Buffer.byteLength(old)}`)
+      materialized = true
+      await vi.waitFor(() => {
+        expect(parseFrames(frames)).toContainEqual({ type: "lines", lines: [added.trimEnd()] })
+      }, { timeout: 3000 })
+      expect(mockWatch).toHaveBeenLastCalledWith(plain, expect.any(Function))
+      closeConnection()
+    } finally {
+      resolvePath.mockImplementation(resolveDefault!)
+    }
+  })
+
+  it("leaves out Claude's api-request records but reports their bytes", async () => {
+    const noise = '{"type":"api-request-blob","hash":"h","message":{"role":"user","content":"é"}}'
+    const real = '{"type":"user","message":{"role":"user","content":"hi"}}'
+    const text = `${noise}\n${real}\n${noise}\n`
+    mockStat.mockResolvedValue({ size: Buffer.byteLength(text), mtimeMs: Date.now() })
+    mockOpen.mockResolvedValue({
+      read: vi.fn(async (buffer: Buffer) => ({ bytesRead: buffer.write(text) })),
+      close: vi.fn().mockResolvedValue(undefined),
+    })
+
+    const { frames, closeConnection } = await connect(`/proj-a/${SESSION}.jsonl?offset=0`)
+    const events = parseFrames(frames)
+    expect(events).toContainEqual({
+      type: "lines",
+      lines: [real],
+      skippedBytes: 2 * (Buffer.byteLength(noise) + 1),
+    })
     closeConnection()
   })
 

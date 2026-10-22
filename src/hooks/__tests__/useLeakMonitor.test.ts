@@ -54,48 +54,23 @@ describe("useLeakMonitor", () => {
     expect(mockedAuthFetch).toHaveBeenCalledWith("/api/system-processes")
   })
 
-  it("killLeaks posts the pids then refreshes", async () => {
-    mockedAuthFetch.mockResolvedValue(jsonResponse({
-      processes: [LEAK],
-      suspectedLeakCount: 1,
-      recentlyReaped: [],
-    }))
-
-    const { result } = renderHook(() => useLeakMonitor())
-    await waitFor(() => expect(result.current.leaks).toHaveLength(1))
-
-    mockedAuthFetch.mockResolvedValue(jsonResponse({
-      processes: [],
-      suspectedLeakCount: 0,
-      recentlyReaped: [],
-    }))
-    // The kill endpoint response is also consumed via this mock; both calls resolve.
-    await act(async () => {
-      await result.current.killLeaks([42])
-    })
-
-    expect(mockedAuthFetch).toHaveBeenCalledWith("/api/system-processes/kill", expect.objectContaining({
-      method: "POST",
-      body: JSON.stringify({ pids: [42] }),
-    }))
-    expect(result.current.leaks).toHaveLength(0)
-    expect(result.current.killing).toBe(false)
-  })
-
-  it("does nothing when killLeaks is called with no pids", async () => {
-    mockedAuthFetch.mockResolvedValue(jsonResponse({
-      processes: [],
-      suspectedLeakCount: 0,
-      recentlyReaped: [],
-    }))
-
-    const { result } = renderHook(() => useLeakMonitor())
-    await waitFor(() => expect(mockedAuthFetch).toHaveBeenCalled())
-    const callsAfterMount = mockedAuthFetch.mock.calls.length
-
-    await act(async () => {
-      await result.current.killLeaks([])
-    })
-    expect(mockedAuthFetch.mock.calls.length).toBe(callsAfterMount)
+  it("skips hidden scans, refreshes on visibility, and discards late unmounted responses", async () => {
+    vi.useFakeTimers()
+    try {
+      const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden")
+      let finish!: (response: Response) => void
+      mockedAuthFetch.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+      const { result, unmount } = renderHook(() => useLeakMonitor())
+      await act(async () => { await vi.advanceTimersByTimeAsync(120_000) })
+      expect(mockedAuthFetch).not.toHaveBeenCalled()
+      visibility.mockReturnValue("visible")
+      act(() => { document.dispatchEvent(new Event("visibilitychange")) })
+      expect(mockedAuthFetch).toHaveBeenCalledOnce()
+      unmount()
+      await act(async () => { finish(jsonResponse({ processes: [LEAK] })) })
+      expect(result.current.leaks).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

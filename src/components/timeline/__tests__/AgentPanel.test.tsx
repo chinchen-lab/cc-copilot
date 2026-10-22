@@ -101,3 +101,24 @@ describe("AgentPanel on a shared session", () => {
     expect(screen.getByText("done")).toBeInTheDocument()
   })
 })
+
+describe("AgentPanel nesting and run settings", () => {
+  function agent(agentId: string, extra: Partial<SubAgentMessage>): SubAgentMessage {
+    return { ...summaryOnlyAgent(), agentId, status: "completed", text: [`${agentId} said`], ...extra }
+  }
+
+  it("lists a nested agent under its parent and shows each agent's model and requested effort", () => {
+    renderPanel([
+      agent("outer1234", { model: "claude-haiku-4-5-20251001", effort: "low", parentToolUseId: "tool-outer" }),
+      agent("twin5678", { parentToolUseId: "tool-twin" }),
+      agent("inner9012", { parentAgentId: "outer1234", effort: "high", parentToolUseId: "tool-inner" }),
+    ])
+
+    const said = screen.getAllByText(/ said$/).map((node) => node.textContent)
+    expect(said).toEqual(["outer1234 said", "inner9012 said", "twin5678 said"])
+    expect(screen.getByText("Haiku 4.5 · low effort")).toBeInTheDocument()
+    expect(screen.getByText("high effort")).toBeInTheDocument()
+    expect(screen.getByText("inner9012 said").closest(".border-l")).toHaveClass("ml-4")
+    expect(screen.getByText("outer1234 said").closest(".border-l")).not.toHaveClass("ml-4")
+  })
+})

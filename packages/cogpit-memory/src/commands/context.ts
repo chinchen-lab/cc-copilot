@@ -9,6 +9,7 @@ import { matchSubagentToMember } from "../lib/helpers"
 import { findSessionFile } from "../lib/stores"
 import { dirs } from "../lib/dirs"
 import { parseTranscript } from "../lib/read-session"
+import { readTranscriptText } from "../lib/transcriptFile"
 import type {
   ParsedSession,
   Turn,
@@ -219,7 +220,13 @@ function mapContentBlock(block: TurnContentBlock) {
     case "task_notification":
       return { kind: "task_notification" as const, content: block.content, timestamp: block.timestamp ?? null }
     case "local_command":
-      return { kind: "local_command" as const, content: block.content, timestamp: block.timestamp ?? null }
+      return {
+        kind: "local_command" as const,
+        content: block.content,
+        timestamp: block.timestamp ?? null,
+        ...(block.contextUsage ? { contextUsage: block.contextUsage } : {}),
+        ...(block.usageReport ? { usageReport: block.usageReport } : {}),
+      }
     default: {
       // Exhaustiveness guard: a new TurnContentBlock kind must fail typecheck here
       // rather than silently serializing as undefined and vanishing from the response.
@@ -344,7 +351,7 @@ function findAgentMetadata(
 export async function getSessionOverview(sessionId: string): Promise<object> {
   const jsonlPath = await findSessionFile(sessionId)
   if (!jsonlPath) return { error: "Session not found" }
-  const content = await readFile(jsonlPath, "utf-8")
+  const content = await readTranscriptText(jsonlPath)
   const session = parseTranscript(content, jsonlPath)
   return mapSessionToOverview(session)
 }
@@ -355,7 +362,7 @@ export async function getSessionOverview(sessionId: string): Promise<object> {
 export async function getTurnDetail(sessionId: string, turnIndex: number): Promise<object> {
   const jsonlPath = await findSessionFile(sessionId)
   if (!jsonlPath) return { error: "Session not found" }
-  const content = await readFile(jsonlPath, "utf-8")
+  const content = await readTranscriptText(jsonlPath)
   const session = parseTranscript(content, jsonlPath)
   if (turnIndex < 0 || turnIndex >= session.turns.length) return { error: "Turn not found" }
   return mapTurnToDetail(session, turnIndex)
@@ -367,13 +374,13 @@ export async function getTurnDetail(sessionId: string, turnIndex: number): Promi
 export async function getAgentOverview(sessionId: string, agentId: string): Promise<object> {
   const jsonlPath = await findSessionFile(sessionId)
   if (!jsonlPath) return { error: "Session not found" }
-  const content = await readFile(jsonlPath, "utf-8")
+  const content = await readTranscriptText(jsonlPath)
   const session = parseTranscript(content, jsonlPath)
 
   const subagentFile = await findSubagentFile(jsonlPath, agentId)
   if (!subagentFile) return { error: "Agent not found" }
 
-  const subagentContent = await readFile(subagentFile.filePath, "utf-8")
+  const subagentContent = await readTranscriptText(subagentFile.filePath)
   const subagentSession = parseTranscript(subagentContent, subagentFile.filePath)
   const metadata = findAgentMetadata(session, agentId)
   const parentToolCallId = findParentToolCallId(session, agentId)
@@ -405,7 +412,7 @@ export async function getAgentTurnDetail(
   const subagentFile = await findSubagentFile(jsonlPath, agentId)
   if (!subagentFile) return { error: "Agent not found" }
 
-  const subagentContent = await readFile(subagentFile.filePath, "utf-8")
+  const subagentContent = await readTranscriptText(subagentFile.filePath)
   const subagentSession = parseTranscript(subagentContent, subagentFile.filePath)
   if (turnIndex < 0 || turnIndex >= subagentSession.turns.length) return { error: "Turn not found" }
 

@@ -26,7 +26,10 @@ export interface SessionHost {
   wait(sessionIds: readonly string[], options: WaitOptions): Promise<WaitResult>
   result(sessionId: string, turn?: number): Promise<SessionResult | null>
   respond(sessionId: string, requestId: string, response: PendingInputResponse, options?: { commandId?: string; req?: IncomingMessage }): Promise<PendingInput>
+  /** The session's durable messages, after an action on its queue (resume, cancel, resolve) when one is given. */
+  queue?(sessionId: string, action: Record<string, unknown> | null, req?: IncomingMessage): Promise<CommandReceipt[]>
   interrupt(sessionId: string): Promise<boolean>
+  /** Ends the session and cancels the messages still waiting for it. */
   stop(sessionId: string): Promise<boolean>
   has(sessionId: string): Promise<boolean>
   /** Where the UI finds the session's transcript; null until it is on disk. */

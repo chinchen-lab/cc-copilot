@@ -101,4 +101,35 @@ describe("BackgroundServers", () => {
     expect(screen.getByText("Background Tasks (2)")).toBeVisible()
     expect(mocks.authFetch).toHaveBeenCalledWith("/api/check-ports?ports=4321")
   })
+  it("does not restart polling when transcript arrays change", async () => {
+    vi.useFakeTimers()
+    const changed = vi.fn()
+    const { rerender, unmount } = render(<BackgroundServers cwd="/work/app" turns={[]} onServersChanged={changed} />)
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    const firstReports = changed.mock.calls.length
+    rerender(<BackgroundServers cwd="/work/app" turns={[]} onServersChanged={changed} />)
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    expect(mocks.authFetch).toHaveBeenCalledOnce()
+    await act(async () => { await vi.advanceTimersByTimeAsync(9000) })
+    expect(mocks.authFetch).toHaveBeenCalledTimes(2)
+    expect(changed).toHaveBeenCalledTimes(firstReports)
+    unmount()
+    vi.useRealTimers()
+  })
+
+  it("keeps portless output available when the fallback port check fails", async () => {
+    const command = { ...DEV_SERVER, ports: [], portStatus: {}, preview: "build output" }
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url.startsWith("/api/background-tasks")) return new Response(JSON.stringify([command]))
+      throw new Error("port check unavailable")
+    })
+    const turns = [makeTurn({
+      assistantText: [], contentBlocks: [],
+      toolCalls: [makeToolCall({ name: "Bash", input: { run_in_background: true, command: "server --port 4321" }, result: "" })],
+    })]
+    await act(async () => { render(<BackgroundServers cwd="/work/app" turns={turns} />) })
+    expect(screen.getByText("build output")).toBeVisible()
+    expect(screen.getByText("Output available")).toBeVisible()
+  })
+
 })

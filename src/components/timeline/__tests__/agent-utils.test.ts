@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { SubAgentMessage } from "../../../../shared/session/types"
-import { buildParentToolByAgent } from "../agent-utils"
+import { buildParentToolByAgent, orderAgentsByParent } from "../agent-utils"
 
 function msg(agentId: string, parentToolUseId?: string): SubAgentMessage {
   return { agentId, parentToolUseId, text: [] } as unknown as SubAgentMessage
@@ -40,5 +40,28 @@ describe("buildParentToolByAgent", () => {
     expect(map.has("a3")).toBe(false)
     // Correctly attributed siblings are untouched.
     expect(map.get("a4")).toBe("tool-own")
+  })
+})
+
+describe("orderAgentsByParent", () => {
+  it("places each agent after the one that launched it, one level deeper", () => {
+    const order = orderAgentsByParent([
+      { agentId: "outer" },
+      { agentId: "twin" },
+      { agentId: "inner", parentAgentId: "outer" },
+      { agentId: "deepest", parentAgentId: "inner" },
+    ])
+
+    expect(order).toEqual([
+      { agentId: "outer", depth: 0 },
+      { agentId: "inner", depth: 1 },
+      { agentId: "deepest", depth: 2 },
+      { agentId: "twin", depth: 0 },
+    ])
+  })
+
+  it("treats an agent whose parent is not listed as a root", () => {
+    expect(orderAgentsByParent([{ agentId: "orphan", parentAgentId: "gone" }]))
+      .toEqual([{ agentId: "orphan", depth: 0 }])
   })
 })

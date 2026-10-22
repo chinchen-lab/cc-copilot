@@ -1,6 +1,5 @@
 import { useTranslation } from "@/hooks/useTranslation"
-import { memo, useRef, useLayoutEffect, useMemo, useState } from "react"
-import { useNearViewport } from "@/hooks/useNearViewport"
+import { memo, useMemo, useState } from "react"
 import { Clock, RotateCcw } from "lucide-react"
 import { UserMessage } from "./UserMessage"
 import { AgentMessageCard } from "./AgentMessageCard"
@@ -215,19 +214,6 @@ const TurnSectionInner = memo(function TurnSectionInner({
   onExpandCommand,
   openQuestionId,
 }: TurnSectionInnerProps) {
-  const { ref, isNear } = useNearViewport()
-
-  // Measure actual content height while visible so the placeholder preserves it
-  // exactly when the turn scrolls out of the viewport zone (prevents scroll jumping).
-  const contentRef = useRef<HTMLDivElement>(null)
-  const lastHeightRef = useRef(0)
-
-  useLayoutEffect(() => {
-    if (isNear && contentRef.current) {
-      lastHeightRef.current = contentRef.current.offsetHeight
-    }
-  }, [isNear])
-
   const hasFileChanges =
     hasEditToolCalls(turn.toolCalls, cwd) ||
     turn.subAgentActivity.some((msg) => hasEditToolCalls(msg.toolCalls, cwd))
@@ -276,7 +262,6 @@ const TurnSectionInner = memo(function TurnSectionInner({
 
   return (
     <div
-      ref={ref}
       data-turn-index={index}
       className={cn(
         "group relative",
@@ -294,73 +279,63 @@ const TurnSectionInner = memo(function TurnSectionInner({
         onOpenBranches={onOpenBranches}
       />
 
-      {isNear ? (
-        <div ref={contentRef} className="flex flex-col gap-3">
-          {turn.userMessage && (
-            <MaybePromptContextMenu index={index}>
-              <div data-turn-prompt className={cn(
-                "rounded-lg p-3",
-                PROMPT_CARD,
-              )}>
-                <UserMessage
-                  content={turn.userMessage}
-                  timestamp={turn.timestamp}
-                  onEditCommand={onEditCommand}
-                  onExpandCommand={onExpandCommand}
-                />
-              </div>
-            </MaybePromptContextMenu>
-          )}
-
-          {foldPlan.foldable ? (
-            <>
-              {leadingBlocks.length > 0 && (
-                <ContentBlocks
-                  blocks={leadingBlocks}
-                  {...contentBlockProps}
-                />
-              )}
-              <TurnWorkFold
-                label={
-                  <TurnWorkLabel
-                    turn={turn}
-                    isTurnDone={isTurnDone}
-                    hiddenToolCalls={foldPlan.hiddenToolCalls}
-                  />
-                }
-                expanded={workVisible}
-                onToggle={() => setWorkExpanded(!workVisible)}
+      <div className="flex flex-col gap-3">
+        {turn.userMessage && (
+          <MaybePromptContextMenu index={index}>
+            <div data-turn-prompt className={cn(
+              "rounded-lg p-3",
+              PROMPT_CARD,
+            )}>
+              <UserMessage
+                content={turn.userMessage}
+                timestamp={turn.timestamp}
+                onEditCommand={onEditCommand}
+                onExpandCommand={onExpandCommand}
               />
-              {trailingBlocks.length > 0 && (
-                <ContentBlocks
-                  blocks={trailingBlocks}
-                  {...contentBlockProps}
-                />
-              )}
-            </>
-          ) : (
-            <ContentBlocks
-              blocks={turn.contentBlocks}
-              {...contentBlockProps}
-            />
-          )}
+            </div>
+          </MaybePromptContextMenu>
+        )}
 
-          {isTurnDone && hasFileChanges && (
-            <TurnChangedFiles turn={turn} turnIndex={index} cwd={cwd} />
-          )}
-        </div>
-      ) : (
-        <div style={{ minHeight: lastHeightRef.current || estimateTurnHeight(turn) }} />
-      )}
+        {foldPlan.foldable ? (
+          <>
+            {leadingBlocks.length > 0 && (
+              <ContentBlocks
+                blocks={leadingBlocks}
+                {...contentBlockProps}
+              />
+            )}
+            <TurnWorkFold
+              label={
+                <TurnWorkLabel
+                  turn={turn}
+                  isTurnDone={isTurnDone}
+                  hiddenToolCalls={foldPlan.hiddenToolCalls}
+                />
+              }
+              expanded={workVisible}
+              onToggle={() => setWorkExpanded(!workVisible)}
+            />
+            {trailingBlocks.length > 0 && (
+              <ContentBlocks
+                blocks={trailingBlocks}
+                {...contentBlockProps}
+              />
+            )}
+          </>
+        ) : (
+          <ContentBlocks
+            blocks={turn.contentBlocks}
+            {...contentBlockProps}
+          />
+        )}
+
+        {isTurnDone && hasFileChanges && (
+          <TurnChangedFiles turn={turn} turnIndex={index} cwd={cwd} />
+        )}
+      </div>
     </div>
   )
 })
-
-// ── Height estimation for turns that haven't been measured yet ────────────────
-
-function estimateTurnHeight(turn: Turn): number {
-  return Math.max(60, (turn.userMessage ? 40 : 0) + turn.contentBlocks.length * 60)
-}
 
 // ── Turn header ──────────────────────────────────────────────────────────────
 
@@ -682,7 +657,12 @@ function ContentBlocks({
 
     if (block.kind === "local_command") {
       elements.push(
-        <LocalCommandBlock key={keyFor(block, i)} content={block.content} />
+        <LocalCommandBlock
+          key={keyFor(block, i)}
+          content={block.content}
+          contextUsage={block.contextUsage}
+          usageReport={block.usageReport}
+        />
       )
       i++
       continue

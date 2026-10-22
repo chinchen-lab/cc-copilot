@@ -1,9 +1,11 @@
 import { open } from "node:fs/promises"
 import type { AgentSettingMessage, WorktreeStateMessage } from "../../shared/session/types"
 import { isRecord } from "../../shared/objects"
+import { isClaudeNoiseLine } from "../../shared/session/claude"
 import { HEAD_BYTES } from "./transcriptHead"
 import type { SessionMeta, TranscriptHead } from "./types"
 import { isTaskWakeup } from "../../shared/contracts/taskWakeup"
+import { isCrewChatDelivery } from "../../shared/contracts/crewChat"
 
 /**
  * Claude Code's session metadata: the identity fields come from the head, and
@@ -45,7 +47,7 @@ function extractUserText(obj: { message?: { content?: unknown } }): string {
       }
     }
   }
-  if (extracted && (SKIP_RE.test(extracted) || isTaskWakeup(extracted))) return ""
+  if (extracted && (SKIP_RE.test(extracted) || isTaskWakeup(extracted) || isCrewChatDelivery(extracted))) return ""
   return extracted
 }
 
@@ -102,6 +104,7 @@ export async function readClaudeSessionMeta(
   let agentSetting: string | undefined
 
   for (const line of lines) {
+    if (isClaudeNoiseLine(line)) continue
     try {
       const obj = JSON.parse(line)
       if (obj.sessionId && !sessionId) sessionId = obj.sessionId
@@ -189,7 +192,7 @@ export async function readClaudeSessionMeta(
         const startIdx = cursor > 0 ? 1 : 0
         for (let j = splitLines.length - 1; j >= startIdx; j--) {
           const line = splitLines[j]
-          if (!line) continue
+          if (!line || isClaudeNoiseLine(line)) continue
           if (!foundCustomTitle && line.includes('"custom-title"')) {
             try {
               const obj = JSON.parse(line)

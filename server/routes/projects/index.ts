@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http"
+import { agentKindForDirName, formatFor } from "../../../shared/session/agents"
 import { sendJson, type UseFn } from "../../http"
 import { storeForDirName, storeForPath } from "../../agents"
 import { authorizeSession, visibilityFor } from "../../edition"
@@ -44,7 +45,7 @@ async function handleTranscript(
     sendJson(res, 403, { error: "Access denied" })
     return
   }
-  await serveTranscript(res, transcript.filePath, params)
+  await serveTranscript(res, transcript.filePath, params, formatFor(agentKindForDirName(dirName)))
 }
 
 export function registerProjectRoutes(use: UseFn) {

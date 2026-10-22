@@ -40,6 +40,20 @@ export interface SessionStatusInfo {
   pendingAgents?: number
   /** Short descriptions of the pending background agents, oldest first */
   pendingAgentDescriptions?: string[]
+  /** Agents launched since the oldest one still running, in launch order (status awaiting_agents) */
+  backgroundAgents?: BackgroundAgent[]
+}
+
+/** A background agent launched by the session. */
+export interface BackgroundAgent {
+  /** What the agent was asked to do; empty when the launch carried no description */
+  description: string
+  /** When the agent was launched (ISO), if the transcript records it */
+  startedAt?: string
+  /** The launching tool call, which keys the agent's live progress summaries */
+  toolUseId?: string
+  /** Finished, failed or stopped */
+  done: boolean
 }
 
 /** A raw transcript record, before any agent-specific interpretation. */
@@ -235,6 +249,15 @@ export interface AgentProgressData {
   }
   prompt: string
   agentId: string
+  /**
+   * Written by Cogpit's subagent watcher. The Agent call that launched this
+   * agent, when that differs from the record's `parentToolUseID` — a nested
+   * agent's records are filed under the main-thread call it descends from.
+   */
+  toolUseId?: string
+  /** The subagent that launched this one (the CLI's `parent_task_id`). */
+  parentAgentId?: string
+  subagentType?: string
 }
 
 export type HookEventName =
@@ -330,10 +353,15 @@ export interface SystemMessage extends BaseMessage {
   isMeta?: boolean
   content?: string
   compactMetadata?: CompactionMeta
+  /** On a `local_command` record answering `/context`. */
+  contextUsage?: LocalCommandContextUsage
+  /** On a `local_command` record answering `/usage`. */
+  usageReport?: LocalCommandUsageReport
 }
 
 export interface CompactionMeta {
-  trigger: "auto" | "manual"
+  /** "idle" (Claude Code 2.1.290+) compacts while the session waits for the user. */
+  trigger: "auto" | "manual" | "idle"
   preTokens: number
   postTokens?: number
 }
@@ -470,6 +498,8 @@ export interface SubAgentMessage {
   agentId: string
   /** The Task/Agent tool_use id this agent belongs to (streaming overlay key) */
   parentToolUseId?: string
+  /** The subagent that launched this one; absent when the main thread did. */
+  parentAgentId?: string
   agentName: string | null
   subagentType: string | null
   type: "user" | "assistant"
@@ -480,6 +510,8 @@ export interface SubAgentMessage {
   timestamp: string
   tokenUsage: TokenUsage | null
   model: string | null
+  /** Reasoning effort the agent ran at, when its spawn recorded one. */
+  effort?: string
   isBackground: boolean
   /** Summary fields from toolUseResult (new format, v2.1.63+) */
   prompt?: string
@@ -534,9 +566,78 @@ export type TurnContentBlock =
    * Output of a slash command that ran locally and answered the user directly
    * (`/usage`, `/context`, `/recap`), recorded as a `local_command` system
    * record. `content` is the raw record text, `<local-command-stdout>` tags
-   * included, left for the renderers like `task_notification`.
+   * included, left for the renderers like `task_notification`. Newer CLIs
+   * record a structured twin of `/context` and `/usage` beside the text.
    */
-  | { kind: "local_command"; content: string; timestamp?: string }
+  | {
+      kind: "local_command"
+      content: string
+      timestamp?: string
+      contextUsage?: LocalCommandContextUsage
+      usageReport?: LocalCommandUsageReport
+    }
+
+/** One `/context` category row. Classify on `kind`, never on the display name. */
+export interface ContextUsageCategory {
+  name: string
+  tokens: number
+  /** `deferred` rows sit outside the window and stay out of the usage math. */
+  kind: "used" | "free" | "buffer" | "deferred"
+}
+
+/** The structured twin of a `/context` reply, as the CLI records it. */
+export interface LocalCommandContextUsage {
+  model: string
+  total_tokens: number
+  /** The window usage is measured against. */
+  raw_max_tokens: number
+  percentage: number
+  over_limit?: { tokens_over: number; kind: "hard_limit" | "compaction_window" }
+  categories: ContextUsageCategory[]
+  mcp_tools?: { name: string; server_name: string; tokens: number }[]
+  memory_files?: { path: string; type: string; tokens: number }[]
+  agents?: { agent_type: string; source: string; tokens: number }[]
+  skills?: { name: string; source: string; plugin_name?: string; tokens: number }[]
+}
+
+/** One plan meter of a `/usage` reply, rendered in the server's order and grading. */
+export interface UsageLimitRow {
+  /** The meter kind, e.g. `session`, `weekly_all`, `weekly_scoped`. */
+  kind: string
+  group: string
+  percent: number
+  resets_at: string | null
+  scope?: {
+    model?: { display_name: string } | null
+    surface?: { display_name: string } | null
+  } | null
+  /** e.g. `normal`, `warning`, `critical`. */
+  severity: string
+  is_active: boolean
+}
+
+/** The structured twin of a `/usage` reply, as the CLI records it. */
+export interface LocalCommandUsageReport {
+  session: {
+    total_cost_usd: number
+    total_api_duration_ms: number
+    total_duration_ms: number
+    total_lines_added: number
+    total_lines_removed: number
+  }
+  /** Null when the plan's usage could not be fetched (no plan, API key). */
+  rate_limits: {
+    limits: UsageLimitRow[] | null
+    /** Amounts are in minor units of `currency`. */
+    extra_usage?: {
+      is_enabled: boolean
+      monthly_limit: number | null
+      used_credits: number | null
+      utilization: number | null
+      currency?: string | null
+    } | null
+  } | null
+}
 
 export interface Turn {
   id: string

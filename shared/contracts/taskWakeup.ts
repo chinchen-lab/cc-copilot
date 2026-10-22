@@ -15,7 +15,8 @@ export interface TaskWakeup {
 
 const RESULT_LIMIT = 24000
 const WAKEUP_RE = /^Delegated task (\S+) (running|completed|error|cancelled)\. Child session: (\S+)\. Result: ([\s\S]*)\nAcknowledge receipt with cogpit-session tasks \S+ --ack \S+\.$/
-const WAKEUP_START_RE = /^Delegated task \S+ (?:running|completed|error|cancelled)\. Child session: /
+const WAKEUP_START_RE = /^Delegated task \S+ (?:running|completed|error|cancelled|needs attention)\. Child session: /
+const ATTENTION_RE = /^Delegated task \S+ needs attention\. Child session: (\S+)\./
 
 /** Room a long reply keeps before the changed files give way. */
 const REPLY_FLOOR = 4000
@@ -57,6 +58,21 @@ function wakeupResult(result: unknown, childSessionId: string): string {
 
 export function formatTaskWakeup(task: Pick<DelegatedTask, "id" | "parentSessionId" | "childSessionId" | "state" | "result">): string {
   return `Delegated task ${task.id} ${task.state}. Child session: ${task.childSessionId}. Result: ${wakeupResult(task.result, task.childSessionId)}\nAcknowledge receipt with cogpit-session tasks ${task.parentSessionId} --ack ${task.id}.`
+}
+
+/**
+ * The prompt that wakes a parent while a session it delegated to is still
+ * working but cannot go on alone: it asked something, or the parent's
+ * follow-up is stuck in its queue.
+ */
+export function formatTaskAttention(task: Pick<DelegatedTask, "id" | "childSessionId">, detail: string, next: readonly string[]): string {
+  return [`Delegated task ${task.id} needs attention. Child session: ${task.childSessionId}. ${detail}`, ...next].join("\n")
+}
+
+/** The child an attention prompt is about, or null for any other text. */
+export function parseTaskAttention(text: string): { childSessionId: string } | null {
+  const match = ATTENTION_RE.exec(text.trim())
+  return match ? { childSessionId: match[1]! } : null
 }
 
 export function parseTaskWakeup(text: string): TaskWakeup | null {

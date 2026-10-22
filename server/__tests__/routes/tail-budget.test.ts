@@ -66,6 +66,21 @@ describe("trimTailToByteBudget", () => {
     expect(result.byteOffset).toBe(11 * 1025)
   })
 
+  it("drops noise lines without letting them spend the budget or the floor", () => {
+    const isNoise = (line: string) => line.startsWith("n")
+    const lines = [lineOfBytes(100), lineOfBytes(500, "n"), lineOfBytes(100), lineOfBytes(500, "n"), lineOfBytes(100)]
+    const result = trimTailToByteBudget(lines, 0, 250, 2, isNoise)
+    expect(result.lines).toEqual([lines[2], lines[4]])
+    // the oldest line and the noise after it are behind the boundary
+    expect(result.byteOffset).toBe(101 + 501)
+  })
+
+  it("skips a page that is all noise to its end", () => {
+    const lines = [lineOfBytes(10, "n"), lineOfBytes(20, "n")]
+    const result = trimTailToByteBudget(lines, 5, 1024, 30, (line) => line.startsWith("n"))
+    expect(result).toEqual({ lines: [], byteOffset: 5 + 11 + 21 })
+  })
+
   it("keeps everything when the floor exceeds the line count", () => {
     const lines = [lineOfBytes(100), lineOfBytes(900_000)]
     const result = trimTailToByteBudget(lines, 7, 1024, 30)

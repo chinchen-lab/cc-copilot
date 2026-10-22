@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => {
     remote,
     create: vi.fn(),
     send: vi.fn(),
+    receipt: vi.fn(),
+    queue: vi.fn(),
     state: vi.fn(),
     wait: vi.fn(),
     result: vi.fn(),
@@ -122,6 +124,10 @@ function state(sessionId: string, outcome: string, extra: Record<string, unknown
   return { sessionId, outcome, live: true, running: outcome === "running", waiting: [], ...extra }
 }
 
+function receipt(id: string, state: string, position: number, error?: string) {
+  return { id, state, position, intent: "queue", conversationId: "conversation", sessionId: "s1", bindingRevision: 1, createdAt: 1, updatedAt: 1, ...(error && { error }) }
+}
+
 const permission = { kind: "permission", requestId: "perm-1", toolName: "Bash", summary: "ls", availableDecisions: ["allow", "deny"] }
 
 function pending(host: FakeHost, waiting: unknown[]) {
@@ -141,6 +147,7 @@ beforeEach(() => {
     })
     host.respond.mockImplementation(async (_s: string, requestId: string) => ({ kind: "permission", requestId }))
     host.stop.mockResolvedValue(true)
+    host.queue.mockResolvedValue([])
   }
 })
 
@@ -200,6 +207,11 @@ describe("new", () => {
     expect((await run(["new", "work", "--wait", "--timeout", "0"], { invocationId: "timed-out" })).exitCode).toBe(EXIT.timedOut)
     expect(orchestrationStore().tasks("local", "parent-1").find((task) => task.sourceId === "timed-out")).toMatchObject({ state: "running", deliveryDisposition: "async" })
   })
+  it("warns that a session started outside a Cogpit session has no parent to notify", async () => {
+    expect(out(await run(["new", "work"], { callerSessionId: undefined })).warning).toContain("COGPIT_SESSION_ID is not set")
+    expect(out(await run(["new", "work"], { invocationId: "with-parent" }))).not.toHaveProperty("warning")
+  })
+
   it("starts a session in the caller's directory with bypass permissions and records the parent", async () => {
     const output = await run(["new", "fix", "the", "tests", "--model", "haiku"])
     expect(mocks.local.create).toHaveBeenCalledWith(expect.objectContaining({
@@ -457,6 +469,59 @@ describe("send", () => {
     expect(mocks.remote.send).toHaveBeenCalledWith("r1", "and now docs", { interrupt: true, intent: "restart", commandId: "invocation-1", req: undefined })
     expect(out(output)).toMatchObject({ sessionId: "r1", device: "agentbox", delivery: "enqueued" })
   })
+
+  it("tracks a follow-up to the caller's own child so its result notifies the caller, and counts what it waits behind", async () => {
+    const queued = receipt("follow-up-1", "queued", 5)
+    mocks.local.send.mockResolvedValue({ delivery: "queued", receipt: queued })
+    mocks.local.queue.mockResolvedValue([receipt("old", "completed", 3), receipt("stuck", "held", 4), queued])
+    mocks.sessionOrigin.mockResolvedValue({ parentSessionId: "parent-1", createdAt: 1 })
+    expect(out(await run(["send", "child-1", "Add a test", "--command-id", "follow-up-1"]))).toMatchObject({ ahead: 1 })
+    expect(orchestrationStore().tasks("local", "parent-1").find((task) => task.sourceId === "send:child-1:follow-up-1")).toMatchObject({ childSessionId: "child-1", commandId: "follow-up-1", state: "running" })
+
+    const first = orchestrationStore().tasks("local", "parent-1").find((task) => task.sourceId === "send:child-1:follow-up-1")!
+    mocks.local.send.mockResolvedValue({ delivery: "queued", receipt: receipt("follow-up-3", "queued", 6) })
+    await run(["send", "child-1", "And the docs", "--command-id", "follow-up-3"])
+    expect(orchestrationStore().tasks("local", "parent-1").find((task) => task.id === first.id)?.acknowledgedAt).toEqual(expect.any(Number))
+    expect(orchestrationStore().tasks("local", "parent-1").find((task) => task.sourceId === "send:child-1:follow-up-3")?.acknowledgedAt).toBeUndefined()
+
+    mocks.sessionOrigin.mockResolvedValue({ parentSessionId: "someone-else", createdAt: 1 })
+    await run(["send", "child-2", "Not mine", "--command-id", "follow-up-2"])
+    expect(orchestrationStore().tasks("local", "parent-1").some((task) => task.childSessionId === "child-2")).toBe(false)
+  })
+})
+
+describe("queue", () => {
+  it("lists messages still on their way, oldest first, with what unblocks them", async () => {
+    mocks.local.queue.mockResolvedValue([receipt("later", "queued", 7), receipt("done", "completed", 2), receipt("steered", "delivered", 3), receipt("lost", "unknown", 4, "Host stopped during delivery"), receipt("paused", "held", 5)])
+    const listed = out(await run(["queue", "s1"]))
+    expect(listed.messages.map((message: { commandId: string }) => message.commandId)).toEqual(["lost", "paused", "later"])
+    expect(listed.messages[0]).toMatchObject({ state: "unknown", error: "Host stopped during delivery" })
+    expect(listed.next).toEqual([
+      expect.stringContaining("cogpit-session queue s1 --resolve lost --delivered"),
+      "cogpit-session queue s1 --resume",
+    ])
+    expect(mocks.local.queue).toHaveBeenCalledWith("s1", null, undefined)
+  })
+
+  it("resumes, cancels and resolves through the session's host", async () => {
+    await run(["queue", "s1", "--resume"])
+    expect(mocks.local.queue).toHaveBeenCalledWith("s1", { action: "resume" }, undefined)
+    await run(["queue", "r1", "--cancel", "c-1"])
+    expect(mocks.remote.queue).toHaveBeenCalledWith("r1", { action: "cancel", commandId: "c-1" }, undefined)
+    await run(["queue", "s1", "--resolve", "c-2", "--not-delivered"])
+    expect(mocks.local.queue).toHaveBeenCalledWith("s1", { action: "resolve", commandId: "c-2", disposition: "failed" }, undefined)
+    expect((await run(["queue", "s1", "--resolve", "c-2"])).exitCode).toBe(EXIT.error)
+    expect((await run(["queue", "s1", "--resume", "--cancel", "c-1"])).exitCode).toBe(EXIT.error)
+  })
+
+  it("shows a stuck queue in status", async () => {
+    mocks.local.state.mockResolvedValue(state("s1", "completed"))
+    mocks.local.queue.mockResolvedValue([receipt("paused", "held", 5, "Host restarted; resume this queue after reviewing it.")])
+    expect(out(await run(["status", "s1"]))).toMatchObject({
+      queue: [{ commandId: "paused", state: "held", error: "Host restarted; resume this queue after reviewing it." }],
+      next: ["cogpit-session queue s1 --resume"],
+    })
+  })
 })
 
 describe("wait", () => {
@@ -482,6 +547,18 @@ describe("wait", () => {
     const output = await run(["wait", "r1"])
     expect(output.exitCode).toBe(EXIT.timedOut)
     expect(out(output)).toMatchObject({ outcome: "unreachable", error: "down", next: "cogpit-session wait r1" })
+  })
+
+  it("settles the caller's tasks for a session it reports finished, but not a follow-up that has not run", async () => {
+    const store = orchestrationStore()
+    const first = store.putTask("local", { parentSessionId: "parent-1", childSessionId: "waited-1", sourceId: "waited-first" })
+    const pendingFollowUp = store.putTask("local", { parentSessionId: "parent-1", childSessionId: "waited-1", sourceId: "waited-follow-up", commandId: "never-admitted" })
+    mocks.waitAcrossHosts.mockResolvedValue({ timedOut: false, sessions: [state("waited-1", "completed")] })
+    await run(["wait", "waited-1"])
+    const tasks = store.tasks("local", "parent-1")
+    expect(tasks.find((task) => task.id === first.id)).toMatchObject({ state: "completed", acknowledgedAt: expect.any(Number), result: expect.objectContaining({ reply: "All done" }) })
+    expect(tasks.find((task) => task.id === pendingFollowUp.id)).toMatchObject({ state: "running" })
+    expect(tasks.find((task) => task.id === pendingFollowUp.id)?.acknowledgedAt).toBeUndefined()
   })
 
   it("reads a finished remote session's reply from its device", async () => {
@@ -536,8 +613,8 @@ describe("children and stop", () => {
 
     mocks.remote.stop.mockRejectedValue(new Error("unreachable"))
     expect(out(await run(["stop", "--children"])).sessions).toEqual([
-      { sessionId: "c1", stopped: true },
-      { sessionId: "r2", device: "agentbox", stopped: false },
+      { sessionId: "c1", stopped: true, running: false },
+      { sessionId: "r2", device: "agentbox", stopped: false, running: true },
     ])
     expect(await run(["stop", "--children"], { callerSessionId: undefined })).toMatchObject({ exitCode: EXIT.error })
   })

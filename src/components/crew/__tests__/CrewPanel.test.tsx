@@ -101,7 +101,7 @@ describe("CrewPanel", () => {
     await waitFor(() => expect(mocks.json).toHaveBeenCalledWith("/api/delegated-tasks", { sessionId: "coordinator", taskId: "task-9", action: "ack" }))
 
     fireEvent.click(screen.getByRole("button", { name: "Stop lane" }))
-    await waitFor(() => expect(mocks.json).toHaveBeenCalledWith("/api/stop-session", { sessionId: "lane" }))
+    await waitFor(() => expect(mocks.json).toHaveBeenCalledWith("/api/stop-session", { sessionId: "lane", cancelQueued: true }))
   })
 
   it("maps the crew from its root next to the overview, and opens a member from the map", async () => {

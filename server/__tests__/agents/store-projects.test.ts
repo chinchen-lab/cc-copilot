@@ -8,9 +8,10 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import { zstdCompressSync } from "node:zlib"
 
 let fixtureRoot: string
 let originalCodexHome: string | undefined
@@ -25,6 +26,20 @@ const COPILOT_SESSION = "e6ab6cc7-cd47-4056-9c5d-52ff33fdabb3"
 
 const CODEX_PARENT_NAME = `2026/07/21/rollout-2026-07-21T10-11-12-${CODEX_PARENT}.jsonl`
 const CODEX_CHILD_NAME = `2026/07/21/rollout-2026-07-21T10-12-13-${CODEX_CHILD}.jsonl`
+const CODEX_ARCHIVED = "1c0e7a52-5b0f-4b6e-a7a1-3f9d2c4e8b10"
+const CODEX_ARCHIVED_NAME = `2026/07/01/rollout-2026-07-01T09-00-00-${CODEX_ARCHIVED}.jsonl`
+const CODEX_ARCHIVED_RECORDS = [
+  // A sub-agent of a session gone from disk, so the listings above stay as they are.
+  {
+    type: "session_meta",
+    payload: {
+      id: CODEX_ARCHIVED,
+      cwd: "/work/archived",
+      source: { subagent: { thread_spawn: { parent_thread_id: "5d1f9c2a-7b3e-4c8d-9e0f-1a2b3c4d5e6f" } } },
+    },
+  },
+  { type: "event_msg", payload: { type: "user_message", message: "an old question" } },
+]
 
 async function write(filePath: string, body: string): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true })
@@ -72,6 +87,12 @@ beforeAll(async () => {
       },
     }),
   )
+
+  // Codex compresses rollouts it has stopped writing. The stale copy of the
+  // parent shows a rollout caught mid-compression, both forms on disk.
+  await write(join(codexRoot, `${CODEX_ARCHIVED_NAME}.zst`), "")
+  await writeFile(join(codexRoot, `${CODEX_ARCHIVED_NAME}.zst`), zstdCompressSync(Buffer.from(jsonl(...CODEX_ARCHIVED_RECORDS))))
+  await writeFile(join(codexRoot, `${CODEX_PARENT_NAME}.zst`), zstdCompressSync(Buffer.from(jsonl({ type: "session_meta", payload: { id: CODEX_PARENT, cwd: "/stale" } }))))
 
   const copilotRoot = agents.storeFor("copilot").sessionsRoot() as string
   await write(
@@ -127,6 +148,23 @@ describe("claude store", () => {
     ])
     await expect(store.listSubagentFiles("proj-x", "no-such-session")).resolves.toEqual([])
     await expect(store.listSubagentFiles("..", "etc")).resolves.toBeNull()
+  })
+
+  it("sees an agent write anywhere under the session's sub-agents, workflow agents included", async () => {
+    const store = agents.storeFor("claude")
+    const subagents = join(sessionPaths.dirs.PROJECTS_DIR, "proj-x", CLAUDE_SESSION, "subagents")
+    const workflowAgent = join(subagents, "workflows", "wf_1", "agent-wf1.jsonl")
+    await write(workflowAgent, "{}\n")
+    const now = Date.now()
+    const hourAgo = new Date(now - 3_600_000)
+    await utimes(join(subagents, "agent-abc123.jsonl"), hourAgo, hourAgo)
+
+    await expect(store.agentsWroteSince("proj-x", CLAUDE_SESSION, now - 60_000)).resolves.toBe(true)
+
+    await utimes(workflowAgent, hourAgo, hourAgo)
+    await expect(store.agentsWroteSince("proj-x", CLAUDE_SESSION, now - 60_000)).resolves.toBe(false)
+    await expect(store.agentsWroteSince("proj-x", "no-such-session", 0)).resolves.toBe(false)
+    await expect(store.agentsWroteSince("..", "etc", 0)).resolves.toBe(false)
   })
 
   it("addresses a transcript by its directory and file name", async () => {
@@ -200,6 +238,29 @@ describe("codex store", () => {
     const target = store.transcriptPath(dirName(), "new-id")
     expect(target?.fileName).toMatch(/^\d{4}\/\d{2}\/\d{2}\/rollout-.*-new-id\.jsonl$/)
     expect(target?.filePath).toBe(join(root, target?.fileName ?? ""))
+  })
+
+  it("lists a compressed rollout under its plain name, preferring a plain copy", async () => {
+    const store = agents.storeFor("codex")
+    const root = store.sessionsRoot() as string
+    const files = await store.listSessionFiles()
+    expect(files.map((file) => file.fileName).sort()).toEqual([CODEX_ARCHIVED_NAME, CODEX_PARENT_NAME, CODEX_CHILD_NAME].sort())
+    expect(files.find((file) => file.fileName === CODEX_ARCHIVED_NAME)?.filePath).toBe(join(root, `${CODEX_ARCHIVED_NAME}.zst`))
+    expect(files.find((file) => file.fileName === CODEX_PARENT_NAME)?.filePath).toBe(join(root, CODEX_PARENT_NAME))
+  })
+
+  it("resolves, identifies and addresses a compressed rollout", async () => {
+    const store = agents.storeFor("codex")
+    const compressed = join(store.sessionsRoot() as string, `${CODEX_ARCHIVED_NAME}.zst`)
+    await expect(store.resolveSessionFile(dirName(), CODEX_ARCHIVED_NAME)).resolves.toBe(compressed)
+    await expect(store.resolveSessionFile(dirName(), `${CODEX_ARCHIVED}.jsonl`)).resolves.toBe(compressed)
+    await expect(store.findSessionFile(CODEX_ARCHIVED)).resolves.toBe(compressed)
+    await expect(store.readIdentity(compressed)).resolves.toMatchObject({ sessionId: CODEX_ARCHIVED, cwd: "/work/archived" })
+    await expect(store.sessionAddress(compressed)).resolves.toEqual({
+      dirName: store.descriptor.dirName.encode("/work/archived"),
+      fileName: CODEX_ARCHIVED_NAME,
+    })
+    await expect(store.transcriptRoot(compressed)).resolves.toEqual({ rootSessionId: CODEX_ARCHIVED, isRootTranscript: true })
   })
 
   it("reads identity from the rollout header", async () => {

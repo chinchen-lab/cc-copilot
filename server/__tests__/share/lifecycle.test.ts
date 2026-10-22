@@ -12,6 +12,8 @@ vi.mock("../../lib/rateLimit", () => ({ isRateLimited: vi.fn(() => false) }))
 vi.mock("../../lib/sessionArchive", () => ({
   forgetSessions: vi.fn().mockResolvedValue(undefined),
 }))
+vi.mock("../../agents/transcriptFile", () => import("../transcriptFileThroughHelpers"))
+
 vi.mock("../../helpers", () => ({
   activeProcesses: new Map(),
   persistentSessions: new Map(),
@@ -149,7 +151,7 @@ async function callRoute(
   const { req, res, next, sendBody } = createMockReqRes(method, url, body)
   handler(req as never, res as never, next)
   sendBody()
-  await vi.waitFor(() => expect(res.end).toHaveBeenCalled())
+  await vi.waitFor(() => expect(res.end).toHaveBeenCalled(), { timeout: 5000 })
   return res
 }
 

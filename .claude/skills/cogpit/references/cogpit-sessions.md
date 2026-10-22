@@ -65,14 +65,27 @@ cogpit-session result "$ID" --text
 
 `send --wait` waits for its delivery receipt; `wait` returns the session's final
 reply and changed files. Reuse the same command ID and message after a lost
-response. `queued` means accepted, not finished. For `unknown` delivery, inspect
-native history before reconciling; do not resend blindly. `held` needs queue review.
-Use `--steer` to join a supported running turn, or `--interrupt` to restart it.
+response. `queued` means accepted, not finished, and `ahead` counts the messages
+it waits behind. A plain `send` runs after the current turn ends. Use `--steer`
+for anything time-critical; its receipt reads `delivery: steered` once it joined
+the running turn. `--interrupt` restarts the turn instead.
+
+`held` and `unknown` messages block everything queued after them; a Cogpit
+restart holds every queued message. `status` lists the queue, and
+`cogpit-session queue ID` shows what is stuck and how to free it: `--resume`
+releases held messages, and `--resolve COMMAND_ID --delivered|--not-delivered`
+settles an `unknown` one after you check the child's history with
+`cogpit-memory`. Do not resend blindly.
 
 Timeout leaves the child running. Continue with `wait`; do not spawn a duplicate.
-Eventual completion is saved and notifies the parent. Read it with
-`cogpit-session tasks`, then acknowledge it with `tasks --ack TASK_ID`.
-A successful `new --wait` already acknowledges its result.
+Completion is saved and notifies the parent, for the first turn and for each
+follow-up you send to your own child. Read it with `cogpit-session tasks`, then
+acknowledge it with `tasks --ack TASK_ID`. A `wait` or `new --wait` that already
+returned the result acknowledges it for you.
+
+A child blocked on a question or approval notifies you once per request with
+"needs attention" and the command that answers it. Only `answer`, `approve` or
+`deny` unblock it; a chat post or a `send` does not.
 
 | Exit | Meaning |
 | --- | --- |
@@ -80,6 +93,22 @@ A successful `new --wait` already acknowledges its result.
 | 2 | Needs an answer or approval; inspect `waiting` and `next` |
 | 3 | Still running or timed out; keep waiting |
 | 1 | Error, missing session or unreachable device; inspect the response |
+
+## Orchestrator checklist
+
+- Before you end your turn with children working, make sure each one will
+  notify you: you started it with `new` or sent it a follow-up from your own
+  session. Otherwise keep a `wait` running. If `new` prints a `warning` about
+  `COGPIT_SESSION_ID`, nothing will notify you.
+- Shortly after launching, run `children` and check that each child is
+  `running`, not `error` or `not_found`.
+- Check `status ID` for `waiting` and `queue` whenever a child seems quiet.
+- A completion reports the end of a turn. A child whose reply says it is still
+  waiting on background agents or commands is not done yet; wait again.
+- After a Cogpit restart, children that were mid-turn stopped. Check their
+  replies, resume held queues and resend what they still need.
+- `stop` cancels messages still queued for the child and stops its own
+  children's results from waking it. Stop those children too.
 
 ## Crew chat
 
@@ -156,7 +185,7 @@ cogpit-session approve "$ID" --request "$REQUEST"
 cogpit-session deny "$ID" --request "$REQUEST" --feedback "Use the smaller change"
 cogpit-session answer "$ID" "Blue" --request "$REQUEST"
 cogpit-session interrupt "$ID"   # stop the turn, retain the session
-cogpit-session stop "$ID"        # stop the session
+cogpit-session stop "$ID"        # stop the session and cancel its queued messages
 cogpit-session discard "$ID"     # fetch remote work once more, then remove its worktree
 ```
 

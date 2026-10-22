@@ -301,9 +301,11 @@ export const claudeRuntime: AgentRuntime = {
 
   activity(sessionId) {
     const state = sdkSessions.get(sessionId)
+    const live = isSDKQueryLive(state)
     return {
-      live: isSDKQueryLive(state),
+      live,
       running: state?.running === true || activeProcesses.has(sessionId),
+      agentsRunning: live && state.backgroundAgents.size > 0,
     }
   },
 

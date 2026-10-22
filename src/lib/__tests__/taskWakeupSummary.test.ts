@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { formatTaskWakeup } from "../../../shared/contracts/taskWakeup"
+import { formatTaskAttention, formatTaskWakeup } from "../../../shared/contracts/taskWakeup"
 import { taskWakeupSummary } from "../userMessageContent"
 
 const wakeup = (state: "completed" | "error", files: number) => formatTaskWakeup({
@@ -22,5 +22,11 @@ describe("taskWakeupSummary", () => {
     expect(taskWakeupSummary(wakeup("completed", 3))).toBe("Delegated session finished")
     expect(taskWakeupSummary(wakeup("error", 3), () => undefined)).toBe("Delegated session failed")
     expect(taskWakeupSummary("Fix the tests", () => "x")).toBeNull()
+  })
+
+  it("says a session needs attention rather than that it finished", () => {
+    const attention = formatTaskAttention({ id: "task-1", childSessionId: "lane" }, "It is waiting on you.", [])
+    expect(taskWakeupSummary(attention, (id) => (id === "lane" ? "w3-ops-tooling" : undefined))).toBe("w3-ops-tooling needs attention")
+    expect(taskWakeupSummary(attention)).toBe("Delegated session needs attention")
   })
 })

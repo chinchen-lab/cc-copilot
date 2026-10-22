@@ -13,8 +13,11 @@ export function useVisiblePolling(
   useEffect(() => {
     if (!poll) return
     let active = true
+    let inFlight = false
     const pollWhenVisible = () => {
-      if (document.visibilityState === "visible") void poll(() => active)
+      if (document.visibilityState !== "visible" || inFlight) return
+      inFlight = true
+      void poll(() => active).finally(() => { inFlight = false })
     }
     pollWhenVisible()
     const id = setInterval(pollWhenVisible, intervalMs)

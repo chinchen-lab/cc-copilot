@@ -1,6 +1,7 @@
 import { useTranslation } from "@/hooks/useTranslation"
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect, useCallback, useRef, useLayoutEffect } from "react"
 import { Play, Server, Square, TerminalSquare } from "lucide-react"
+import { useVisiblePolling } from "@/hooks/useVisiblePolling"
 import { cn } from "@/lib/utils"
 import { authFetch } from "@/lib/auth"
 import { SectionHeading } from "@/components/stats/SectionHeading"
@@ -135,62 +136,42 @@ export function BackgroundServers({
     return states
   }, [turns])
 
-  // Poll the background-tasks API, fall back to JSONL port checking
-  useEffect(() => {
-    if (!cwd) return
-
-    let cancelled = false
-    async function check() {
-      try {
-        let apiTasks: BgTask[] = []
-        const res = await authFetch(
-          `/api/background-tasks?cwd=${encodeURIComponent(cwd)}`
-        )
-        if (cancelled) return
-        if (res.ok) {
-          apiTasks = await res.json()
-          if (cancelled) return
-        }
-
-        setTasks(apiTasks)
-        const listedPorts = new Set(apiTasks.flatMap(task => task.ports))
-        const portsToCheck = [...jsonlPorts.keys()].filter(port => !listedPorts.has(port))
-        if (portsToCheck.length === 0) {
-          return
-        }
-        const portRes = await authFetch(
-          `/api/check-ports?ports=${portsToCheck.join(",")}`
-        )
-        if (cancelled) return
-        if (portRes.ok) {
-          const portStatus: Record<number, boolean> = await portRes.json()
-          if (cancelled) return
-          const fallbackTasks: BgTask[] = []
-          const seen = new Set<number>()
-          for (const [port, info] of jsonlPorts) {
-            if (listedPorts.has(port) || !portStatus[port] || seen.has(port)) continue
-            seen.add(port)
-            fallbackTasks.push({
-              id: `port-${port}`,
-              outputPath: info.outputPath,
-              ports: [port],
-              portStatus: { [port]: true },
-              preview: info.description,
-            })
-          }
-          setTasks([...apiTasks, ...fallbackTasks])
-        }
-      } catch {
-        // ignore
+  const jsonlPortsRef = useRef(jsonlPorts)
+  useLayoutEffect(() => { jsonlPortsRef.current = jsonlPorts }, [jsonlPorts])
+  const poll = useCallback(async (isActive: () => boolean) => {
+    const publish = (next: BgTask[]) => {
+      if (isActive()) setTasks((current) => JSON.stringify(current) === JSON.stringify(next) ? current : next)
+    }
+    let apiTasks: BgTask[] = []
+    let receivedTasks = false
+    try {
+      const res = await authFetch(`/api/background-tasks?cwd=${encodeURIComponent(cwd)}`)
+      if (!isActive()) return
+      if (res.ok) {
+        apiTasks = await res.json()
+        receivedTasks = true
+        if (!isActive()) return
       }
+      const ports = jsonlPortsRef.current
+      const listedPorts = new Set(apiTasks.flatMap(task => task.ports))
+      const portsToCheck = [...ports.keys()].filter(port => !listedPorts.has(port))
+      if (portsToCheck.length === 0) { publish(apiTasks); return }
+      const portRes = await authFetch(`/api/check-ports?ports=${portsToCheck.join(",")}`)
+      if (!isActive()) return
+      if (!portRes.ok) { publish(apiTasks); return }
+      const portStatus: Record<number, boolean> = await portRes.json()
+      const fallbackTasks: BgTask[] = []
+      for (const [port, info] of ports) {
+        if (listedPorts.has(port) || !portStatus[port]) continue
+        fallbackTasks.push({ id: `port-${port}`, outputPath: info.outputPath, ports: [port], portStatus: { [port]: true }, preview: info.description })
+      }
+      publish([...apiTasks, ...fallbackTasks])
+    } catch {
+      if (receivedTasks) publish(apiTasks)
+      // The next visible poll retries.
     }
-    check()
-    const interval = setInterval(check, 10_000)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [cwd, jsonlPorts])
+  }, [cwd])
+  useVisiblePolling(cwd ? poll : null, 10_000)
 
   const handleKillPort = useCallback(
     async (port: number) => {
@@ -211,8 +192,9 @@ export function BackgroundServers({
   )
 
   // Report discovered servers to parent for the ServerPanel badges
+  const lastReport = useRef<{ callback: NonNullable<BackgroundServersProps["onServersChanged"]>; value: string } | null>(null)
   useEffect(() => {
-    if (!onServersChanged) return
+    if (!onServersChanged) { lastReport.current = null; return }
     const discovered = tasks
       .filter((t) => t.outputPath)
       .map((t) => ({
@@ -221,6 +203,9 @@ export function BackgroundServers({
         title: getTaskTitle(t),
         status: taskStatus(t, sessionId, taskStates),
       }))
+    const value = JSON.stringify(discovered)
+    if (lastReport.current?.callback === onServersChanged && lastReport.current.value === value) return
+    lastReport.current = { callback: onServersChanged, value }
     onServersChanged(discovered)
   }, [tasks, onServersChanged, sessionId, taskStates])
 

@@ -113,6 +113,9 @@ export interface GitHubPullRequest {
   mergeState: GitHubPullMergeState | null
   /** Full SHA of the head commit, pinned on merge so a changed branch is never merged unseen. */
   headSha: string
+  /** Lines added and deleted across the pull request. Hosts older than these fields leave them out. */
+  additions?: number
+  deletions?: number
 }
 
 export type GitHubPullFileStatus =

@@ -1,9 +1,8 @@
-import { nativeBinding } from "../agents/nativeBindings"
 import { resolveConversationTransition, transitionConversation, type TransitionInput, type TransitionResolution } from "../lib/conversationTransition"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import { authorizeSession } from "../edition"
-import { resolveSessionAgent, runtimeFor } from "../agents/runtimes"
-import { attachCommandAuthority, commandDispatcher, commandScope } from "../lib/durableSend"
+import { commandDispatcher, commandScope } from "../lib/durableSend"
+import { applyQueueAction, queueContext } from "../lib/sessionQueue"
 import { sendJson, withJsonBody, type UseFn } from "../http"
 import { sendAgentError } from "./agentErrors"
 import { localHost } from "../sessionHosts/localHost"
@@ -12,11 +11,9 @@ import { OrchestrationError } from "../orchestration/store"
 async function context(req: IncomingMessage, res: ServerResponse, sessionId: unknown, mutate: boolean) {
   if (typeof sessionId !== "string" || !sessionId) throw new OrchestrationError(400, "sessionId is required")
   if (await authorizeSession(req, res, { sessionId }, mutate ? "interact" : "view") === null) return null
-  const { kind, filePath, instanceId } = await resolveSessionAgent(sessionId)
-  const dispatcher = commandDispatcher()
-  const conversation = dispatcher.store.ensureConversation(await nativeBinding(sessionId, kind, filePath))
-  if (conversation.binding.sessionId !== sessionId && await authorizeSession(req, res, { sessionId: conversation.binding.sessionId }, mutate ? "interact" : "view") === null) return null
-  return { dispatcher, conversation, scope: commandScope(req), runtime: runtimeFor(kind, instanceId) }
+  const ctx = await queueContext(sessionId, req)
+  if (ctx.conversation.binding.sessionId !== sessionId && await authorizeSession(req, res, { sessionId: ctx.conversation.binding.sessionId }, mutate ? "interact" : "view") === null) return null
+  return ctx
 }
 
 export function registerSessionCommandRoutes(use: UseFn): void {
@@ -46,42 +43,7 @@ export function registerSessionCommandRoutes(use: UseFn): void {
       try {
         const ctx = await context(req, res, body.sessionId, true)
         if (!ctx) return
-        const { dispatcher, conversation, scope, runtime } = ctx
-        if (conversation.binding.sessionId !== body.sessionId) throw new OrchestrationError(409, `This conversation moved to ${conversation.binding.sessionId}; open its current session to update the queue`)
-        const { action, commandId } = body
-        const id = typeof commandId === "string" ? commandId : ""
-        attachCommandAuthority(scope, conversation.id, runtime, req)
-        const command = id ? dispatcher.store.command(scope, id) : null
-        if (id && command?.receipt.conversationId !== conversation.id) throw new OrchestrationError(404, "Command not found in this conversation")
-        switch (action) {
-          case "resume": dispatcher.store.resume(scope, conversation.id); break
-          case "cancel": dispatcher.store.cancel(scope, id); break
-          case "edit": {
-            if (!command || typeof body.message !== "string" || !body.message.trim() || typeof body.newCommandId !== "string") throw new OrchestrationError(400, "message and a newCommandId are required")
-            dispatcher.store.replace(scope, id, body.newCommandId, { ...command.payload, message: body.message }); break
-          }
-          case "reorder": {
-            if (!Array.isArray(body.commandIds) || !body.commandIds.every((value) => typeof value === "string")) throw new OrchestrationError(400, "commandIds must list the queued commands")
-            dispatcher.store.reorder(scope, conversation.id, body.commandIds); break
-          }
-          case "resolve": {
-            if (body.disposition !== "completed" && body.disposition !== "failed") throw new OrchestrationError(400, "Choose completed or failed after inspecting native history")
-            dispatcher.store.resolveUnknown(scope, id, body.disposition); break
-          }
-          case "resend": {
-            if (!command || typeof body.newCommandId !== "string" || body.confirmDuplicateRisk !== true) throw new OrchestrationError(409, "Explicitly confirm a possible duplicate and supply a newCommandId")
-            dispatcher.store.resendUnknown(scope, id, body.newCommandId); break
-          }
-          case "steer":
-          case "restart": {
-            if (!command || typeof body.newCommandId !== "string") throw new OrchestrationError(400, "A newCommandId is required")
-            if (action === "steer" && !runtime.descriptor.capabilities.midTurnSteering) throw new OrchestrationError(400, "This provider does not support steering")
-            dispatcher.store.promote(scope, id, body.newCommandId, action); break
-          }
-          default: throw new OrchestrationError(400, "Unknown queue action")
-        }
-        void dispatcher.tick()
-        sendJson(res, 200, { conversation, commands: dispatcher.store.commands(conversation.id, scope) })
+        sendJson(res, 200, { conversation: ctx.conversation, commands: applyQueueAction(ctx, body.sessionId as string, body, req) })
       } catch (error) { sendAgentError(res, error, "Failed to update the queue") }
     })
   })

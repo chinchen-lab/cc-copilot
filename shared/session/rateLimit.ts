@@ -26,6 +26,8 @@ export interface RateLimitBlock {
   resetsAt: number | null
   /** Whether continuing at lower priority in a terminal would get past this block. */
   lowPriority: boolean
+  /** Whether the account has extra (paid) usage turned on; absent when the runtime did not say. */
+  extraUsage?: boolean
 }
 
 /**
@@ -35,7 +37,7 @@ export interface RateLimitBlock {
  */
 export function readRateLimitBlock(kind: AgentKind, info: unknown): RateLimitBlock | null {
   if (typeof info !== "object" || info === null || Array.isArray(info)) return null
-  const report = info as { status?: unknown; resetsAt?: unknown; rateLimitType?: unknown }
+  const report = info as { status?: unknown; resetsAt?: unknown; rateLimitType?: unknown; overageEnabled?: unknown }
   if (report.status !== "rejected") return null
 
   const limit = typeof report.rateLimitType === "string" ? report.rateLimitType : null
@@ -47,5 +49,6 @@ export function readRateLimitBlock(kind: AgentKind, info: unknown): RateLimitBlo
     limit,
     resetsAt,
     lowPriority: limit === SESSION_LIMIT && descriptorFor(kind).capabilities.lowPriorityInTerminal,
+    ...(typeof report.overageEnabled === "boolean" ? { extraUsage: report.overageEnabled } : {}),
   }
 }

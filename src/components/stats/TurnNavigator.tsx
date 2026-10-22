@@ -6,7 +6,7 @@ import { SectionHeading } from "@/components/stats/SectionHeading"
 import type { Turn } from "../../../shared/session/types"
 import { truncate } from "@/lib/format"
 import { getUserMessageText } from "../../../shared/session/parser"
-import { taskWakeupSummary } from "@/lib/userMessageContent"
+import { generatedPromptSummary } from "@/lib/userMessageContent"
 import { useSessionNamer } from "@/hooks/useSessionNamer"
 import { getTurnKey } from "@/components/stats/turnKey"
 import { Button } from "@/components/ui/button"
@@ -30,7 +30,7 @@ export function TurnNavigator({ turns, onJumpToTurn }: TurnNavigatorProps): Reac
         <div className="flex flex-col gap-0.5 pr-2">
           {turns.map((turn, i) => {
             const text = getUserMessageText(turn.userMessage)
-            const preview = taskWakeupSummary(text, nameOf) ?? text
+            const preview = generatedPromptSummary(text, nameOf) ?? text
             const isActive = activeTurn === i
             return (
               <Button

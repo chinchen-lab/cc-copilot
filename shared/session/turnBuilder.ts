@@ -92,6 +92,22 @@ function isTaskNotificationRecord(msg: UserMessage): boolean {
   return text.replace(TASK_NOTIFICATION_BLOCK_RE, "").replace(ANY_TAG_RE, "").trim() === ""
 }
 
+/** "Task" is the pre-v2.1.63 name of the Agent tool, kept for old sessions. */
+function isTaskToolName(name: string): boolean {
+  return name === "Task" || name === "Agent"
+}
+
+interface TaskMeta { name: string | null; subagentType: string | null; effort: string | null }
+
+function readTaskMeta(input: Record<string, unknown>): TaskMeta {
+  const effort = input.effort
+  return {
+    name: typeof input.name === "string" ? input.name : null,
+    subagentType: typeof input.subagent_type === "string" ? input.subagent_type : null,
+    effort: typeof effort === "string" || typeof effort === "number" ? String(effort) : null,
+  }
+}
+
 interface QueuedPromptSource {
   /**
    * The prompt exactly as written. This is the enqueue ledger's key — the
@@ -515,8 +531,8 @@ export function buildTurnsWithStarts(messages: RawMessage[]): BuiltTurns {
   // Track parentToolUseIDs from Task tool calls with run_in_background: true
   const backgroundAgentParentIds = new Set<string>()
 
-  // Track Task tool call metadata (name, subagent_type) by tool_use ID
-  const taskMetaMap = new Map<string, { name: string | null; subagentType: string | null }>()
+  // Task/Agent call metadata by tool_use ID, including calls made inside subagents
+  const taskMetaMap = new Map<string, TaskMeta>()
 
   // A queued prompt may either be an in-turn steer or the durable precursor to
   // the next ordinary user record. Hold it until the next non-queue record so
@@ -680,7 +696,13 @@ export function buildTurnsWithStarts(messages: RawMessage[]): BuiltTurns {
     // so it belongs to that turn. It never opens one: turn boundaries are
     // user and assistant records only (see `findTurnStartIndices`).
     if (isSystemMessage(msg) && msg.subtype === "local_command" && msg.content) {
-      current?.contentBlocks.push({ kind: "local_command", content: msg.content, timestamp: msg.timestamp })
+      current?.contentBlocks.push({
+        kind: "local_command",
+        content: msg.content,
+        timestamp: msg.timestamp,
+        ...(msg.contextUsage ? { contextUsage: msg.contextUsage } : {}),
+        ...(msg.usageReport ? { usageReport: msg.usageReport } : {}),
+      })
       continue
     }
 
@@ -786,6 +808,7 @@ export function buildTurnsWithStarts(messages: RawMessage[]): BuiltTurns {
               parentToolUseId: toolUseId || undefined,
               agentName: taskMeta?.name ?? null,
               subagentType: taskMeta?.subagentType ?? null,
+              ...(taskMeta?.effort ? { effort: taskMeta.effort } : {}),
               type: "assistant",
               content: toolUseResult.content,
               toolCalls: [],
@@ -955,17 +978,12 @@ export function buildTurnsWithStarts(messages: RawMessage[]): BuiltTurns {
           msgToolCalls.push(tc)
           pendingToolUses.set(block.id, { turn: current, index: idx })
 
-          // Track Task/Agent tool calls metadata for agent name/type display
-          // "Task" is deprecated (pre-v2.1.63); kept for old sessions
-          if (block.name === "Task" || block.name === "Agent") {
+          if (isTaskToolName(block.name)) {
             const input = block.input as Record<string, unknown>
             if (input.run_in_background === true) {
               backgroundAgentParentIds.add(block.id)
             }
-            taskMetaMap.set(block.id, {
-              name: (input.name as string) ?? null,
-              subagentType: (input.subagent_type as string) ?? null,
-            })
+            taskMetaMap.set(block.id, readTaskMeta(input))
           }
         }
       }
@@ -979,7 +997,10 @@ export function buildTurnsWithStarts(messages: RawMessage[]): BuiltTurns {
     // Kept for old sessions and subagentWatcher live progress synthesis.
     if (isProgressMessage(msg) && msg.data.type === "agent_progress") {
       const data = msg.data
+      // Block key: the main-thread Agent call. A nested agent's own call is in
+      // `data.toolUseId`; records written before nesting carry only the key.
       const parentId = msg.parentToolUseID ?? ""
+      const ownToolUseId = data.toolUseId ?? parentId
 
       // Extract token usage from sub-agent assistant messages (deduplicated by message ID)
       let subAgentUsage: TokenUsage | null = null
@@ -1002,12 +1023,14 @@ export function buildTurnsWithStarts(messages: RawMessage[]): BuiltTurns {
         ? ((data.message.message as Record<string, unknown>).model as string | undefined) ?? null
         : null
 
-      const taskMeta = taskMetaMap.get(parentId)
+      const taskMeta = taskMetaMap.get(ownToolUseId)
       const agentMsg: SubAgentMessage = {
         agentId: data.agentId,
-        parentToolUseId: parentId || undefined,
+        parentToolUseId: ownToolUseId || undefined,
+        ...(data.parentAgentId ? { parentAgentId: data.parentAgentId } : {}),
+        ...(taskMeta?.effort ? { effort: taskMeta.effort } : {}),
         agentName: taskMeta?.name ?? null,
-        subagentType: taskMeta?.subagentType ?? null,
+        subagentType: taskMeta?.subagentType ?? data.subagentType ?? null,
         type: data.message.type,
         content: data.message.message.content,
         toolCalls: [],
@@ -1029,6 +1052,7 @@ export function buildTurnsWithStarts(messages: RawMessage[]): BuiltTurns {
             } else if (block.type === "text") {
               agentMsg.text.push(block.text)
             } else if (block.type === "tool_use") {
+              if (isTaskToolName(block.name)) taskMetaMap.set(block.id, readTaskMeta(block.input as Record<string, unknown>))
               agentMsg.toolCalls.push({
                 id: block.id,
                 name: block.name,

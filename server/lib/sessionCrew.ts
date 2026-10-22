@@ -11,9 +11,6 @@ import type { SessionState } from "./sessionWait"
  * is waiting on. Served by `/api/session-crew/:id` for the Crew panel.
  */
 
-/** More members than this is a runaway, not a crew a panel can show. */
-const MAX_MEMBERS = 200
-
 /** A session as the machine it runs on describes it. */
 export interface DescribedSession {
   host: { remote: boolean; id: string; name: string }
@@ -36,7 +33,8 @@ export interface ListedFacts {
 export interface CrewSources {
   parents: ReadonlyMap<string, CrewLink>
   canView: (sessionId: string) => Promise<boolean>
-  describe: (sessionId: string) => Promise<DescribedSession>
+  /** Null for a session neither on disk nor held by anything, which the session list leaves out too. */
+  describe: (sessionId: string) => Promise<DescribedSession | null>
   listed: (sessionId: string) => Promise<ListedFacts | null>
   tasks: () => readonly DelegatedTask[]
 }
@@ -56,9 +54,9 @@ export async function crewSessionIds(rootId: string, sources: Pick<CrewSources, 
   const children = childrenIndex(sources.parents)
   const ids = [rootId]
   const seen = new Set(ids)
-  for (let index = 0; index < ids.length && ids.length < MAX_MEMBERS; index++) {
+  for (let index = 0; index < ids.length; index++) {
     for (const child of children.get(ids[index]!) ?? []) {
-      if (seen.has(child) || ids.length >= MAX_MEMBERS) continue
+      if (seen.has(child)) continue
       seen.add(child)
       if (await sources.canView(child)) ids.push(child)
     }
@@ -82,7 +80,8 @@ async function describeMember(
   rootId: string,
   sources: CrewSources,
   task: DelegatedTask | undefined,
-): Promise<CrewMember> {
+  required: boolean,
+): Promise<CrewMember | null> {
   const link = sessionId === rootId ? undefined : sources.parents.get(sessionId)
   const place = {
     sessionId,
@@ -91,7 +90,7 @@ async function describeMember(
     ...(link?.name && { name: link.name }),
     ...(task && { result: { taskId: task.id, state: task.state, acknowledged: Boolean(task.acknowledgedAt) } }),
   }
-  let described: DescribedSession
+  let described: DescribedSession | null
   try {
     described = await sources.describe(sessionId)
   } catch (error) {
@@ -103,6 +102,10 @@ async function describeMember(
       waiting: [],
       error: error instanceof Error ? error.message : String(error),
     }
+  }
+  if (!described) {
+    // The root and the session asked about stay, so the crew keeps both ends.
+    return required ? { ...place, device: null, address: null, outcome: "not_found", waiting: [] } : null
   }
   const { host, state, address } = described
   const listed = host.remote ? null : await sources.listed(sessionId)
@@ -126,6 +129,8 @@ export async function readSessionCrew(sessionId: string, sources: CrewSources): 
   const rootId = root === sessionId || await sources.canView(root) ? root : sessionId
   const ids = await crewSessionIds(rootId, sources)
   const tasks = resultTasks(sources.tasks())
-  const members = await Promise.all(ids.map((id) => describeMember(id, rootId, sources, tasks.get(id))))
-  return { sessionId, rootId, members }
+  const members = await Promise.all(ids.map((id) => (
+    describeMember(id, rootId, sources, tasks.get(id), id === rootId || id === sessionId)
+  )))
+  return { sessionId, rootId, members: members.flatMap((member) => (member ? [member] : [])) }
 }

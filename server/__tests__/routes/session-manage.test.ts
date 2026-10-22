@@ -34,6 +34,9 @@ const { mockCodexAppServer, mockSDKControls, mockCopilotRuntime, mockFindJsonlPa
   return { mockCodexAppServer, mockSDKControls, mockCopilotRuntime, mockFindJsonlPath }
 })
 
+const mockCancelWaitingMessages = vi.hoisted(() => vi.fn(async () => {}))
+vi.mock("../../lib/sessionQueue", () => ({ cancelWaitingMessages: mockCancelWaitingMessages }))
+
 // The process registry itself is real: the teardown helpers close over its
 // maps, so a stubbed copy would leave every kill assertion looking at nothing.
 vi.mock("../../lib/sessionArchive", () => ({
@@ -603,6 +606,18 @@ describe("session lifecycle routes", () => {
       expect(ps.proc.kill).toHaveBeenCalledWith("SIGTERM")
       expect(mockPersistentSessions.has("sess-1")).toBe(false)
       expect(res._getData().success).toBe(true)
+    })
+
+    it("cancels the session's waiting messages only when the caller ends it for good", async () => {
+      const handler = handlers.get("/api/stop-session")!
+      for (const body of [{ sessionId: "sess-queue" }, { sessionId: "sess-queue", cancelQueued: true }]) {
+        const { req, res, next, sendBody } = createMockReqRes("POST", "/", JSON.stringify(body))
+        handler(req as never, res as never, next)
+        sendBody()
+        await vi.waitFor(() => expect(res.end).toHaveBeenCalled())
+      }
+      expect(mockCancelWaitingMessages).toHaveBeenCalledOnce()
+      expect(mockCancelWaitingMessages).toHaveBeenCalledWith("sess-queue")
     })
 
     it("kills an active process", async () => {

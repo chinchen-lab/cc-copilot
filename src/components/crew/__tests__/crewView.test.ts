@@ -61,6 +61,12 @@ describe("crewView", () => {
     })
   })
 
+  it("counts a deferred permission as needing someone, as the session list does", () => {
+    const deferred = member("deferred", { status: "deferred" })
+    expect(memberCellState(deferred)).toBe("needs-you")
+    expect(memberActivity(deferred)).toBe("Awaiting permission review")
+  })
+
   it("queues every request the crew is blocked on, the longest waiting first", () => {
     expect(crewRequests(crew).map(({ member: value, pending }) => [value.sessionId, pending.requestId])).toEqual([
       ["rooftop", "p1"],

@@ -465,6 +465,32 @@ describe("CodexAppServer threads and goals", () => {
     ])
   })
 
+  it("reports a thread's descendants mid-turn, not the thread itself or a stranger", async () => {
+    const harness = createHarness()
+    const child = await initialize(harness)
+    const turnStarted = (threadId: string) => child.send({
+      method: "turn/started",
+      params: { threadId, turn: { id: `turn-${threadId}`, status: "inProgress" } },
+    })
+
+    child.send({ method: "thread/started", params: { thread: { id: "child-thread", parentThreadId: "root-thread" } } })
+    child.send({ method: "thread/started", params: { thread: { id: "grandchild-thread", parentThreadId: "child-thread" } } })
+    turnStarted("root-thread")
+    turnStarted("unrelated-thread")
+    expect(harness.server.hasActiveDescendantTurn("root-thread")).toBe(false)
+
+    turnStarted("grandchild-thread")
+    expect(harness.server.hasActiveDescendantTurn("root-thread")).toBe(true)
+    expect(harness.server.hasActiveDescendantTurn("child-thread")).toBe(true)
+    expect(harness.server.hasActiveDescendantTurn("unrelated-thread")).toBe(false)
+
+    child.send({
+      method: "turn/completed",
+      params: { threadId: "grandchild-thread", turn: { id: "turn-grandchild-thread", status: "completed" } },
+    })
+    expect(harness.server.hasActiveDescendantTurn("root-thread")).toBe(false)
+  })
+
   it("wraps thread lifecycle and persisted goal methods", async () => {
     const harness = createHarness()
     const child = await initialize(harness)
@@ -488,12 +514,14 @@ describe("CodexAppServer threads and goals", () => {
     const set = harness.server.setGoal("thread-1", {
       objective: "Ship it",
       tokenBudget: 40_000,
+      origin: "user",
     })
     const setRequest = requestFor(child, "thread/goal/set")
     expect(setRequest.params).toEqual({
       threadId: "thread-1",
       objective: "Ship it",
       tokenBudget: 40_000,
+      origin: "user",
     })
     child.send({ id: setRequest.id, result: { goal: null } })
     await set
@@ -503,8 +531,9 @@ describe("CodexAppServer threads and goals", () => {
     child.send({ id: getRequest.id, result: { goal: null } })
     await expect(get).resolves.toEqual({ goal: null })
 
-    const clear = harness.server.clearGoal("thread-1")
+    const clear = harness.server.clearGoal("thread-1", "user")
     const clearRequest = requestFor(child, "thread/goal/clear")
+    expect(clearRequest.params).toEqual({ threadId: "thread-1", origin: "user" })
     child.send({ id: clearRequest.id, result: { cleared: true } })
     await expect(clear).resolves.toEqual({ cleared: true })
   })

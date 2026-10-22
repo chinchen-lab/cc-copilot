@@ -23,10 +23,10 @@ export function buildAgentLabelMap(messages: SubAgentMessage[]): Map<string, str
 /**
  * agentId → Task/Agent tool_use id, the key for an agent's live stream.
  *
- * A tool id shared by several agents means they were mis-attributed upstream
- * (see subagentWatcher's prompt matching). Keying off it would replay one
- * agent's stream under every sibling, so contested ids are dropped instead —
- * sessions recorded before that fix still carry the bad mapping on disk.
+ * Cogpit now binds agents by task id, but sessions it recorded while it
+ * matched agents to calls by prompt can carry one tool id under several
+ * agents. Keying off it would replay one agent's stream under every sibling,
+ * so contested ids are dropped instead.
  */
 export function buildParentToolByAgent(messages: SubAgentMessage[]): Map<string, string> {
   const map = new Map<string, string>()
@@ -42,4 +42,36 @@ export function buildParentToolByAgent(messages: SubAgentMessage[]): Map<string,
     if ((agentsPerTool.get(toolId) ?? 0) > 1) map.delete(agentId)
   }
   return map
+}
+
+/**
+ * Agents in display order, each followed by the agents it launched, with
+ * their nesting depth. An agent whose parent is not among them is a root.
+ */
+export function orderAgentsByParent(
+  messages: ReadonlyArray<Pick<SubAgentMessage, "agentId" | "parentAgentId">>,
+): Array<{ agentId: string; depth: number }> {
+  const parentOf = new Map<string, string | undefined>()
+  for (const msg of messages) {
+    if (msg.parentAgentId) parentOf.set(msg.agentId, msg.parentAgentId)
+    else if (!parentOf.has(msg.agentId)) parentOf.set(msg.agentId, undefined)
+  }
+  const children = new Map<string | undefined, string[]>()
+  for (const [agentId, parentId] of parentOf) {
+    const key = parentId && parentOf.has(parentId) && parentId !== agentId ? parentId : undefined
+    children.set(key, [...(children.get(key) ?? []), agentId])
+  }
+
+  const ordered: Array<{ agentId: string; depth: number }> = []
+  const placed = new Set<string>()
+  const place = (agentId: string, depth: number) => {
+    if (placed.has(agentId)) return
+    placed.add(agentId)
+    ordered.push({ agentId, depth })
+    for (const child of children.get(agentId) ?? []) place(child, depth + 1)
+  }
+  for (const root of children.get(undefined) ?? []) place(root, 0)
+  // A parent cycle has no root to reach it from.
+  for (const agentId of parentOf.keys()) place(agentId, 0)
+  return ordered
 }

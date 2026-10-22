@@ -6,7 +6,7 @@ interface LineageReferences {
   branchedFrom?: { sessionId: string }
   parentSessionId?: string | null
   teamLeadSessionId?: string
-  crew?: { rootId: string; parentId: string }
+  crew?: { rootId: string; parentId: string; hostId?: string }
 }
 
 export type LineageFilter = <T extends LineageReferences>(row: T) => Promise<T>
@@ -29,20 +29,20 @@ export function visibleLineage(check: VisibilityCheck): LineageFilter {
     return verdict
   }
   return async (row) => {
-    const [branch, parent, lead, crewRoot, crewParent] = await Promise.all([
+    const [branch, parent, lead, crewRoot, crewParent, crewHost] = await Promise.all([
       hidden(row.branchedFrom?.sessionId),
       hidden(row.parentSessionId),
       hidden(row.teamLeadSessionId),
       hidden(row.crew?.rootId),
       hidden(row.crew?.parentId),
+      hidden(row.crew?.hostId),
     ])
     return {
       ...row,
       ...(branch && { branchedFrom: undefined }),
       ...(parent && { parentSessionId: null }),
       ...(lead && { teamLeadSessionId: undefined }),
-      // A crew names its root and parent, with their titles; neither may leak.
-      ...((crewRoot || crewParent) && { crew: undefined }),
+      ...((crewRoot || crewParent || crewHost) && { crew: undefined }),
     }
   }
 }

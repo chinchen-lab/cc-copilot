@@ -1,11 +1,14 @@
 import { useTranslation } from "@/hooks/useTranslation"
 import { memo, useMemo, useRef, useState, useEffect } from "react"
-import { Bot, Brain, CheckCircle2, CircleEllipsis, ChevronsDownUp, CircleHelp, TerminalSquare } from "lucide-react"
+import { Bot, Brain, CheckCircle2, ChevronDown, CircleDashed, CircleEllipsis, ChevronsDownUp, CircleHelp, TerminalSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { deriveSessionStatus, getStatusLabel, getTerminalReasonLabel } from "../../../shared/session/sessionStatus"
 import { formatDuration, getTurnDuration } from "@/lib/format"
 import { useSessionContext } from "@/contexts/SessionContext"
+import { useAgentProgress } from "@/contexts/StreamingOverlayContext"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import type { SessionStatus, SessionStatusInfo } from "../../../shared/session/sessionStatus"
+import type { BackgroundAgent } from "../../../shared/session/types"
 
 function StatusIcon({ status }: { status: SessionStatus }) {
   switch (status) {
@@ -17,8 +20,6 @@ function StatusIcon({ status }: { status: SessionStatus }) {
       return <CircleEllipsis className="size-5 text-warning" />
     case "compacting":
       return <ChevronsDownUp className="size-5 text-warning" />
-    case "awaiting_agents":
-      return <Bot className="size-5 text-info" />
     case "completed":
       return <CheckCircle2 className="size-5 text-success" />
     default:
@@ -44,7 +45,6 @@ function AgentStatusLine({
 }) {
   const { t } = useTranslation()
   const isCompleted = status.status === "completed"
-  const pendingDescriptions = status.pendingAgentDescriptions ?? []
 
   return (
     <div
@@ -68,20 +68,105 @@ function AgentStatusLine({
       {!isCompleted && startTimestamp && (
         <LiveElapsed startTimestamp={startTimestamp} />
       )}
-      {pendingDescriptions.length > 0 && (
-        <span
-          className="truncate text-xs text-muted-foreground"
-          title={pendingDescriptions.join("\n")}
-        >
-          {pendingDescriptions.join(" · ")}
-        </span>
-      )}
       {(status.pendingQueue ?? 0) > 0 && (
         <span className="ml-1 shrink-0 text-xs text-muted-foreground">
           +{status.pendingQueue} {t(" queued")}
         </span>
       )}
     </div>
+  )
+}
+
+/**
+ * The turn ended and the session is waiting on background agents: one row per
+ * agent in the current batch, with how far along the batch is.
+ *
+ * Running rows are deliberately static — this card can sit off-screen for the
+ * whole wait, and the ticking timers already show the agents are alive.
+ */
+function AwaitingAgentsStatus({
+  status,
+  startTimestamp,
+}: {
+  status: SessionStatusInfo
+  startTimestamp?: string
+}) {
+  const [open, setOpen] = useState(true)
+  const agents = status.backgroundAgents ?? []
+  const running = agents.filter((agent) => !agent.done).length
+  // Each finished agent wakes the parent for a short turn, so the turn start
+  // would restart the clock; the batch's first launch is when the wait began.
+  const waitingSince = agents.find((agent) => agent.startedAt)?.startedAt ?? startTimestamp
+
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="mx-4 my-3 rounded-lg border border-border/60 bg-muted/20"
+      data-testid="awaiting-agents"
+    >
+      <CollapsibleTrigger className="flex w-full min-w-0 items-center gap-2.5 px-3 py-2 text-left">
+        <Bot className="size-4 shrink-0 text-info" />
+        <span className="truncate text-xs font-medium text-foreground">
+          {running < agents.length
+            ? `Waiting on ${running} of ${agents.length} agents`
+            : `Waiting on ${running} agent${running === 1 ? "" : "s"}`}
+        </span>
+        <span className="ml-auto flex shrink-0 items-center gap-2">
+          {(status.pendingQueue ?? 0) > 0 && (
+            <span className="text-xs text-muted-foreground">+{status.pendingQueue} queued</span>
+          )}
+          {waitingSince && <LiveElapsed startTimestamp={waitingSince} />}
+          <ChevronDown
+            className={cn("size-3.5 text-muted-foreground transition-transform", !open && "-rotate-90")}
+          />
+        </span>
+      </CollapsibleTrigger>
+      {agents.length > 1 && <BatchProgress agents={agents} />}
+      <CollapsibleContent>
+        <ul className="flex flex-col border-t border-border/40 py-1">
+          {agents.map((agent, index) => (
+            <BackgroundAgentRow key={agent.toolUseId ?? index} agent={agent} />
+          ))}
+        </ul>
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+function BatchProgress({ agents }: { agents: BackgroundAgent[] }) {
+  return (
+    <div className="px-3 pb-2.5" aria-hidden>
+      <div className="flex h-1 gap-0.5">
+        {agents.map((agent, index) => (
+          <span key={index} className={cn("flex-1 rounded-full", agent.done ? "bg-success" : "bg-info/25")} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function BackgroundAgentRow({ agent }: { agent: BackgroundAgent }) {
+  const summary = useAgentProgress(agent.done ? undefined : agent.toolUseId)
+
+  return (
+    <li className="flex min-w-0 items-start gap-2.5 px-3 py-1.5" data-agent-done={agent.done || undefined}>
+      {agent.done
+        ? <CheckCircle2 className="mt-px size-3.5 shrink-0 text-success" />
+        : <CircleDashed className="mt-px size-3.5 shrink-0 text-info" />}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span
+          className={cn("truncate text-xs", agent.done ? "text-muted-foreground" : "text-foreground")}
+          title={agent.description || undefined}
+        >
+          {agent.description || "Agent"}
+        </span>
+        {summary && <span className="truncate text-xs text-muted-foreground" title={summary}>{summary}</span>}
+      </span>
+      {agent.done
+        ? <span className="shrink-0 text-xs text-muted-foreground">Done</span>
+        : agent.startedAt && <LiveElapsed startTimestamp={agent.startedAt} className="shrink-0" />}
+    </li>
   )
 }
 
@@ -254,7 +339,11 @@ export const AgentStatusIndicator = memo(function AgentStatusIndicator() {
     return <CompletedAgentStatus status={agentStatus} durationLabel={durationLabel} />
   }
 
-  const label = getStatusLabel(agentStatus.status, agentStatus.toolName, agentStatus.terminalReason, agentStatus.pendingAgents)
+  if (agentStatus.status === "awaiting_agents") {
+    return <AwaitingAgentsStatus status={agentStatus} startTimestamp={lastTurn?.timestamp} />
+  }
+
+  const label = getStatusLabel(agentStatus.status, agentStatus.toolName, agentStatus.terminalReason)
   if (!label) return null
 
   return (

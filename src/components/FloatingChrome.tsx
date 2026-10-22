@@ -221,7 +221,7 @@ export const FloatingChrome = memo(function FloatingChrome({
         <div className="electron-no-drag window-inset-end pointer-events-auto flex shrink-0 items-center gap-1.5">
           <ThemeToggleButton className={cn(FLOATING_PILL, "size-8 shrink-0")} />
           <div className={cn(FLOATING_PILL, PILL_ROW, "empty:hidden")}>
-            <LeakIndicator />
+            <LeakIndicator onReview={() => setMonitorOpen(true)} />
           </div>
           <div className={cn(FLOATING_PILL, PILL_ROW, "empty:hidden")}>
             <NotificationsBell />

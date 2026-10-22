@@ -342,6 +342,8 @@ export class CopilotRuntime {
 
   private readonly activeSessions = new Set<string>()
   private readonly activeTurns = new Set<string>()
+  /** Subagents each session started that have not finished, by agent id. */
+  private readonly runningSubagents = new Map<string, Set<string>>()
   private readonly turnObservers = new Map<string, Set<{ resolve: (result: { isError: boolean; message?: string }) => void; reject: (error: Error) => void }>>()
   private readonly sendingSessions = new Set<string>()
   private readonly openingSessions = new Set<string>()
@@ -364,6 +366,10 @@ export class CopilotRuntime {
 
   isTurnActive(sessionId: string): boolean {
     return this.activeTurns.has(sessionId)
+  }
+
+  hasRunningSubagents(sessionId: string): boolean {
+    return (this.runningSubagents.get(sessionId)?.size ?? 0) > 0
   }
   observeTurn(sessionId: string) {
     let observer!: { resolve: (result: { isError: boolean; message?: string }) => void; reject: (error: Error) => void }
@@ -1136,6 +1142,7 @@ export class CopilotRuntime {
     }
     this.updateResumeConflict(notification)
     this.updateTurnState(notification)
+    this.updateSubagents(notification)
     this.updatePendingPermission(notification)
   }
 
@@ -1261,6 +1268,7 @@ export class CopilotRuntime {
     this.finishObservedTurn(sessionId, new Error(reason))
     this.activeSessions.delete(sessionId)
     this.activeTurns.delete(sessionId)
+    this.runningSubagents.delete(sessionId)
     this.sendingSessions.delete(sessionId)
     this.openingSessions.delete(sessionId)
     this.conflictingResumes.delete(sessionId)
@@ -1310,6 +1318,26 @@ export class CopilotRuntime {
             : "Copilot turn failed",
         )
       }
+    }
+  }
+
+  /** Subagents outlive the turn that started them; only their own end, or the session's, settles them. */
+  private updateSubagents({ sessionId, event }: CopilotSessionEventNotification): void {
+    const agentId = typeof event.agentId === "string" ? event.agentId : ""
+    if (!agentId) {
+      if (event.type === "abort" || event.type === "session.error" || event.type === "session.shutdown") {
+        this.runningSubagents.delete(sessionId)
+      }
+      return
+    }
+    if (event.type === "subagent.started" || event.type === "subagent.configured") {
+      const running = this.runningSubagents.get(sessionId) ?? new Set<string>()
+      running.add(agentId)
+      this.runningSubagents.set(sessionId, running)
+    } else if (event.type === "subagent.completed" || event.type === "subagent.failed") {
+      const running = this.runningSubagents.get(sessionId)
+      running?.delete(agentId)
+      if (running?.size === 0) this.runningSubagents.delete(sessionId)
     }
   }
 
@@ -1365,6 +1393,7 @@ export class CopilotRuntime {
   private async performShutdown(): Promise<Error[]> {
     this.stopped = true
     this.activeTurns.clear()
+    this.runningSubagents.clear()
     const errors: Error[] = []
     if (this.startPromise) {
       try {

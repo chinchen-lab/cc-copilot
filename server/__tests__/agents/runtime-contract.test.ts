@@ -30,6 +30,7 @@ const { sdk, codex, copilot, registry } = vi.hoisted(() => ({
   },
   codex: {
     getActiveTurnId: vi.fn(() => undefined as string | undefined),
+    hasActiveDescendantTurn: vi.fn((_threadId: string) => false),
     listActiveTurns: vi.fn(() => [] as Array<{ threadId: string; turnId: string }>),
     listApprovalThreadIds: vi.fn(() => [] as string[]),
     listPendingApprovals: vi.fn(() => [] as unknown[]),
@@ -44,6 +45,7 @@ const { sdk, codex, copilot, registry } = vi.hoisted(() => ({
     send: vi.fn(async () => {}),
     isSessionActive: vi.fn((_sessionId: string) => false),
     isTurnActive: vi.fn((_sessionId: string) => false),
+    hasRunningSubagents: vi.fn((_sessionId: string) => false),
     getActiveSessionIds: vi.fn(() => [] as string[]),
     getPendingPermissions: vi.fn(() => [] as unknown[]),
     getPendingUserInputs: vi.fn(() => [] as unknown[]),
@@ -124,11 +126,13 @@ beforeEach(() => {
   registry.persistentSessions.clear()
   sdk.isSDKQueryLive.mockReturnValue(false)
   codex.getActiveTurnId.mockReturnValue(undefined)
+  codex.hasActiveDescendantTurn.mockReturnValue(false)
   codex.listActiveTurns.mockReturnValue([])
   codex.listApprovalThreadIds.mockReturnValue([])
   codex.listPendingApprovals.mockReturnValue([])
   copilot.isSessionActive.mockReturnValue(false)
   copilot.isTurnActive.mockReturnValue(false)
+  copilot.hasRunningSubagents.mockReturnValue(false)
   copilot.getActiveSessionIds.mockReturnValue([])
   copilot.getPendingPermissions.mockReturnValue([])
   copilot.getPendingUserInputs.mockReturnValue([])
@@ -171,7 +175,7 @@ describe.each<AgentKind>(["claude", "codex", "copilot"])("%s runtime", (kind) =>
   })
 
   it("reports neither live nor running for an id it has never seen", () => {
-    expect(runtime().activity("unknown")).toEqual({ live: false, running: false })
+    expect(runtime().activity("unknown")).toEqual({ live: false, running: false, agentsRunning: false })
     expect(runtime().hasSession("unknown")).toBe(false)
   })
 
@@ -199,6 +203,36 @@ describe.each<AgentKind>(["claude", "codex", "copilot"])("%s runtime", (kind) =>
 
   it("shuts down without throwing", async () => {
     await expect(runtime().shutdown()).resolves.toBeUndefined()
+  })
+})
+
+describe("agents that outlive the turn that started them", () => {
+  it("Claude counts the background agents its live CLI process reports", () => {
+    const state = { running: false, backgroundAgents: new Set(["task-1"]) } as unknown as SDKSessionState
+    sdk.sdkSessions.set("session-1", state)
+    sdk.isSDKQueryLive.mockReturnValue(true)
+    expect(runtimeFor("claude").activity("session-1")).toMatchObject({ running: false, agentsRunning: true })
+
+    state.backgroundAgents = new Set()
+    expect(runtimeFor("claude").activity("session-1").agentsRunning).toBe(false)
+  })
+
+  it("Claude reports no agents once the process hosting them is gone", () => {
+    sdk.sdkSessions.set("session-1", { backgroundAgents: new Set(["task-1"]) } as unknown as SDKSessionState)
+    sdk.isSDKQueryLive.mockReturnValue(false)
+    expect(runtimeFor("claude").activity("session-1").agentsRunning).toBe(false)
+  })
+
+  it("Codex counts a child thread with a turn in flight", () => {
+    codex.hasActiveDescendantTurn.mockImplementation((threadId: string) => threadId === "thread-1")
+    expect(runtimeFor("codex").activity("thread-1").agentsRunning).toBe(true)
+    expect(runtimeFor("codex").activity("thread-2").agentsRunning).toBe(false)
+  })
+
+  it("Copilot counts the subagents its transport saw start and not finish", () => {
+    copilot.hasRunningSubagents.mockImplementation((sessionId: string) => sessionId === "sess-1")
+    expect(runtimeFor("copilot").activity("sess-1").agentsRunning).toBe(true)
+    expect(runtimeFor("copilot").activity("sess-2").agentsRunning).toBe(false)
   })
 })
 

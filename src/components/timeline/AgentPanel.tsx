@@ -1,10 +1,11 @@
 import { useTranslation } from "@/hooks/useTranslation"
 import { useState, memo, useMemo } from "react"
 import { Users, ChevronRight, ChevronDown, Clock, Wrench, CheckCircle2, XCircle, Loader2, ExternalLink } from "lucide-react"
-import { formatDuration, parseSubAgentPath } from "@/lib/format"
+import { cn } from "@/lib/utils"
+import { formatDuration, parseSubAgentPath, shortenModel } from "@/lib/format"
 import type { SubAgentMessage } from "../../../shared/session/types"
 import { LiveSubagentTranscript } from "./LiveSubagentTranscript"
-import { buildAgentLabelMap, buildParentToolByAgent } from "./agent-utils"
+import { buildAgentLabelMap, buildParentToolByAgent, orderAgentsByParent } from "./agent-utils"
 import { useSubagentContent } from "@/hooks/useSubagentContent"
 import { useSessionContext } from "@/contexts/SessionContext"
 import ReactMarkdown from "react-markdown"
@@ -54,7 +55,9 @@ export const AgentPanel = memo(function AgentPanel({
     return match?.[1] ?? null
   }, [sessionSource])
 
-  const agentIds = useMemo(() => [...new Set(displayMessages.map((m) => m.agentId))], [displayMessages])
+  const allMessages = useMemo(() => [...messages, ...displayMessages], [messages, displayMessages])
+  const orderedAgents = useMemo(() => orderAgentsByParent(allMessages), [allMessages])
+  const agentIds = useMemo(() => orderedAgents.map((agent) => agent.agentId), [orderedAgents])
   const agentLabelMap = useMemo(() => buildAgentLabelMap(displayMessages), [displayMessages])
 
   // Per-agent stats — merge anything present on the launch event summary or on
@@ -62,7 +65,7 @@ export const AgentPanel = memo(function AgentPanel({
   // always carries these on the summary/launch event.
   const statsByAgent = useMemo(() => {
     const map = new Map<string, { durationMs?: number; toolUseCount?: number; status?: string }>()
-    for (const m of [...messages, ...displayMessages]) {
+    for (const m of allMessages) {
       const existing = map.get(m.agentId) ?? {}
       if (m.durationMs != null) existing.durationMs = m.durationMs
       if (m.toolUseCount != null) existing.toolUseCount = m.toolUseCount
@@ -70,12 +73,21 @@ export const AgentPanel = memo(function AgentPanel({
       map.set(m.agentId, existing)
     }
     return map
-  }, [messages, displayMessages])
+  }, [allMessages])
 
-  const parentToolByAgent = useMemo(
-    () => buildParentToolByAgent([...messages, ...displayMessages]),
-    [messages, displayMessages],
-  )
+  // The model an agent ran on, and the effort its Agent call asked for.
+  const runByAgent = useMemo(() => {
+    const map = new Map<string, { model?: string; effort?: string }>()
+    for (const m of allMessages) {
+      const existing = map.get(m.agentId) ?? {}
+      if (m.model) existing.model = m.model
+      if (m.effort) existing.effort = m.effort
+      map.set(m.agentId, existing)
+    }
+    return map
+  }, [allMessages])
+
+  const parentToolByAgent = useMemo(() => buildParentToolByAgent(allMessages), [allMessages])
 
   // Pick the "return" message for each agent — the last message that carried
   // non-empty text (what the sub-agent handed back to its parent). Falls back
@@ -179,7 +191,7 @@ export const AgentPanel = memo(function AgentPanel({
               {t("Loading agent output...")}
             </div>
           )}
-          {agentIds.map((id) => {
+          {orderedAgents.map(({ agentId: id, depth }) => {
             const msg = finalMessageByAgent.get(id)
             const stats = statsByAgent.get(id)
             // Opening a sub-agent chat is a session load, which a guest
@@ -191,6 +203,8 @@ export const AgentPanel = memo(function AgentPanel({
                 agentLabel={agentLabelMap.get(id) ?? id}
                 message={msg}
                 stats={stats}
+                run={runByAgent.get(id)}
+                depth={depth}
                 parentToolUseId={parentToolByAgent.get(id)}
                 canNavigate={canNavigate}
                 onOpen={() => {
@@ -215,6 +229,9 @@ interface AgentReturnItemProps {
   agentLabel: string
   message: SubAgentMessage | undefined
   stats: { durationMs?: number; toolUseCount?: number; status?: string } | undefined
+  run: { model?: string; effort?: string } | undefined
+  /** How many agents deep it was launched: 0 for one the main thread started. */
+  depth: number
   parentToolUseId: string | undefined
   canNavigate: boolean
   onOpen: () => void
@@ -224,11 +241,16 @@ function AgentReturnItem({
   agentLabel,
   message,
   stats,
+  run,
+  depth,
   parentToolUseId,
   canNavigate,
   onOpen,
 }: AgentReturnItemProps): React.ReactElement {
   const { t } = useTranslation()
+  const runLabel = [run?.model ? shortenModel(run.model) : null, run?.effort ? `${run.effort} effort` : null]
+    .filter(Boolean)
+    .join(" · ")
   const text = message?.text
   const markdownText = useMemo(() => preprocessMediaPaths((text ?? []).join("\n\n")), [text])
   const hasText = (text?.length ?? 0) > 0
@@ -236,13 +258,14 @@ function AgentReturnItem({
   const isCompleted = stats?.status === "completed"
 
   return (
-    <div className="border-l pl-3">
+    <div className={cn("border-l pl-3", depth === 1 && "ml-4", depth >= 2 && "ml-8")}>
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         {/* Header: agent label + stats + open button */}
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="outline">
             {agentLabel}
           </Badge>
+          {runLabel && <span className="text-xs text-muted-foreground">{runLabel}</span>}
           {stats && (
             <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
               {isCompleted && <CheckCircle2 className="size-3 text-success" />}

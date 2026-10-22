@@ -9,7 +9,6 @@
  * read from the start again.
  */
 
-import { open, stat } from "node:fs/promises"
 import { computeNetDiff } from "../../shared/diff-utils"
 import {
   asRecordOrEmpty,
@@ -18,6 +17,7 @@ import {
   type SessionAccumulator,
 } from "../agents/summaryAccumulator"
 import { foldSummaryEntry } from "../agents/summaryFolds"
+import { openTranscript, statTranscript, type TranscriptHandle } from "../agents/transcriptFile"
 import { recencyCache } from "./recencyCache"
 import type {
   MissionControlCurrentTool,
@@ -141,7 +141,7 @@ const EMPTY = Buffer.alloc(0)
 const NEWLINE = 0x0a
 
 async function readAt(
-  handle: Awaited<ReturnType<typeof open>>,
+  handle: TranscriptHandle,
   from: number,
   to: number,
 ): Promise<Buffer> {
@@ -157,7 +157,7 @@ async function readSince(
   from: number,
   to: number,
 ): Promise<{ anchor: Buffer; chunk: Buffer }> {
-  const handle = await open(filePath, "r")
+  const handle = await openTranscript(filePath)
   try {
     const anchor = await readAt(handle, Math.max(0, from - ANCHOR_BYTES), from)
     return { anchor, chunk: await readAt(handle, from, to) }
@@ -176,7 +176,7 @@ export async function summarizeSession(
 ): Promise<MissionControlSummary | null> {
   let size: number
   try {
-    size = (await stat(filePath)).size
+    size = (await statTranscript(filePath)).size
   } catch {
     return null
   }

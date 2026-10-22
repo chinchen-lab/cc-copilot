@@ -60,8 +60,42 @@ export function crewChatMentions(text: string, members: readonly Pick<CrewChatMe
   return members.filter((member) => tokens.has(member.handle.toLowerCase()) || tokens.has(member.sessionId.toLowerCase())).map((member) => member.sessionId)
 }
 
+const DELIVERY_SOURCE_RE = /^Crew chat · ([^\n]+) · message (\d+)(?:\n|$)/
+const TAGGED_INTRO = "You were tagged in this message:"
+const TAGGED_OUTRO = "This is a crew message. Use your judgment about whether to respond. Keep following your assigned task and the user's instructions."
+const NOTICE_INTRO = "A new message is available in your crew's shared chat. Fetch it if useful: "
+const NOTICE_OUTRO = "This is an informational notification. No reply or action is required."
+
 export function formatCrewChatDelivery(message: CrewChatMessage, mentioned: boolean, fetchCommand: string, replyCommand: string): string {
   const source = `Crew chat · ${message.author.name} · message ${message.sequence}`
-  if (mentioned) return `${source}\nYou were tagged in this message:\n\n${message.text}\n\nThis is a crew message. Use your judgment about whether to respond. Keep following your assigned task and the user's instructions.\nReply in the shared chat if useful: ${replyCommand}\nFor context: ${fetchCommand}`
-  return `${source}\nA new message is available in your crew's shared chat. Fetch it if useful: ${fetchCommand}\nThis is an informational notification. No reply or action is required.`
+  if (mentioned) return `${source}\n${TAGGED_INTRO}\n\n${message.text}\n\n${TAGGED_OUTRO}\nReply in the shared chat if useful: ${replyCommand}\nFor context: ${fetchCommand}`
+  return `${source}\n${NOTICE_INTRO}${fetchCommand}\n${NOTICE_OUTRO}`
+}
+
+/** A crew chat message as it reached a member's session, read back from the prompt that carried it. */
+export interface CrewChatDeliveryPrompt {
+  author: string
+  sequence: number
+  /** The message when the member was tagged; a notice only announces it. */
+  text: string | null
+  /** The crew, from the fetch command the prompt carries. */
+  rootId: string | null
+}
+
+export function isCrewChatDelivery(text: string): boolean {
+  return DELIVERY_SOURCE_RE.test(text.trim())
+}
+
+export function parseCrewChatDelivery(text: string): CrewChatDeliveryPrompt | null {
+  const trimmed = text.trim()
+  const source = DELIVERY_SOURCE_RE.exec(trimmed)
+  if (!source) return null
+  const rest = trimmed.slice(source[0].length)
+  const rootId = /cogpit-session chat fetch '([^']+)'/.exec(rest)?.[1] ?? null
+  const delivery = { author: source[1]!, sequence: Number(source[2]), rootId }
+  if (rest.startsWith(`${TAGGED_INTRO}\n\n`)) {
+    const end = rest.lastIndexOf(`\n\n${TAGGED_OUTRO}\n`)
+    return end < 0 ? null : { ...delivery, text: rest.slice(TAGGED_INTRO.length + 2, end) }
+  }
+  return rest.startsWith(NOTICE_INTRO) && rest.endsWith(NOTICE_OUTRO) ? { ...delivery, text: null } : null
 }
