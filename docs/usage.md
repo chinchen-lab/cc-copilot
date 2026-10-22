@@ -79,7 +79,7 @@ The process leak monitor flags suspected orphaned agents, browsers, and scripts,
 
 ## Notifications
 
-Cogpit raises notifications when an agent finishes or needs an answer, including sessions started in a terminal. The notification inbox persists in `~/.cogpit/notifications.json`. Open the bell in the header, or read `GET /api/notifications`.
+Cogpit raises notifications when an agent finishes or needs an answer, including sessions started in a terminal. The notification inbox persists in `~/.cogpit/notifications.json`. Read it with `GET /api/notifications`.
 
 Desktop notifications use the Cogpit icon and open the relevant session when clicked. They are suppressed when the window is focused and already showing that session. A headless server falls back to `osascript` on macOS. Other headless systems use push notifications.
 

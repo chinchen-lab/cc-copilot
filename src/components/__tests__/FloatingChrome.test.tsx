@@ -79,7 +79,6 @@ vi.mock("sonner", () => ({
 vi.mock("@/components/TokenUsageWidget", () => ({ TokenUsageIndicator: () => null }))
 vi.mock("@/components/LeakIndicator", () => ({ LeakIndicator: () => null }))
 vi.mock("@/components/DeviceSwitcher", () => ({ DeviceSwitcher: () => null }))
-vi.mock("@/components/NotificationsBell", () => ({ NotificationsBell: () => null }))
 vi.mock("@/components/PowerMonitor", () => ({
   PowerMonitor: ({ open }: { open: boolean }) => (open ? <div data-testid="power-monitor" /> : null),
 }))
