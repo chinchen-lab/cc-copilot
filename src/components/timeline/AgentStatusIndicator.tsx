@@ -63,7 +63,7 @@ function AgentStatusLine({
           isCompleted && !status.terminalReason && "text-success",
         )}
       >
-        {label}
+        {t(label)}
       </span>
       {!isCompleted && startTimestamp && (
         <LiveElapsed startTimestamp={startTimestamp} />

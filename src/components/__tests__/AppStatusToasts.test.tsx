@@ -90,7 +90,7 @@ describe("AppStatusToasts", () => {
 
     await waitFor(() => expect(mocks.info).toHaveBeenCalledOnce())
     expect(mocks.info).toHaveBeenCalledWith(
-      "This server offers features this build of Cogpit doesn’t include.",
+      "This server offers features this build of CC-Copilot doesn’t include.",
       { id: "edition-ui-unavailable" },
     )
   })

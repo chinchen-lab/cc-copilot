@@ -112,7 +112,7 @@ export function WorkflowDetailView({
                 {confirming ? t("Confirm stop") : t("Stop workflow")}
               </Button>
               {!canStop && (
-                <span className="text-xs text-muted-foreground">{t("This run is not controlled by Cogpit")}</span>
+                <span className="text-xs text-muted-foreground">{t("This run is not controlled by CC-Copilot")}</span>
               )}
             </div>
           )}

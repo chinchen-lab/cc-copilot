@@ -61,7 +61,7 @@ describe("projectElicitationSchema", () => {
     [{ type: "array" }, "the request is an array"],
     [
       { type: "object", properties: { tags: { type: "array" } } },
-      '"tags" is an array, which Cogpit cannot render',
+      '"tags" is an array, which CC-Copilot cannot render',
     ],
     [
       { type: "object", properties: { level: { enum: [1, 2] } } },

@@ -257,7 +257,7 @@ export function registerWorkflowRoutes(use: UseFn) {
         sendJson(res, 200, {
           success: false,
           controllable: false,
-          error: "This workflow runs in a session Cogpit doesn't control.",
+          error: "This workflow runs in a session CC-Copilot doesn't control.",
         })
         return
       }

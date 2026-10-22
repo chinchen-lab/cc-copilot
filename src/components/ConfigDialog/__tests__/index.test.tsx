@@ -92,16 +92,16 @@ describe("ConfigDialog editor routing", () => {
     expect(screen.getByText(/Leave blank to use \$VISUAL/)).toBeInTheDocument()
   })
 
-  it("disables the editor field as soon as files are routed into Cogpit", async () => {
+  it("disables the editor field as soon as files are routed into CC-Copilot", async () => {
     const user = userEvent.setup()
     mockConfig()
     const { onSaved } = renderDialog()
 
     await waitFor(() => expect(editorInput()).toHaveValue("cursor"))
-    await user.click(screen.getByRole("checkbox", { name: /Open files in Cogpit/ }))
+    await user.click(screen.getByRole("checkbox", { name: /Open files in CC-Copilot/ }))
 
     expect(editorInput()).toBeDisabled()
-    expect(screen.getByText("Not used while files open in Cogpit.")).toBeInTheDocument()
+    expect(screen.getByText("Not used while files open in CC-Copilot.")).toBeInTheDocument()
 
     await user.click(screen.getByRole("button", { name: "Save" }))
 
@@ -118,7 +118,7 @@ describe("ConfigDialog editor routing", () => {
     renderDialog()
 
     await waitFor(() => expect(editorInput()).toBeDisabled())
-    expect(screen.getByRole("checkbox", { name: /Open files in Cogpit/ })).toBeChecked()
+    expect(screen.getByRole("checkbox", { name: /Open files in CC-Copilot/ })).toBeChecked()
     // Nothing changed yet, so there is nothing to save.
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled()
   })
@@ -187,7 +187,7 @@ describe("ConfigDialog executable picker", () => {
     await expandPicker(user)
 
     await waitFor(() => expect(screen.getByRole("radio", { name: "Automatic" })).toBeChecked())
-    await user.click(screen.getByRole("radio", { name: "Bundled with Cogpit" }))
+    await user.click(screen.getByRole("radio", { name: "Bundled with CC-Copilot" }))
     await user.click(screen.getByRole("button", { name: "Save" }))
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
@@ -280,7 +280,7 @@ describe("ConfigDialog categories", () => {
 
     await user.click(screen.getByRole("tab", { name: "Agents" }))
     await user.click(await screen.findByRole("button", { name: /Claude Code executable/ }))
-    await user.click(await screen.findByRole("radio", { name: "Bundled with Cogpit" }))
+    await user.click(await screen.findByRole("radio", { name: "Bundled with CC-Copilot" }))
     await waitFor(() => expect(screen.queryByRole("combobox", { name: "Language" })).not.toBeInTheDocument())
 
     await user.click(screen.getByRole("tab", { name: "Network & sharing" }))

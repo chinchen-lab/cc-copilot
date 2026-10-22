@@ -130,13 +130,13 @@ describe("DeviceRoot offline banner", () => {
     fireUnreachable("dev_1", "DEVICE_REFUSED")
 
     // Until the device answers, the banner says what the hub knows.
-    expect(screen.getByText("Studio is not admitting this account right now. Cogpit will keep retrying.")).toBeInTheDocument()
+    expect(screen.getByText("Studio is not admitting this account right now. CC-Copilot will keep retrying.")).toBeInTheDocument()
     expect(screen.queryByText(/rejected the stored password/i)).not.toBeInTheDocument()
     expect(mocks.testDevice).toHaveBeenCalledExactlyOnceWith("dev_1")
 
     // No poll has run yet: the device's own text arrives with the first answer.
     await act(async () => {})
-    expect(screen.getByText("Studio: Only admins can sign in for now. Cogpit will keep retrying.")).toBeInTheDocument()
+    expect(screen.getByText("Studio: Only admins can sign in for now. CC-Copilot will keep retrying.")).toBeInTheDocument()
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10_000)
@@ -154,7 +154,7 @@ describe("DeviceRoot offline banner", () => {
     fireUnreachable("dev_1", "DEVICE_REFUSED")
     await act(async () => {})
 
-    expect(screen.getByText("Studio: Only admins can sign in for now. Cogpit will keep retrying.")).toBeInTheDocument()
+    expect(screen.getByText("Studio: Only admins can sign in for now. CC-Copilot will keep retrying.")).toBeInTheDocument()
     expect(mocks.testDevice).toHaveBeenCalledOnce()
   })
 
@@ -167,7 +167,7 @@ describe("DeviceRoot offline banner", () => {
       await vi.advanceTimersByTimeAsync(10_000)
     })
 
-    expect(screen.getByText("Studio is not admitting this account right now. Cogpit will keep retrying.")).toBeInTheDocument()
+    expect(screen.getByText("Studio is not admitting this account right now. CC-Copilot will keep retrying.")).toBeInTheDocument()
   })
 
   it("clears the banner when a retry reports the device is healthy again", async () => {

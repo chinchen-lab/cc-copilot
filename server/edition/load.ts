@@ -35,7 +35,7 @@ function teamEditionIn(loaded: unknown): EditionModule {
   if (!isRecord(edition) || edition.edition !== "team") throw new Error(`${TEAM_PACKAGE} does not export a team edition`)
   const missing = missingEditionMembers(edition)
   if (missing.length > 0) {
-    throw new Error(`${TEAM_PACKAGE} does not match this build of Cogpit; it lacks ${missing.join(", ")}`)
+    throw new Error(`${TEAM_PACKAGE} does not match this build of CC-Copilot; it lacks ${missing.join(", ")}`)
   }
   return edition as unknown as EditionModule
 }
@@ -47,7 +47,7 @@ async function importTeamEdition(importTeam: EditionImporter): Promise<EditionMo
   } catch (error) {
     if (isTeamPackageMissing(error)) {
       throw new Error(
-        "Cogpit Team is not installed in this build — set COGPIT_EDITION=personal or remove edition from config.local.json",
+        "CC-Copilot Team is not installed in this build — set COGPIT_EDITION=personal or remove edition from config.local.json",
         { cause: error },
       )
     }
@@ -69,7 +69,7 @@ export async function loadEdition(
   const edition = resolveEdition(process.env, options.configEdition, options.shell)
   if (edition === getEdition()) return edition
   if (edition === "personal") {
-    throw new Error(`Cogpit is already running its ${getEdition()} edition`)
+    throw new Error(`CC-Copilot is already running its ${getEdition()} edition`)
   }
   installEdition(await importTeamEdition(importTeam))
   return edition

@@ -115,7 +115,7 @@ async function sweep(): Promise<void> {
   if (toKill.length > 0) {
     const processCount = toKill.reduce((sum, tree) => sum + tree.pids.length, 0)
     deliverNotification({
-      title: "Cogpit",
+      title: "CC-Copilot",
       body: `Cleaned up ${processCount} leaked agent ${processCount === 1 ? "process" : "processes"} (orphaned ${toKill.length === 1 ? "session" : "sessions"})`,
       nav: { sessionId: null, dirName: null },
     })

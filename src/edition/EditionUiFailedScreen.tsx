@@ -18,7 +18,7 @@ export function EditionUiFailedScreen({ onRetry }: { onRetry: () => void }) {
           <EmptyMedia variant="icon">
             <CloudOff className="text-destructive" />
           </EmptyMedia>
-          <EmptyTitle>Cogpit couldn’t finish loading</EmptyTitle>
+          <EmptyTitle>CC-Copilot couldn’t finish loading</EmptyTitle>
           <EmptyDescription>Part of this server’s interface didn’t download. Check your connection and try again.</EmptyDescription>
         </EmptyHeader>
         <EmptyContent className="flex-row justify-center">

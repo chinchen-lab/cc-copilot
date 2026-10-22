@@ -14,6 +14,8 @@ import { getHighlighter, ensureLang, getLangFromPath, type ThemedToken } from "@
 import { useIsDarkMode } from "@/hooks/useIsDarkMode"
 import { Button } from "@/components/ui/button"
 import { canHighlightDiff } from "@/lib/diffHighlight"
+import { useFileSnapshots } from "@/hooks/useFileSnapshots"
+import { useSessionContextOptional } from "@/contexts/SessionContext"
 
 // ── Simple line-level diff (LCS-based, optimized) ──────────────────────────
 
@@ -447,6 +449,80 @@ function DiffLines({
   )
 }
 
+/** Pair replacements by position, leaving blank cells for insertions/deletions. */
+function splitRows(lines: DiffLine[]): Array<{ old?: DiffLine; next?: DiffLine }> {
+  const rows: Array<{ old?: DiffLine; next?: DiffLine }> = []
+  for (let i = 0; i < lines.length;) {
+    if (lines[i].type === "unchanged") {
+      rows.push({ old: lines[i], next: lines[i] })
+      i++
+      continue
+    }
+    const removed: DiffLine[] = [], added: DiffLine[] = []
+    while (i < lines.length && lines[i].type !== "unchanged") {
+      const line = lines[i++]
+      ;(line.type === "removed" ? removed : added).push(line)
+    }
+    for (let j = 0; j < Math.max(removed.length, added.length); j++) rows.push({ old: removed[j], next: added[j] })
+  }
+  return rows
+}
+
+function SplitDiffLines({ lines, oldTokens, newTokens, compact, startLine }: {
+  lines: DiffLine[]; oldTokens: TokenizedLines | null; newTokens: TokenizedLines | null; compact: boolean; startLine: number
+}) {
+  const { t } = useTranslation()
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const rows = useMemo(() => splitRows(lines), [lines])
+  const items = useMemo(() => {
+    const visible = new Set<number>()
+    rows.forEach((row, i) => {
+      if (row.old?.type !== "unchanged" || row.next?.type !== "unchanged") {
+        for (let j = Math.max(0, i - CONTEXT_LINES); j <= Math.min(rows.length - 1, i + CONTEXT_LINES); j++) visible.add(j)
+      }
+    })
+    const result: Array<{ row: typeof rows[number]; index: number } | { index: number; count: number }> = []
+    for (let i = 0; i < rows.length;) {
+      if (visible.size === 0 || visible.has(i) || expanded.has(i)) { result.push({ row: rows[i], index: i++ }); continue }
+      const index = i
+      while (i < rows.length && !visible.has(i) && !expanded.has(i)) i++
+      result.push({ index, count: i - index })
+    }
+    return result
+  }, [rows, expanded])
+  const [count, setCount] = useState(INITIAL_BATCH)
+  useEffect(() => { setCount(INITIAL_BATCH); setExpanded(new Set()) }, [lines])
+  useEffect(() => {
+    if (count >= items.length) return
+    const frame = requestAnimationFrame(() => setCount(value => value + BATCH_SIZE))
+    return () => cancelAnimationFrame(frame)
+  }, [count, items.length])
+  return <div className={cn("grid grid-cols-2 font-mono text-xs leading-relaxed", compact && "max-h-64 overflow-y-auto")} aria-label={t("Side-by-side diff")}>
+    {(["old", "next"] as const).map(side => <div key={side} className={cn("min-w-0 overflow-x-auto", side === "old" && "border-r border-border")} aria-label={side === "old" ? t("Before") : t("After")}>
+      <div className="min-w-max">
+        {items.slice(0, Math.max(INITIAL_BATCH, count)).map(item => {
+          if (!("row" in item)) return <CollapsedSeparator key={item.index} count={item.count} onExpand={() => setExpanded(previous => {
+            const next = new Set(previous)
+            for (let i = item.index; i < item.index + item.count; i++) next.add(i)
+            return next
+          })} />
+          const line = item.row[side]
+          if (!line) return <div key={item.index} className="h-[1.625em] bg-muted/40" aria-hidden="true">{"\u00a0"}</div>
+          return <DiffLineRow key={item.index} line={line} lineNum={(side === "old" ? line.oldIdx ?? 0 : line.newIdx ?? 0) + startLine} oldTokens={side === "old" ? oldTokens : null} newTokens={side === "old" ? null : newTokens} />
+        })}
+      </div>
+    </div>)}
+  </div>
+}
+
+type DiffLayout = "unified" | "split"
+function LayoutControls({ layout, onChange }: { layout: DiffLayout; onChange: (layout: DiffLayout) => void }) {
+  const { t } = useTranslation()
+  return <div className="flex gap-1" role="group" aria-label={t("Diff layout")}>
+    {(["unified", "split"] as const).map(value => <Button key={value} type="button" variant={layout === value ? "secondary" : "ghost"} size="xs" aria-pressed={layout === value} onClick={() => onChange(value)}>{value === "split" ? t("Side by side") : t("Unified")}</Button>)}
+  </div>
+}
+
 // ── Stat summary ────────────────────────────────────────────────────────────
 
 function DiffStats({ lines }: { lines: DiffLine[] }): React.ReactElement {
@@ -471,6 +547,7 @@ function DiffStats({ lines }: { lines: DiffLine[] }): React.ReactElement {
 // ── Main component ──────────────────────────────────────────────────────────
 
 interface EditDiffViewProps {
+  defaultLayout?: DiffLayout
   oldString: string
   newString: string
   filePath: string
@@ -489,9 +566,11 @@ export function EditDiffView({
   compact: isCompact = true,
   startLine = 1,
   hideHeader = false,
+  defaultLayout = "unified",
 }: EditDiffViewProps): React.ReactElement {
   const { t } = useTranslation()
   const [modalOpen, setModalOpen] = useState(false)
+  const [layout, setLayout] = useState<DiffLayout>(defaultLayout)
   const isDark = useIsDarkMode()
   const lines = useMemo(() => getCachedDiff(oldString, newString), [oldString, newString])
   const { oldTokens, newTokens } = useHighlightedTokens(
@@ -516,6 +595,7 @@ export function EditDiffView({
               {shortPath}
             </span>
             <div className="flex shrink-0 items-center gap-2">
+              <LayoutControls layout={layout} onChange={setLayout} />
               <DiffStats lines={lines} />
               {isCompact && (
                 <Button
@@ -533,38 +613,40 @@ export function EditDiffView({
             </div>
           </div>
         )}
-        <DiffLines
+        {hideHeader && <div className="flex justify-end border-b border-border px-2 py-1"><LayoutControls layout={layout} onChange={setLayout} /></div>}
+        {layout === "split" ? <SplitDiffLines lines={lines} oldTokens={oldTokens} newTokens={newTokens} compact={isCompact} startLine={startLine} /> : <DiffLines
           lines={lines}
           oldTokens={oldTokens}
           newTokens={newTokens}
           compact={isCompact}
           startLine={startLine}
-        />
+        />}
       </div>
 
       {isCompact && (
         <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-          <DialogContent className="flex max-h-[85vh] flex-col border-border bg-popover sm:max-w-4xl">
-            <DialogHeader>
-              <DialogTitle className="font-mono text-sm text-foreground flex min-w-0 flex-wrap items-center gap-3 [overflow-wrap:anywhere]">
-                {filePath}
-                <DiffStats lines={lines} />
-              </DialogTitle>
-              <DialogDescription className="sr-only">
-                {t("Diff view for edit operation")}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex-1 overflow-auto rounded border border-border bg-background">
-              <DiffLines
-                lines={lines}
-                oldTokens={oldTokens}
-                newTokens={newTokens}
-                startLine={startLine}
-              />
-            </div>
+          <DialogContent className="flex max-h-[calc(100dvh-5rem)] w-[calc(100vw-2rem)] flex-col border-border bg-popover sm:max-w-[calc(100vw-2rem)]">
+            <SessionFileDiffContent oldString={oldString} newString={newString} filePath={filePath} startLine={startLine} />
           </DialogContent>
         </Dialog>
       )}
     </>
   )
+}
+
+/** Mounted only while expanded, keeping history I/O out of inline tool cards. */
+export function SessionFileDiffContent({ oldString, newString, filePath, startLine }: EditDiffViewProps) {
+  const { t } = useTranslation()
+  const session = useSessionContextOptional()?.session
+  const revision = JSON.stringify([session?.turns.length, session?.turns.at(-1)?.toolCalls])
+  const { snapshot, loading } = useFileSnapshots(session?.sessionId, filePath, true, revision)
+  return <>
+    <DialogHeader>
+      <DialogTitle className="break-all pr-6 font-mono text-sm">{filePath}</DialogTitle>
+      <DialogDescription>{loading ? t("Loading file snapshots…") : snapshot ? t("Full file snapshots · all session edits") : t("Recorded edits · full file snapshots unavailable")}</DialogDescription>
+    </DialogHeader>
+    <div className="min-h-0 flex-1 overflow-auto rounded border border-border bg-background">
+      {!loading && <EditDiffView key={snapshot ? "snapshot" : "edits"} oldString={snapshot?.before ?? oldString} newString={snapshot?.after ?? newString} filePath={filePath} compact={false} startLine={snapshot ? 1 : startLine} hideHeader defaultLayout="split" />}
+    </div>
+  </>
 }

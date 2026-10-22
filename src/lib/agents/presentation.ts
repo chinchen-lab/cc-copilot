@@ -152,7 +152,7 @@ export const AGENT_DISPLAY_ORDER: readonly AgentKind[] = [
 
 /** Banner shown when another process owns the session and Cogpit can only read it. */
 export function readOnlySessionNotice(kind: AgentKind): string {
-  return `This ${SHORT_NAMES[kind]} session is controlled by another process. Cogpit can only view it.`
+  return `This ${SHORT_NAMES[kind]} session is controlled by another process. CC-Copilot can only view it.`
 }
 
 /**

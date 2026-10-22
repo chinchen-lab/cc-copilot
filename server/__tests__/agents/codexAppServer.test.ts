@@ -146,7 +146,7 @@ describe("CodexAppServer transport", () => {
         params: {
           clientInfo: {
             name: "cogpit",
-            title: "Cogpit",
+            title: "CC-Copilot",
             version: "9.8.7",
           },
           capabilities: {
@@ -897,25 +897,25 @@ describe("CodexAppServer MCP tool-call approvals", () => {
       "a browser_auth approval",
       { codex_approval_kind: "browser_auth" },
       {},
-      'Cogpit has no prompt for "browser_auth" approvals',
+      'CC-Copilot has no prompt for "browser_auth" approvals',
     ],
     [
       "a tool_suggestion approval",
       { codex_approval_kind: "tool_suggestion" },
       {},
-      'Cogpit has no prompt for "tool_suggestion" approvals',
+      'CC-Copilot has no prompt for "tool_suggestion" approvals',
     ],
     [
       "a tool-call approval with fields to fill in",
       {},
       { requestedSchema: { type: "object", properties: { note: { type: "string" } } } },
-      "Cogpit cannot show a tool-call approval that also asks for input",
+      "CC-Copilot cannot show a tool-call approval that also asks for input",
     ],
     [
       "a tool-call approval sent as a link",
       {},
       { mode: "url", url: "https://example.com", elicitationId: "e-1" },
-      "Cogpit cannot show a tool-call approval that also asks for input",
+      "CC-Copilot cannot show a tool-call approval that also asks for input",
     ],
   ])("declines %s rather than approving something it cannot show", async (_label, meta, params, reason) => {
     const harness = createHarness()
@@ -1075,17 +1075,17 @@ describe("CodexAppServer MCP elicitations", () => {
     [
       "device verification",
       { mode: "openai/userVerification", title: "Confirm", description: "Touch ID", challenge: "abc" },
-      "Cogpit cannot verify the user on this device",
+      "CC-Copilot cannot verify the user on this device",
     ],
     [
       "an experimental form",
       { mode: "openai/form", requestedSchema: { anything: true } },
-      'Cogpit has no prompt for "openai/form" requests',
+      'CC-Copilot has no prompt for "openai/form" requests',
     ],
     [
       "the renamed experimental form",
       { mode: "openaiForm", requestedSchema: { anything: true } },
-      'Cogpit has no prompt for "openaiForm" requests',
+      'CC-Copilot has no prompt for "openaiForm" requests',
     ],
     [
       "a field it cannot draw",
@@ -1095,7 +1095,7 @@ describe("CodexAppServer MCP elicitations", () => {
           properties: { tags: { type: "array", items: { type: "string", enum: ["a"] } } },
         },
       },
-      'Cogpit renders text, number, checkbox and choice fields only, and "tags" is an array, which Cogpit cannot render',
+      'CC-Copilot renders text, number, checkbox and choice fields only, and "tags" is an array, which CC-Copilot cannot render',
     ],
   ])("declines %s instead of parking it", async (_label, params, reason) => {
     const harness = createHarness()

@@ -255,7 +255,7 @@ describe("config routes", () => {
       await handler(req, res, next)
 
       expect(res._getStatus()).toBe(403)
-      expect(JSON.parse(res._getData()).error).toContain("local Cogpit app")
+      expect(JSON.parse(res._getData()).error).toContain("local CC-Copilot app")
       expect(mockedCreateSessionToken).not.toHaveBeenCalled()
     })
 

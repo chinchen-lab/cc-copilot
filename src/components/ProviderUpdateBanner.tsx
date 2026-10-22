@@ -84,8 +84,8 @@ export function ProviderUpdateBanner() {
         {pending.length > 1
           ? pending.map(describe).join(" · ")
           : first.updateCommand
-            ? t("Cogpit can run `{0}` for you.", { "0": first.updateCommand })
-            : t("Update it with whatever installed it — Cogpit could not tell.")}
+            ? t("CC-Copilot can run `{0}` for you.", { "0": first.updateCommand })
+            : t("Update it with whatever installed it — CC-Copilot could not tell.")}
       </AlertDescription>
       <AlertAction className="static col-start-3 row-span-2 row-start-1 flex items-center gap-2 self-center">
         {runnable.map((info) => (

@@ -365,18 +365,18 @@ export function mapWranglerFailure(error: unknown): CloudflareRouteError {
   if (error instanceof CloudflareRouteError) return error
   const failure = error as NodeJS.ErrnoException & { stderr?: string; stdout?: string }
   if (failure.code === "ENOENT") {
-    return new CloudflareRouteError(503, "wrangler_missing", "Install Wrangler in this project or on the Cogpit host to view deployments")
+    return new CloudflareRouteError(503, "wrangler_missing", "Install Wrangler in this project or on the CC-Copilot host to view deployments")
   }
   const detail = `${failure.message ?? ""}\n${failure.stderr ?? ""}\n${failure.stdout ?? ""}`
   if (/Unknown argument: json/i.test(detail)) return unsupportedCli()
   if (/"loggedIn":\s*false|not authenticated|not logged in|wrangler login|Authentication (error|failed)|Unable to authenticate|code: (10000|9106|10001)\]|invalid.*token|CLOUDFLARE_API_TOKEN/i.test(detail)) {
-    return new CloudflareRouteError(503, "cloudflare_auth_required", "Sign in with `wrangler login` on the Cogpit host, or set CLOUDFLARE_API_TOKEN, to view deployments")
+    return new CloudflareRouteError(503, "cloudflare_auth_required", "Sign in with `wrangler login` on the CC-Copilot host, or set CLOUDFLARE_API_TOKEN, to view deployments")
   }
   if (/code: 10007\]|does not exist on your account|(worker|script) not found/i.test(detail)) {
     return new CloudflareRouteError(404, "cloudflare_worker_missing", "This Worker has not been deployed to the selected Cloudflare account yet")
   }
   if (/more than one account|which account|account_id|CLOUDFLARE_ACCOUNT_ID/i.test(detail)) {
-    return new CloudflareRouteError(400, "cloudflare_account_required", "Set account_id in the Wrangler configuration or CLOUDFLARE_ACCOUNT_ID on the Cogpit host")
+    return new CloudflareRouteError(400, "cloudflare_account_required", "Set account_id in the Wrangler configuration or CLOUDFLARE_ACCOUNT_ID on the CC-Copilot host")
   }
   if (/forbidden|not authorized|access denied|permission|code: (10021|10013)\]|\b403\b/i.test(detail)) {
     return new CloudflareRouteError(403, "cloudflare_access_denied", "Your Cloudflare account cannot access this Worker")

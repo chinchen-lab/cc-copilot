@@ -7,7 +7,7 @@ import type { CreatedFolder, FolderListing } from "../../shared/contracts/folder
 // Both calls go through authFetch, so on a hub they reach the active device.
 
 /** A server from before the folder routes answers them with the API's generic 404. */
-const UNSUPPORTED = "Browsing folders needs a newer Cogpit on this machine."
+const UNSUPPORTED = "Browsing folders needs a newer CC-Copilot on this machine."
 
 async function failure(res: Response): Promise<Error> {
   const message = await readError(res, `Request failed (${res.status})`)

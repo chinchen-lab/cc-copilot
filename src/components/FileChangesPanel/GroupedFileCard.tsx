@@ -1,11 +1,12 @@
 import { useTranslation } from "@/hooks/useTranslation"
 import { useState, useRef, useEffect, memo, useCallback, startTransition } from "react"
 import { useNearViewport } from "@/hooks/useNearViewport"
-import { ChevronDown, ChevronRight, Code2, GitCompareArrows } from "lucide-react"
+import { ChevronDown, ChevronRight, Code2, GitCompareArrows, Maximize2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { EditDiffView } from "../timeline/EditDiffView"
+import { SessionFileDiffDialog } from "@/components/diff/SessionFileDiffDialog"
 import { cn } from "@/lib/utils"
 import { fileExtension } from "@/lib/fileTypeColors"
 import { ChangeBar, LineCounts } from "@/components/shared/ChangeCounts"
@@ -26,6 +27,7 @@ export const GroupedFileCard = memo(function GroupedFileCard({ file, defaultOpen
   const { t } = useTranslation()
   const { ref: nearRef, isNear } = useNearViewport()
   const [open, setOpen] = useState(defaultOpen)
+  const [diffOpen, setDiffOpen] = useState(false)
   // Deferred open: the card header updates immediately, diff content renders
   // as a lower-priority transition so the UI stays responsive.
   const [deferredOpen, setDeferredOpen] = useState(defaultOpen)
@@ -116,6 +118,9 @@ export const GroupedFileCard = memo(function GroupedFileCard({ file, defaultOpen
           )}
         </Button>
         <div className="flex items-center gap-1.5 pr-2 shrink-0">
+          <Button type="button" variant="ghost" size="icon-xs" onClick={() => setDiffOpen(true)} title={t("View session file diff")} aria-label={t("View session file diff")}>
+            <Maximize2 data-icon="icon" />
+          </Button>
           {file.subAgentId && <SubAgentIndicator agentId={file.subAgentId} />}
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             <Tooltip>
@@ -160,6 +165,7 @@ export const GroupedFileCard = memo(function GroupedFileCard({ file, defaultOpen
         edits={file.edits}
         netStartLine={file.netStartLine}
       />
+      {diffOpen && <SessionFileDiffDialog open={diffOpen} onOpenChange={setDiffOpen} filePath={file.filePath} oldString={oldString} newString={newString} startLine={file.netStartLine} />}
     </div>
   )
 })

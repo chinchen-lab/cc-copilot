@@ -137,7 +137,7 @@ export function WorkflowAgentCard({ agent, dirName, sessionId, runId }: Workflow
             <div className="flex shrink-0 items-center gap-2">
               <Badge variant="outline" className={cn("hidden sm:inline-flex", style.badge)}>
                 {running && <Spinner data-icon="inline-start" />}
-                {style.label}
+                {t(style.label)}
               </Badge>
               <ChevronDown className="mt-0.5 size-4 text-muted-foreground transition-transform group-data-panel-open:rotate-180 motion-reduce:transition-none" />
             </div>

@@ -82,7 +82,7 @@ describe("App while the edition UI chunk loads", () => {
     render(<DeviceRoot />)
 
     const retry = await screen.findByRole("button", { name: "Retry" }, { timeout: 5_000 })
-    expect(screen.getByText("Cogpit couldn’t finish loading")).toBeInTheDocument()
+    expect(screen.getByText("CC-Copilot couldn’t finish loading")).toBeInTheDocument()
     expect(screen.queryByPlaceholderText("Username")).not.toBeInTheDocument()
     expect(sessionStorage.getItem(RELOAD_FLAG)).toBeNull()
 

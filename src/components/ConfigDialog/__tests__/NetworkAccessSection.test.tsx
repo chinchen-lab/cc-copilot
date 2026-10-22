@@ -71,7 +71,7 @@ describe("NetworkAccessSection", () => {
     renderSection()
 
     expect(screen.getByText(/remote browsers need an HTTPS reverse proxy/i)).toBeInTheDocument()
-    expect(screen.getByText(/port 19384 remains available to Cogpit hubs/i)).toBeInTheDocument()
+    expect(screen.getByText(/port 19384 remains available to CC-Copilot hubs/i)).toBeInTheDocument()
   })
 
   it("delegates switch changes to the settings owner", async () => {

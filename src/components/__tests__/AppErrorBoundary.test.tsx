@@ -15,9 +15,9 @@ describe("AppErrorBoundary", () => {
       </AppErrorBoundary>,
     )
 
-    expect(screen.getByRole("heading", { name: "Cogpit hit a render error" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "CC-Copilot hit a render error" })).toBeInTheDocument()
     expect(screen.getByText("render exploded")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Reload Cogpit" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Reload CC-Copilot" })).toBeInTheDocument()
     consoleError.mockRestore()
   })
 })

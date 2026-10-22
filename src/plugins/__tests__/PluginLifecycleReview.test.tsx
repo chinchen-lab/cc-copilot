@@ -237,13 +237,13 @@ describe("installed plugin lifecycle review", () => {
     window.history.replaceState({}, "", "/d/remote-host/?pluginSafeMode=1&view=panels")
     await setup()
     expect(screen.getByRole("button", { name: "Resume plugins in this browser" })).toBeDisabled()
-    expect(screen.getByText(/host owner must restart Cogpit/)).toBeInTheDocument()
+    expect(screen.getByText(/host owner must restart CC-Copilot/)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Uninstall" })).toBeEnabled()
   })
 })
 
 describe("package access changes", () => {
-  it("explains native CLI reads and related Cogpit session access as separate permissions", () => {
+  it("explains native CLI reads and related CC-Copilot session access as separate permissions", () => {
     const next = parseManifest({ ...manifest, permissions: {
       navigation: ["external", "session"],
       integrations: [
@@ -265,10 +265,10 @@ describe("package access changes", () => {
     for (const operation of ["deployments", "build logs"]) {
       expect(requested.getByText(`Read Vercel ${operation} using this host's signed-in CLI`)).toBeInTheDocument()
     }
-    const sessionRead = requested.getByText("Read related Cogpit sessions for the selected GitHub repository")
+    const sessionRead = requested.getByText("Read related CC-Copilot sessions for the selected GitHub repository")
     expect(sessionRead).not.toHaveTextContent("CLI")
     expect(requested.getByText("Open permitted sessions")).not.toBe(sessionRead)
-    expect(requested.getByText("Ask Cogpit to open HTTPS links")).toBeInTheDocument()
+    expect(requested.getByText("Ask CC-Copilot to open HTTPS links")).toBeInTheDocument()
     expect(requested.getAllByRole("listitem")).toHaveLength(10)
   })
   it("highlights newly added native/session access and removed reads during update review", () => {
@@ -279,7 +279,7 @@ describe("package access changes", () => {
       { id: "github", operations: ["actions", "pullSessions"] }, { id: "vercel", operations: ["deployments"] },
     ] } })
     render(<PluginInstallReview preview={{ ...candidate(), manifest: next, previousManifest: previous }} />)
-    expect(screen.getByText("Added: Read related Cogpit sessions for the selected GitHub repository")).toBeInTheDocument()
+    expect(screen.getByText("Added: Read related CC-Copilot sessions for the selected GitHub repository")).toBeInTheDocument()
     expect(screen.getByText("Added: Open permitted sessions")).toBeInTheDocument()
     expect(screen.getByText("Added: Read Vercel deployments using this host's signed-in CLI")).toBeInTheDocument()
     expect(screen.getByText("Removed: Read Vercel build logs using this host's signed-in CLI")).toBeInTheDocument()
@@ -290,12 +290,12 @@ describe("package access changes", () => {
     const access = [{ id: "service", definition: "connection.json", operations: ["read"] }]
     const previous = parseManifest({ ...manifest, permissions: { context: ["project.identity"], connections: access } })
     const next = parseManifest({ ...manifest, version: "1.1.0", permissions: { composer: ["append"], connections: access } })
-    render(<PluginInstallReview preview={{ ...candidate(), manifest: next, previousManifest: previous, previousConnectionDefinitions: [connection("https://old.example.com")], connectionDefinitions: [connection("https://new.example.com")], incompatibleClients: ["Cogpit 2.4 · API 1.0"] }} />)
+    render(<PluginInstallReview preview={{ ...candidate(), manifest: next, previousManifest: previous, previousConnectionDefinitions: [connection("https://old.example.com")], connectionDefinitions: [connection("https://new.example.com")], incompatibleClients: ["CC-Copilot 2.4 · API 1.0"] }} />)
     expect(screen.getByText("Added: Append text to your draft message")).toBeInTheDocument()
     expect(screen.getByText("Removed: Read the selected project's name and plugin identifier")).toBeInTheDocument()
     expect(screen.getByText(/Changed connection: Example account/)).toBeInTheDocument()
     expect(screen.getByText("Credential destinations: https://new.example.com")).toBeInTheDocument()
     expect(screen.getByText("Some connected clients cannot run this version")).toBeInTheDocument()
-    expect(screen.getByText(/Cogpit 2.4 · API 1.0/)).toBeInTheDocument()
+    expect(screen.getByText(/CC-Copilot 2.4 · API 1.0/)).toBeInTheDocument()
   })
 })

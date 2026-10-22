@@ -12,7 +12,7 @@ export function editionModule(): EditionModule {
 /** Replace personal edition with `module`, once per process. */
 export function installEdition(module: EditionModule): void {
   if (installed !== PERSONAL_EDITION) {
-    throw new Error(`Cogpit's ${installed.edition} edition is already installed`)
+    throw new Error(`CC-Copilot's ${installed.edition} edition is already installed`)
   }
   installed = module
 }

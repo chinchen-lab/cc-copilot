@@ -74,7 +74,7 @@ async function createWindow(port: number) {
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    title: "Cogpit",
+    title: "CC-Copilot",
     ...titleBarOptions(),
     backgroundColor: "#09090b",
     webPreferences: {
@@ -160,6 +160,9 @@ app.whenReady().then(async () => {
   // Determine static directory for production builds
   const staticDir = join(__dirname, "../renderer")
   const userDataDir = app.getPath("userData")
+  // Keep the existing data directory when changing the displayed app name.
+  app.setName("CC-Copilot")
+  app.setPath("userData", userDataDir)
   const isDev = !!process.env.ELECTRON_RENDERER_URL
 
   // Start server in a separate utility process
@@ -172,7 +175,7 @@ app.whenReady().then(async () => {
     return
   }
 
-  console.log(`Cogpit server ready on port ${port} (utility process)`)
+  console.log(`CC-Copilot server ready on port ${port} (utility process)`)
 
   // Custom menu: removes macOS "Show Tab Bar" (Ctrl+Cmd+T) which
   // conflicts with the open-terminal shortcut in the renderer.
@@ -180,7 +183,7 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     isWindows
       ? { label: "File", submenu: [{ role: "quit", label: "Exit" }] }
-      : { role: "appMenu" },
+      : { role: "appMenu", label: "CC-Copilot" },
     { role: "editMenu" },
     {
       label: "View",

@@ -60,7 +60,7 @@ export function createInstanceRuntime(instance: ProviderInstance, dataRoot: stri
     if (child) return child
     const source = fileURLToPath(new URL("./instanceWorker.ts", import.meta.url))
     const script = existsSync(source) ? source : fileURLToPath(new URL("./instance-worker.js", import.meta.url))
-    if (!existsSync(script)) throw new AgentRuntimeError(503, "WORKER_UNAVAILABLE", "Provider instance worker is missing; rebuild Cogpit")
+    if (!existsSync(script)) throw new AgentRuntimeError(503, "WORKER_UNAVAILABLE", "Provider instance worker is missing; rebuild CC-Copilot")
     const worker = fork(script, [], { execPath: script.endsWith(".ts") ? "bun" : process.execPath, execArgv: [], env: providerInstanceEnvironment(instance, dataRoot), stdio: ["ignore", "ignore", "ignore", "ipc"], serialization: "json" })
     child = worker
     worker.on("error", (error) => { if (child === worker) disconnect(error) })

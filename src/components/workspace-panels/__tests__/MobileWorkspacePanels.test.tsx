@@ -4,8 +4,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { MobileWorkspacePanels } from "../MobileWorkspacePanels"
 import type { RegisteredWorkspacePanel, WorkspacePanelContext, WorkspacePanelProps } from "@/plugin-api"
+import { setLanguage } from "@/lib/i18n/language"
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); setLanguage("en") })
 
 const context: WorkspacePanelContext = {
   session: null, sessionChangeKey: 0, projectPath: "/repo/project", hasFileChanges: false,
@@ -26,6 +27,17 @@ const panels: RegisteredWorkspacePanel[] = [
 const props = { panels, context, activePanelId: null, active: true, onSelectPanel: vi.fn(), onClosePanel: vi.fn() }
 
 describe("MobileWorkspacePanels", () => {
+  it("translates browser and utility titles in the chooser and open header", () => {
+    setLanguage("zh-TW")
+    const actions = [{id:"config",title:"Config",icon:Circle,active:false,onSelect:vi.fn()}]
+    const view = render(<MobileWorkspacePanels {...props} actions={actions} />)
+    expect(screen.getByRole("button", {name:"瀏覽器"})).toBeInTheDocument()
+    expect(screen.getByRole("button", {name:/設置/})).toBeInTheDocument()
+    view.rerender(<MobileWorkspacePanels {...props} activePanelId="test.browser" />)
+    expect(screen.getByRole("heading", {name:"瀏覽器"})).toBeInTheDocument()
+    view.rerender(<MobileWorkspacePanels {...props} actions={[{...actions[0],active:true}]} />)
+    expect(screen.getByRole("heading", {name:"設置"})).toBeInTheDocument()
+  })
   it("uses the desktop registry and capability rules, including plugin panels", () => {
     render(<MobileWorkspacePanels {...props} />)
     expect(screen.getByRole("heading", { name: "Workspace" })).toBeInTheDocument()

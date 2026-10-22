@@ -34,7 +34,7 @@ type DeviceProblem =
 const BANNER: Record<DeviceProblem["kind"], { title: string; description: (device: string) => string }> = {
   unreachable: {
     title: "Remote device unavailable",
-    description: (device) => `Can’t reach ${device}. Cogpit will keep retrying.`,
+    description: (device) => `Can’t reach ${device}. CC-Copilot will keep retrying.`,
   },
   "bad-password": {
     title: "Device credentials need attention",
@@ -42,12 +42,12 @@ const BANNER: Record<DeviceProblem["kind"], { title: string; description: (devic
   },
   refused: {
     title: "Device not admitting this account",
-    description: (device) => `${device} is not admitting this account right now. Cogpit will keep retrying.`,
+    description: (device) => `${device} is not admitting this account right now. CC-Copilot will keep retrying.`,
   },
 }
 
 function bannerDescription(problem: DeviceProblem, device: string): string {
-  if (problem.kind === "refused" && problem.detail) return `${problem.detail} Cogpit will keep retrying.`
+  if (problem.kind === "refused" && problem.detail) return `${problem.detail} CC-Copilot will keep retrying.`
   return BANNER[problem.kind].description(device)
 }
 

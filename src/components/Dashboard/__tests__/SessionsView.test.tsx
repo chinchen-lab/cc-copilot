@@ -17,7 +17,7 @@ vi.mock("@/components/SessionContextMenu", () => ({
 const project = {
   dirName: "-workspace-cogpit",
   path: "/workspace/cogpit",
-  shortName: "Cogpit",
+  shortName: "CC-Copilot",
   sessionCount: 1,
   lastModified: "2026-08-19T12:00:00.000Z",
 }

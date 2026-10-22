@@ -57,10 +57,10 @@ function isWebUrl(value: string): boolean {
 export function routeElicitation(params: JsonObject): RoutedElicitation {
   const mode = params.mode
   if (mode === "openai/userVerification") {
-    return { route: "decline", reason: "Cogpit cannot verify the user on this device" }
+    return { route: "decline", reason: "CC-Copilot cannot verify the user on this device" }
   }
   if (mode !== "form" && mode !== "url") {
-    return { route: "decline", reason: `Cogpit has no prompt for "${String(mode)}" requests` }
+    return { route: "decline", reason: `CC-Copilot has no prompt for "${String(mode)}" requests` }
   }
 
   const message = text(params, "message") ?? ""
@@ -74,7 +74,7 @@ export function routeElicitation(params: JsonObject): RoutedElicitation {
     if (approvalKind !== "mcp_tool_call") {
       return {
         route: "decline",
-        reason: `Cogpit has no prompt for "${String(approvalKind)}" approvals`,
+        reason: `CC-Copilot has no prompt for "${String(approvalKind)}" approvals`,
       }
     }
     // The permission bar can only show a tool call in full when there is
@@ -82,7 +82,7 @@ export function routeElicitation(params: JsonObject): RoutedElicitation {
     if (mode !== "form" || !("fields" in projection) || projection.fields.length > 0) {
       return {
         route: "decline",
-        reason: "Cogpit cannot show a tool-call approval that also asks for input",
+        reason: "CC-Copilot cannot show a tool-call approval that also asks for input",
       }
     }
     const connectorName = text(meta, "connector_name")
@@ -105,7 +105,7 @@ export function routeElicitation(params: JsonObject): RoutedElicitation {
   if ("unsupported" in projection) {
     return {
       route: "decline",
-      reason: "Cogpit renders text, number, checkbox and choice fields only, and "
+      reason: "CC-Copilot renders text, number, checkbox and choice fields only, and "
         + projection.unsupported,
     }
   }

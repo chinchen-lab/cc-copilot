@@ -24,6 +24,7 @@ let mockPendingInteraction: unknown = null
 let mockPermissions = permissionsForAccess("own")
 const mockSendMessage = vi.fn()
 vi.mock("@/contexts/SessionContext", () => ({
+  useSessionContextOptional: () => null,
   useSessionContext: vi.fn(() => ({
     session: mockSession,
     pendingInteraction: mockPendingInteraction,

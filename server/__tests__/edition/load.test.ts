@@ -115,7 +115,7 @@ describe("loadEdition", () => {
     ["Node", nodeNotFound("@cogpit/team", LOADER)],
   ])("refuses to boot a team edition the build does not include (%s)", async (_runtime, missing) => {
     const refusal = loadTeamFrom(async () => { throw missing })
-    await expect(refusal).rejects.toThrow("Cogpit Team is not installed in this build")
+    await expect(refusal).rejects.toThrow("CC-Copilot Team is not installed in this build")
     await expect(refusal).rejects.toThrow("set COGPIT_EDITION=personal or remove edition from config.local.json")
     expect(editionModule()).toBe(PERSONAL_EDITION)
   })
@@ -147,7 +147,7 @@ describe("loadEdition", () => {
       notificationRetention: { hostEntries: 200, persistDelayMs: "soon" },
     }
     await expect(loadTeamFrom(async () => ({ default: outdated }))).rejects.toThrow(
-      "@cogpit/team does not match this build of Cogpit; it lacks flush, me, unguardedApiPaths, access.markDecided, activity, notificationRetention.persistDelayMs",
+      "@cogpit/team does not match this build of CC-Copilot; it lacks flush, me, unguardedApiPaths, access.markDecided, activity, notificationRetention.persistDelayMs",
     )
     expect(editionModule()).toBe(PERSONAL_EDITION)
   })

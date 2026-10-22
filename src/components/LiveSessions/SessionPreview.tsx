@@ -52,7 +52,7 @@ export function SessionPreview({
       )}
       {statusLabel && (
         <span className={cn("font-medium", getStatusColor(s.agentStatus))}>
-          {statusLabel}
+          {t(statusLabel)}
         </span>
       )}
       {s.teamName && s.agentName && (

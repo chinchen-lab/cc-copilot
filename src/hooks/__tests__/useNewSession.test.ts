@@ -669,7 +669,7 @@ describe("useNewSession", () => {
     })
 
     it("adopts nothing when the server refused the start as unconfirmed, though an own session is recent", async () => {
-      const refusal = "Cogpit could not confirm the new session; an admin can assign it once it appears"
+      const refusal = "CC-Copilot could not confirm the new session; an admin can assign it once it appears"
       const { sessionId, result } = await recoverFrom(
         [{ sessionId: "own-session", access: access(true) }],
         { status: 502, body: { code: "SESSION_UNCONFIRMED", error: refusal } },

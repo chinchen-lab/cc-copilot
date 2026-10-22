@@ -137,7 +137,7 @@ describe("listFolder", () => {
     await chmod(locked, 0o000)
     try {
       expect(await refusalOf(listFolder(locked))).toEqual({
-        status: 403, code: "FORBIDDEN", message: `Cogpit is not allowed to open ${locked}`,
+        status: 403, code: "FORBIDDEN", message: `CC-Copilot is not allowed to open ${locked}`,
       })
     } finally {
       await chmod(locked, 0o700)
@@ -218,7 +218,7 @@ describe("createFolder", () => {
     await chmod(root, 0o500)
     try {
       expect(await refusalOf(createFolder(root, "child"))).toEqual({
-        status: 403, code: "FORBIDDEN", message: `Cogpit is not allowed to create folders in ${root}`,
+        status: 403, code: "FORBIDDEN", message: `CC-Copilot is not allowed to create folders in ${root}`,
       })
     } finally {
       await chmod(root, 0o700)

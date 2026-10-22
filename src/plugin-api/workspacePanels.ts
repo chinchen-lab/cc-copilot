@@ -88,7 +88,7 @@ const ID_PATTERN = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/
 
 function assertId(kind: "plugin" | "panel", id: string): void {
   if (!ID_PATTERN.test(id)) {
-    throw new Error(`Invalid Cogpit ${kind} id "${id}"`)
+    throw new Error(`Invalid CC-Copilot ${kind} id "${id}"`)
   }
 }
 
@@ -110,13 +110,13 @@ export function collectWorkspacePanels(
 
   for (const plugin of plugins) {
     assertId("plugin", plugin.id)
-    if (pluginIds.has(plugin.id)) throw new Error(`Duplicate Cogpit plugin id "${plugin.id}"`)
+    if (pluginIds.has(plugin.id)) throw new Error(`Duplicate CC-Copilot plugin id "${plugin.id}"`)
     pluginIds.add(plugin.id)
 
     for (const panel of plugin.workspacePanels ?? []) {
       assertId("panel", panel.id)
       const id = workspacePanelId(plugin.id, panel.id)
-      if (panelIds.has(id)) throw new Error(`Duplicate Cogpit workspace panel id "${id}"`)
+      if (panelIds.has(id)) throw new Error(`Duplicate CC-Copilot workspace panel id "${id}"`)
       panelIds.add(id)
       panels.push({ ...panel, id, pluginId: plugin.id, localId: panel.id })
     }

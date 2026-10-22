@@ -141,7 +141,7 @@ export function useUrlSync({
             }
             const location = await lookup.json() as { dirName?: string; fileName?: string }
             if (!location.dirName || !location.fileName) {
-              throw new Error("Cogpit returned an invalid session location.")
+              throw new Error("CC-Copilot returned an invalid session location.")
             }
             const loaded = await loadSessionTailCached(
               location.dirName,

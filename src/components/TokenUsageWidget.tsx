@@ -59,6 +59,11 @@ function TooltipBody({ usage }: { usage: UsageData }) {
         const resetH = resetMs != null && Number.isFinite(resetMs) && resetMs > 0
           ? Math.ceil(resetMs / 3_600_000)
           : null
+        const resetHours = resetH ?? 0
+        const resetDays = resetMs != null && resetMs >= 86_400_000 ? Math.floor(resetHours / 24) : 0
+        const resetLabel = resetDays > 0
+          ? `${t(resetDays === 1 ? "{0} Day" : "{0} Days", { "0": resetDays })}${resetHours % 24 ? ` ${resetHours % 24}h` : ""}`
+          : `${resetHours}h`
         const level = usageLevel(r.pct)
         return (
           <div key={r.label} className="flex flex-col gap-1">
@@ -70,7 +75,7 @@ function TooltipBody({ usage }: { usage: UsageData }) {
             </div>
             <Progress value={Math.min(r.pct, 100)} />
             {resetH != null && (
-              <div className="text-xs text-muted-foreground">{t("Resets in ")}{resetH}h</div>
+              <div className="text-xs text-muted-foreground">{t("Resets in ")}{resetLabel}</div>
             )}
           </div>
         )

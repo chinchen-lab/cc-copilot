@@ -102,7 +102,7 @@ function labelFor(kind: SystemProcessKind, command: string): string {
 
   if (kind === "cogpit") {
     const helper = /Cogpit Helper(?: \((?:Renderer|GPU|Plugin)\))?/.exec(command)
-    return helper ? helper[0] : "Cogpit"
+    return helper ? helper[0].replace("Cogpit", "CC-Copilot") : "CC-Copilot"
   }
 
   // Scripts and shells: "<runtime> <script-basename>", e.g. "bun ua-echo.ts"

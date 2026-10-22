@@ -27,7 +27,7 @@ vi.mock("@/contexts/PtyContext", () => ({
 const projects = [{
   dirName: "-workspace-cogpit",
   path: "/workspace/cogpit",
-  shortName: "Cogpit",
+  shortName: "CC-Copilot",
   sessionCount: 7,
   lastModified: "2026-07-15T12:00:00.000Z",
 }]
@@ -36,7 +36,7 @@ const sessions = [{
   dirName: "-workspace-cogpit",
   fileName: "session-1.jsonl",
   sessionId: "session-1",
-  projectShortName: "Cogpit",
+  projectShortName: "CC-Copilot",
   aiTitle: "Improve terminal workflow",
   gitBranch: "main",
   cwd: "/workspace/cogpit",

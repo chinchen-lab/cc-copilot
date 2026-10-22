@@ -102,7 +102,7 @@ describe("PermissionRequestBar", () => {
     expect(screen.getByRole("button", { name: /Allow all/ })).toBeInTheDocument()
   })
 
-  it("explains when the protocol only offers decisions Cogpit cannot express", () => {
+  it("explains when the protocol only offers decisions CC-Copilot cannot express", () => {
     render(
       <PermissionRequestBar
         requests={[request({ availableDecisions: [] })]}

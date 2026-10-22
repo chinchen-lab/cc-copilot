@@ -71,13 +71,13 @@ describe("folder API", () => {
   })
 
   it("throws the server's own explanation", async () => {
-    mocks.authFetch.mockResolvedValue(json({ error: "Cogpit is not allowed to open /root", code: "FORBIDDEN" }, 403))
-    await expect(fetchFolderListing("/root")).rejects.toThrow("Cogpit is not allowed to open /root")
+    mocks.authFetch.mockResolvedValue(json({ error: "CC-Copilot is not allowed to open /root", code: "FORBIDDEN" }, 403))
+    await expect(fetchFolderListing("/root")).rejects.toThrow("CC-Copilot is not allowed to open /root")
   })
 
   it("names an older server for what it is, not as a missing folder", async () => {
     mocks.authFetch.mockResolvedValue(json({ error: "Not found", code: "NOT_FOUND" }, 404))
-    await expect(fetchFolderListing(null)).rejects.toThrow("Browsing folders needs a newer Cogpit on this machine.")
+    await expect(fetchFolderListing(null)).rejects.toThrow("Browsing folders needs a newer CC-Copilot on this machine.")
   })
 
   it("makes a folder and answers its path", async () => {

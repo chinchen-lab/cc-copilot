@@ -105,7 +105,7 @@ export function probeMessage(
     if (result.hello.signIn !== "account" && result.hello.networkAccess === false) {
       return {
         tone: "warn",
-        text: "Cogpit is running but network access is disabled — enable it in that device's settings.",
+        text: "CC-Copilot is running but network access is disabled — enable it in that device's settings.",
       }
     }
     if (result.hello.configured === false) {
@@ -116,18 +116,18 @@ export function probeMessage(
     }
     const name = result.hello.name ? ` "${result.hello.name}"` : ""
     const version = result.hello.version ? ` (v${result.hello.version})` : ""
-    return { tone: "ok", text: `Found Cogpit${name}${version}.` }
+    return { tone: "ok", text: `Found CC-Copilot${name}${version}.` }
   }
   switch (result.code) {
     case "UNREACHABLE":
       return {
         tone: "error",
-        text: `Can't reach ${host}:${port}. Is Cogpit running with network access enabled?`,
+        text: `Can't reach ${host}:${port}. Is CC-Copilot running with network access enabled?`,
       }
     case "LEGACY_NO_HELLO":
-      return { tone: "error", text: "That Cogpit is too old for multi-device — update it." }
+      return { tone: "error", text: "That CC-Copilot is too old for multi-device — update it." }
     case "NOT_COGPIT":
-      return { tone: "error", text: "Something responded, but it isn't Cogpit." }
+      return { tone: "error", text: "Something responded, but it isn't CC-Copilot." }
     case "SELF_ADD":
       return { tone: "error", text: "That's this machine." }
     default:
@@ -370,7 +370,7 @@ function DeviceRow({
               </Button>
             )}
             title={<>{t("Remove ")}{device.name}?</>}
-            description={t("This device will disappear from Cogpit. You can add it again later.")}
+            description={t("This device will disappear from CC-Copilot. You can add it again later.")}
             confirmLabel="Remove device"
             destructive
             onConfirm={async () => {
@@ -576,7 +576,7 @@ export function DevicesDialog({ open, initialMode, onClose }: DevicesDialogProps
         <DialogHeader>
           <DialogTitle>{t("Devices")}</DialogTitle>
           <DialogDescription>
-            {t("Control another Cogpit device from here. The active device is chosen from the header switcher — ")}{SWITCH_TIP} {t(" jumps between devices. Drag a device by its handle to change its number; this machine is always 1.")}
+            {t("Control another CC-Copilot device from here. The active device is chosen from the header switcher — ")}{SWITCH_TIP} {t(" jumps between devices. Drag a device by its handle to change its number; this machine is always 1.")}
           </DialogDescription>
         </DialogHeader>
 

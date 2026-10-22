@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react"
+import { useTranslation } from "@/hooks/useTranslation"
 import { Puzzle, RefreshCw } from "lucide-react"
 import type { PluginInstallPreview, PluginScope, InstalledPlugin } from "../../shared/contracts/plugins"
 import { compareVersions } from "../../shared/versions"
@@ -23,6 +24,7 @@ import { useRuntimeProject } from "./useRuntimeProject"
 export function PluginsDialog({ client, state, currentPath, onClose, initialPluginId }: {
   client: RuntimePluginClient; state: RuntimePluginState; currentPath: string | null; onClose: () => void; initialPluginId?: string
 }) {
+  const { t } = useTranslation()
   const id = useId()
   const status = state.status
   const localSafeMode = useBrowserSafeMode()
@@ -79,15 +81,15 @@ export function PluginsDialog({ client, state, currentPath, onClose, initialPlug
   const disabled = busy || trial || !status?.store.available
   return <Dialog open onOpenChange={(open) => { if (!open && !busy && !trial) { clearPreview(); onClose() } }}>
     <DialogContent className="flex max-h-[85dvh] flex-col sm:max-w-2xl" showCloseButton={!busy && !trial}>
-      <DialogHeader><DialogTitle>Plugins</DialogTitle><DialogDescription>
+      <DialogHeader><DialogTitle>{t("Plugins")}</DialogTitle><DialogDescription>
         {status ? `Installed on ${status.host.name}. Changes apply to every client connected to this host.` : "Connecting to the selected host…"}
       </DialogDescription></DialogHeader>
       <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
         {(state.error || error || status?.store.error) && <Alert variant="destructive"><AlertTitle>{status?.store.available && !error && !state.error ? "Plugin setup needs attention" : "Plugin action unavailable"}</AlertTitle><AlertDescription>{error ?? state.error ?? status?.store.error}</AlertDescription></Alert>}
         {notice && <Alert><AlertDescription>{notice}</AlertDescription></Alert>}
-        {safeMode && <Alert><AlertTitle>Plugin safe mode</AlertTitle><AlertDescription>Plugin panels are stopped. You can disable or uninstall plugins here.{status?.safeMode && " The host owner must restart Cogpit without COGPIT_DISABLE_PLUGINS=1 to resume plugins on this host."}</AlertDescription></Alert>}
+        {safeMode && <Alert><AlertTitle>Plugin safe mode</AlertTitle><AlertDescription>Plugin panels are stopped. You can disable or uninstall plugins here.{status?.safeMode && " The host owner must restart CC-Copilot without COGPIT_DISABLE_PLUGINS=1 to resume plugins on this host."}</AlertDescription></Alert>}
         <Button size="sm" variant="outline" disabled={busy || trial || status?.safeMode} onClick={() => setBrowserSafeMode(!localSafeMode)}>{localSafeMode ? "Resume plugins in this browser" : "Pause plugins in this browser"}</Button>
-        {status?.store.recoveryCode && <p className="text-sm text-muted-foreground">{status.store.recoveryCode === "STORE_LOCKED" ? "Close the other Cogpit process using this data directory, then restart this host." : status.store.recoveryCode === "STORE_VERSION" ? "Open this host with the Cogpit version that last used its plugin store, or a newer compatible version." : "Keep the plugin data directory intact. Restart with plugin safe mode enabled and check the host log before restoring a verified backup."}</p>}
+        {status?.store.recoveryCode && <p className="text-sm text-muted-foreground">{status.store.recoveryCode === "STORE_LOCKED" ? "Close the other CC-Copilot process using this data directory, then restart this host." : status.store.recoveryCode === "STORE_VERSION" ? "Open this host with the CC-Copilot version that last used its plugin store, or a newer compatible version." : "Keep the plugin data directory intact. Restart with plugin safe mode enabled and check the host log before restoring a verified backup."}</p>}
         {!status && <Button variant="outline" disabled={busy} onClick={() => { void run(() => client.refresh()) }}><RefreshCw data-icon="inline-start" />Retry connection</Button>}
         {status && connectionPlugin && !preview && <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-medium">{connectionPlugin.manifest.name} connections</h2><Button variant="outline" size="sm" onClick={() => setConnectionsId(undefined)}>Back to installed</Button></div>
@@ -100,7 +102,7 @@ export function PluginsDialog({ client, state, currentPath, onClose, initialPlug
               : <Empty><EmptyHeader><EmptyMedia variant="icon"><Puzzle /></EmptyMedia><EmptyTitle>No installed plugins</EmptyTitle><EmptyDescription>Browse available plugins or install a signed package to add panels to this host.</EmptyDescription></EmptyHeader></Empty>}
           </div></TabsContent>
           <TabsContent value="browse"><div className="flex flex-col gap-4 pt-4">
-            <p className="text-sm text-muted-foreground">These optional plugins are available with this Cogpit release. Choose which ones to install on {status.host.name}.</p>
+            <p className="text-sm text-muted-foreground">These optional plugins are available with this CC-Copilot release. Choose which ones to install on {status.host.name}.</p>
             <PluginScopeEditor value={scope} onChange={setScope} projects={status.projects} disabled={disabled} />
             {(status.store.availableSeeds ?? []).map((seed) => {
               const installed = status.store.plugins.find((plugin) => plugin.id === seed.manifest.id)

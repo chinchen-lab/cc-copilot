@@ -26,7 +26,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("[Cogpit] Unhandled render error", error, info.componentStack)
+    console.error("[CC-Copilot] Unhandled render error", error, info.componentStack)
   }
 
   render() {
@@ -38,7 +38,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
         <Card className="w-full max-w-lg text-center">
           <CardHeader className="justify-items-center">
             <AlertTriangle aria-hidden="true" className="mb-2 size-8 text-destructive" />
-            <CardTitle><h1>Cogpit hit a render error</h1></CardTitle>
+            <CardTitle><h1>CC-Copilot hit a render error</h1></CardTitle>
             <CardDescription>
               Reload the app to recover. Your sessions and project files are unchanged.
             </CardDescription>
@@ -51,7 +51,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
           <CardFooter className="justify-center">
             <Button onClick={() => window.location.reload()}>
               <RefreshCw data-icon="inline-start" />
-              Reload Cogpit
+              Reload CC-Copilot
             </Button>
           </CardFooter>
         </Card>

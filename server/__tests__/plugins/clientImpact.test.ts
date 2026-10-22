@@ -19,12 +19,12 @@ describe("connected client impact", () => {
 
   it("reports app and API incompatibility using anonymous coarse versions", () => {
     const clients = [{ ...client, appVersion: "1.8.1" }, { ...client, appVersion: "2.6.6", apiVersions: ["2.0.0"] }]
-    expect(clientImpact(preview(), clients, host).incompatibleClients).toEqual(["Cogpit 1.8 · API 1.0", "Cogpit 2.6 · API 2.0"])
+    expect(clientImpact(preview(), clients, host).incompatibleClients).toEqual(["CC-Copilot 1.8 · API 1.0", "CC-Copilot 2.6 · API 2.0"])
   })
 
   it("reports browser or capability requirements but ignores unavailable optional features", () => {
     const required = preview({ browser: ["web-crypto"], requires: { client: { "workspace.panel": "^1.0.0" }, host: {} } })
-    expect(clientImpact(required, [client], host).incompatibleClients).toEqual(["Cogpit 2.6 · API 1.0"])
+    expect(clientImpact(required, [client], host).incompatibleClients).toEqual(["CC-Copilot 2.6 · API 1.0"])
     const optional = preview({ optional: { client: { "workspace.panel": "^1.0.0" }, host: {} } })
     expect(clientImpact(optional, [client], host).incompatibleClients).toBeUndefined()
     expect(clientImpact(preview({ browser: ["web-crypto"] }), [{ ...client, browser: [] }], host).incompatibleClients).toHaveLength(1)
@@ -37,13 +37,13 @@ describe("connected client impact", () => {
 
   it("detects disjoint API majors even when both satisfy the package's broad range", () => {
     const candidate = preview({ engines: { client: ">=2.0.0", host: ">=2.0.0", pluginApi: ">=1.0.0" } })
-    expect(clientImpact(candidate, [client], { ...host, apiVersions: ["2.0.0"] }).incompatibleClients).toEqual(["Cogpit 2.6 · API 1.0"])
+    expect(clientImpact(candidate, [client], { ...host, apiVersions: ["2.0.0"] }).incompatibleClients).toEqual(["CC-Copilot 2.6 · API 1.0"])
   })
 
   it("deduplicates patch versions and never echoes version metadata or unrecognized version text", () => {
     const clients = [{ ...client, appVersion: "1.8.1+private-user-label" }, { ...client, appVersion: "1.8.2+another-label" }, { ...client, appVersion: "/private/host/token", browser: [] }]
     const result = clientImpact(preview({ browser: ["web-crypto"] }), clients, host)
-    expect(result.incompatibleClients).toEqual(["Cogpit 1.8 · API 1.0", "Cogpit unknown · API 1.0"])
+    expect(result.incompatibleClients).toEqual(["CC-Copilot 1.8 · API 1.0", "CC-Copilot unknown · API 1.0"])
     expect(JSON.stringify(result.incompatibleClients)).not.toMatch(/private|token|label/)
   })
 

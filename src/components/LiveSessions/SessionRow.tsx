@@ -151,7 +151,7 @@ export function SessionRow({
                 !isNativeIdle && getStatusColor(s.agentStatus),
               )}
             >
-              {statusLabel}
+              {t(statusLabel)}
             </Badge>
           )}
           {isDeferred && (
@@ -238,8 +238,8 @@ export function SessionRow({
           size="icon-xs"
           onClick={(event) => { event.stopPropagation(); archiveAction.run() }}
           className="absolute right-0 top-0 bg-popover text-muted-foreground opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:text-foreground"
-          title={archiveAction.label}
-          aria-label={archiveAction.label}
+          title={t(archiveAction.label)}
+          aria-label={t(archiveAction.label)}
         >
           <archiveAction.icon data-icon="inline-start" />
         </Button>

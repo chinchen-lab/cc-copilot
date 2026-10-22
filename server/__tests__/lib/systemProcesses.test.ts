@@ -118,6 +118,6 @@ describe("classifyProcesses", () => {
     expect(byPid.get(202)?.label).toBe("Headless Chrome")
     expect(byPid.get(200)?.label).toBe("agent-browser daemon")
     expect(byPid.get(301)?.label).toBe("bun ua-echo.ts")
-    expect(byPid.get(400)?.label).toBe("Cogpit Helper (Renderer)")
+    expect(byPid.get(400)?.label).toBe("CC-Copilot Helper (Renderer)")
   })
 })

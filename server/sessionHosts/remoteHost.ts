@@ -16,7 +16,7 @@ import { startFields, type HostProject, type SessionAddress, type SessionHost } 
 export const SESSION_SCOPE_HEADER = "x-cogpit-session-scope"
 const LOCAL_SCOPE = { [SESSION_SCOPE_HEADER]: "local" }
 
-/** Session control needs the device to run a Cogpit with these endpoints. */
+/** Session control needs the device to run a CC-Copilot with these endpoints. */
 const SESSION_API_VERSION = 1
 
 /** How long a device may be silent before a wait gives up on it for this poll. */
@@ -61,7 +61,7 @@ function registered(deviceId: string): HubDevice {
   return found
 }
 
-/** Refuse a device whose Cogpit predates the session endpoints, naming the fix. */
+/** Refuse a device whose CC-Copilot predates the session endpoints, naming the fix. */
 export async function ensureSessionApi(deviceId: string): Promise<void> {
   const current = registered(deviceId)
   if (sessionApiChecked.get(deviceId) === connectionKey(current)) return
@@ -70,7 +70,7 @@ export async function ensureSessionApi(deviceId: string): Promise<void> {
     throw new DeviceRequestError(
       deviceId,
       426,
-      `${current.name} runs Cogpit ${hello.version ?? "(unknown version)"}, which cannot run sessions for another machine. Update it first.`,
+      `${current.name} runs CC-Copilot ${hello.version ?? "(unknown version)"}, which cannot run sessions for another machine. Update it first.`,
       "DEVICE_TOO_OLD",
     )
   }

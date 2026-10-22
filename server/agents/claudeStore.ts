@@ -5,6 +5,7 @@ import { descriptorFor, type AgentDescriptor } from "../../shared/session/agent-
 import { dirs } from "../dirs"
 import { isWithinDir } from "../pathSafety"
 import { readClaudeSessionMeta } from "./claudeMetadata"
+import { readClaudeFileSnapshot } from "./claudeFileSnapshots"
 import {
   canonicalPathWithin,
   isSinglePathSegment,
@@ -164,6 +165,12 @@ export function createClaudeStore(projectsRoot?: string, configuredDescriptor?: 
     descriptor,
 
     sessionsRoot,
+
+    async readFileSnapshot(transcriptPath, transcript, filePath) {
+      const root = sessionsRoot()
+      if (!root || !await canonicalPathWithin(root, transcriptPath)) return null
+      return readClaudeFileSnapshot(root, basename(transcriptPath, ".jsonl"), transcript, filePath)
+    },
 
     ownsPath(filePath: string): boolean {
       const root = sessionsRoot()

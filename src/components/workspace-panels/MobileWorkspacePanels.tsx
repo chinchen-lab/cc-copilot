@@ -37,7 +37,7 @@ export function MobileWorkspacePanels({
             <Button variant="ghost" size="icon-lg" onClick={onClosePanel} aria-label={t("All workspace tools")}>
               <ArrowLeft data-icon="inline-start" />
             </Button>
-            <h1 className="min-w-0 flex-1 truncate text-sm font-medium">{title}</h1>
+            <h1 className="min-w-0 flex-1 truncate text-sm font-medium">{t(title)}</h1>
             <Button variant="outline" onClick={onClosePanel}>{t("Switch")}</Button>
           </>
         ) : (
@@ -68,7 +68,7 @@ export function MobileWorkspacePanels({
             {actions.map(({ id, title: label, icon: Icon, onSelect }) => (
               <Button key={id} variant="outline" className="h-auto min-h-24 min-w-0 flex-col items-start justify-between gap-3 whitespace-normal p-3 text-left" onClick={onSelect}>
                 <Icon data-icon="inline-start" />
-                <span className="flex w-full items-center justify-between gap-2"><span>{label}</span><ChevronRight data-icon="inline-end" /></span>
+                <span className="flex w-full items-center justify-between gap-2"><span>{t(label)}</span><ChevronRight data-icon="inline-end" /></span>
               </Button>
             ))}
           </nav>

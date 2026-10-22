@@ -33,7 +33,7 @@ interface SetupScreenProps {
 /** The one agent whose home Cogpit cannot find on its own and has to be told. */
 const configuredAgent = soleDescriptorWhere(
   (descriptor) => !descriptor.cli.homeIsDiscoverable,
-  "a home Cogpit has to be told about",
+  "a home CC-Copilot has to be told about",
 )
 /** The rest are found where their CLIs keep them. */
 const detectedAgents = allDescriptors().filter((descriptor) => descriptor.cli.homeIsDiscoverable && !descriptor.cli.requiresConfiguration)
@@ -95,7 +95,7 @@ export function SetupScreen({ onConfigured }: SetupScreenProps) {
             </div>
             <CardTitle>{t("Connect your coding agent")}</CardTitle>
             <CardDescription>
-              {t("Cogpit detects ")}{detectedNames} {t(" automatically. Existing histories live in")}{" "}
+              {t("CC-Copilot detects ")}{detectedNames} {t(" automatically. Existing histories live in")}{" "}
               {detectedHomes}.{" "}
               {t("For ")}{configuredAgent.displayName}{t(", enter its data directory, usually")}{" "}
               <Path>{configuredHome}</Path>.

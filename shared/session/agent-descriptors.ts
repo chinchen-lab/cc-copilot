@@ -1008,7 +1008,7 @@ const acp: AgentDescriptor = {
   ...copilot, kind: "acp", displayName: "ACP agent", binName: "acp",
   dirName: base64DirNameCodec("acp__"),
   sessionFile: { name: (id) => `${id}.jsonl`, sessionId: sessionIdFromJsonlName, ...jsonlPathUrlCodec, transcriptRoot: (path) => { const segments = plainPathSegments(path); return segments?.length === 1 ? ownTranscriptRoot(sessionIdFromJsonlName(path)) : null } },
-  resume: { command: () => "Resume this session in Cogpit", args: () => [] },
+  resume: { command: () => "Resume this session in CC-Copilot", args: () => [] },
   launchArgs: { permissions: () => [], model: () => [], effort: () => [], fastTier: () => [] },
   cli: { ...copilot.cli, packageName: "", homebrew: null, wingetId: null, selfUpdate: null, requiresConfiguration: true, homeDirName: ".cogpit-acp", homeEnvVar: "COGPIT_ACP_HOME", homeIsDiscoverable: true, installMarker: "projects" },
   config: { ...copilot.config, rootDirName: ".cogpit-acp", instructions: [], settings: [], skillsDir: null },

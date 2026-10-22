@@ -22,7 +22,7 @@ describe("SidebarHeader", () => {
     const home = screen.getByRole("button", { name: "Home" })
     expect(home).toHaveAttribute("title", "Mission Control")
     expect(home.querySelector("use")).toHaveAttribute("href", "/cogpit.svg#mark")
-    expect(screen.getByRole("img", { name: "CC Copilot" })).toBeVisible()
+    expect(screen.getByRole("img", { name: "CC-Copilot" })).toBeVisible()
     expect(screen.queryByText("Pro")).not.toBeInTheDocument()
     expect(
       screen.getAllByRole("button").map((button) => button.getAttribute("aria-label")),

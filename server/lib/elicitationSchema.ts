@@ -84,7 +84,7 @@ function projectElicitationField(
   if (type === "string" || type === "number" || type === "integer" || type === "boolean") {
     return { ...base, type, ...elicitationDefault(prop) }
   }
-  return `${describeSchemaType(type)}, which Cogpit cannot render`
+  return `${describeSchemaType(type)}, which CC-Copilot cannot render`
 }
 
 export function projectElicitationSchema(schema: Record<string, unknown> | undefined): ElicitationSchemaProjection {

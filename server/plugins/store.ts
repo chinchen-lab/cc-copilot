@@ -81,7 +81,7 @@ export class PluginStore {
   snapshot(): PluginStoreSnapshot {
     if (!this.available || this.closed) return { available: false, error: this.error ?? "Plugin store is closed", recoveryCode: this.recoveryCode, revision: this.registry.revision, plugins: [], publishers: [], legacyPluginIds: [], availableSeeds: [] }
     const publishers = new Map(Object.entries(this.trust.publishers).map(([id, publisher]) => [id, { id, label: publisher.label, kind: publisher.kind, fingerprint: sha256(decodeBase64(publisher.pinnedRoot, 256 * 1024)), ...(publisher.checkpoint ? { verifiedAt: publisher.checkpoint.verifiedAt } : {}) }]))
-    for (const seed of Object.values(this.trust.appSeeds ?? {})) if (!publishers.has(seed.publisher)) publishers.set(seed.publisher, { id: seed.publisher, label: `${seed.publisher} (bundled with Cogpit)`, kind: "official", fingerprint: seed.digest })
+    for (const seed of Object.values(this.trust.appSeeds ?? {})) if (!publishers.has(seed.publisher)) publishers.set(seed.publisher, { id: seed.publisher, label: `${seed.publisher} (bundled with CC-Copilot)`, kind: "official", fingerprint: seed.digest })
     return { available: this.available && !this.closed, ...(this.error ? { error: this.error } : {}), revision: this.registry.revision,
       plugins: Object.values(this.registry.plugins).map(plugin => ({ ...installedOf(plugin), versions: plugin.versions.map(version => {
         const unavailableReason = this.registry.quarantined?.[version.digest]?.reason
@@ -122,7 +122,7 @@ export class PluginStore {
   private async read<T>(name: string, schema: z.ZodType<T>): Promise<T> {
     const value = parseJsonText(await regularFile(join(this.root, name)), STORE_DOCUMENT_LIMIT)
     const format = z.object({ formatVersion: z.number(), minWriterVersion: z.number() }).passthrough().safeParse(value)
-    if (format.success && (format.data.formatVersion > 1 || format.data.minWriterVersion > 1)) throw new Error("Plugin store uses a newer format; upgrade Cogpit before opening it")
+    if (format.success && (format.data.formatVersion > 1 || format.data.minWriterVersion > 1)) throw new Error("Plugin store uses a newer format; upgrade CC-Copilot before opening it")
     return schema.parse(value)
   }
   private async initialize(): Promise<void> {

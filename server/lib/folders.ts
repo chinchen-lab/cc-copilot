@@ -30,7 +30,7 @@ function refusalFor(error: unknown, path: string, action: string): RouteError | 
       return new RouteError(404, ErrorCodes.NOT_FOUND, `The folder ${path} does not exist`)
     case "EACCES":
     case "EPERM":
-      return new RouteError(403, ErrorCodes.FORBIDDEN, `Cogpit is not allowed to ${action} ${path}`)
+      return new RouteError(403, ErrorCodes.FORBIDDEN, `CC-Copilot is not allowed to ${action} ${path}`)
     default:
       return null
   }
@@ -172,6 +172,6 @@ export async function sessionFolderProblem(cwd: string): Promise<string | null> 
   } catch (error) {
     return error instanceof RouteError
       ? error.message
-      : `Cogpit cannot open ${cwd}: ${error instanceof Error ? error.message : String(error)}`
+      : `CC-Copilot cannot open ${cwd}: ${error instanceof Error ? error.message : String(error)}`
   }
 }

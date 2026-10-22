@@ -152,7 +152,7 @@ function StripRow({
               variant="outline"
               className={cn("shrink-0", compact ? "text-muted-foreground" : chip.className)}
             >
-              {isReadOnlySession ? t("Read-only") : chip.label}
+              {isReadOnlySession ? t("Read-only") : t(chip.label)}
             </Badge>
             {!compact && <TimeSince iso={since ?? (s.lastActivityAt || s.lastModified)} />}
           </span>

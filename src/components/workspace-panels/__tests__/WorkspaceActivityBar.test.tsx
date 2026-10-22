@@ -1,7 +1,11 @@
 import { useState, type ReactNode } from "react"
 import { Circle } from "lucide-react"
 import { fireEvent, render, screen } from "@testing-library/react"
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import { setLanguage } from "@/lib/i18n/language"
+import { cleanup } from "@testing-library/react"
+
+afterEach(() => { cleanup(); setLanguage("en") })
 import {
   availableWorkspacePanels,
   WorkspaceActivityBar,
@@ -60,6 +64,14 @@ const panels: RegisteredWorkspacePanel[] = [
 ]
 
 describe("WorkspaceActivityBar", () => {
+  it("translates right-side browser, config and plugin controls", () => {
+    setLanguage("zh-TW")
+    render(<WorkspaceActivityBar panels={[{...panels[0],title:"Browser"}]} context={context} activePanelId={null} onTogglePanel={vi.fn()} actions={[
+      {id:"config",title:"Config",icon:Circle,active:false,onSelect:vi.fn()},
+      {id:"plugins",title:"Plugins",icon:Circle,active:false,onSelect:vi.fn()},
+    ]} />)
+    for (const name of ["設置", "外掛", "瀏覽器"]) expect(screen.getByRole("button", {name})).toBeInTheDocument()
+  })
   it("filters unavailable panels and reports the active selection", () => {
     const onTogglePanel = vi.fn()
     const filtered = [

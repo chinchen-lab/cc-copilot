@@ -36,7 +36,7 @@ export function hostNamed(name: string): SessionHost {
     const known = devices.map((device) => device.name).join(", ")
     throw new RouteError(404, ErrorCodes.NOT_FOUND, known
       ? `No device named "${name}". Known devices: ${known}`
-      : `No device named "${name}"; this Cogpit has no devices registered`)
+      : `No device named "${name}"; this CC-Copilot has no devices registered`)
   }
   return remoteHost(match.id)
 }

@@ -390,7 +390,7 @@ export function CommandPalette(props: CommandPaletteProps) {
       SlidersHorizontal,
       props.onOpenConfig,
     ),
-    action("settings", t("Open Cogpit settings"), "preferences network", Settings, props.onOpenSettings),
+    action("settings", t("Open CC-Copilot settings"), "preferences network", Settings, props.onOpenSettings),
     action(
       "theme",
       t("Appearance preferences"),
@@ -444,7 +444,7 @@ export function CommandPalette(props: CommandPaletteProps) {
       open={props.open}
       onOpenChange={props.onOpenChange}
       title={t("Command palette")}
-      description={t("Search for a Cogpit action to run.")}
+      description={t("Search for a CC-Copilot action to run.")}
       className="max-w-xl"
     >
       <Command label={t("Search commands")} loop>

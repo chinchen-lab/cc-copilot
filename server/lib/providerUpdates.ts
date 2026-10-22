@@ -375,7 +375,7 @@ export async function runProviderUpdate(
   if (!command) {
     return result(
       "failed",
-      `Cogpit cannot tell how ${descriptor.displayName} was installed, so it will not run an update for you.`,
+      `CC-Copilot cannot tell how ${descriptor.displayName} was installed, so it will not run an update for you.`,
       before,
     )
   }

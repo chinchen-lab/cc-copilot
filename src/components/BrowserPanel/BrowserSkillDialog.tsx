@@ -72,7 +72,7 @@ export function BrowserSkillDialog({
         <DialogHeader>
           <DialogTitle>{t("Agent skill")}</DialogTitle>
           <DialogDescription>
-            {t("The skill teaches an agent how Cogpit’s browsers work: when to use a named one, when to keep to a throwaway, and that this panel is watching. Install it for agents you run outside Cogpit — it writes a")}{" "}
+            {t("The skill teaches an agent how CC-Copilot’s browsers work: when to use a named one, when to keep to a throwaway, and that this panel is watching. Install it for agents you run outside CC-Copilot — it writes a")}{" "}
             <code className="font-mono">SKILL.md</code> {t(" into that CLI’s configuration directory in your home folder.")}
           </DialogDescription>
         </DialogHeader>
@@ -97,7 +97,7 @@ export function BrowserSkillDialog({
                     </span>
                     {target.automatic && (
                       <span className="truncate text-xs text-muted-foreground">
-                        {t("Already automatic in the sessions Cogpit starts")}
+                        {t("Already automatic in the sessions CC-Copilot starts")}
                       </span>
                     )}
                   </span>

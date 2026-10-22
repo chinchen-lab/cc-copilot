@@ -32,7 +32,7 @@ const SOURCE_LABELS: Record<ExecutableChoice["source"], string> = {
   auto: "Automatic",
   path: "Installed on PATH",
   npm: "Global npm install",
-  bundled: "Bundled with Cogpit",
+  bundled: "Bundled with CC-Copilot",
   custom: "Custom path",
 }
 
@@ -152,7 +152,7 @@ export function ExecutableSection({ kind, value, onChange, disabled, reportVersi
       <CollapsibleContent>
         <Field>
           <FieldDescription>
-            {t("Which binary new sessions run. Automatic uses your installed CLI unless it is older than the copy bundled with Cogpit.")}
+            {t("Which binary new sessions run. Automatic uses your installed CLI unless it is older than the copy bundled with CC-Copilot.")}
           </FieldDescription>
           <div className="flex flex-col gap-2 pl-1">
             {option("auto", SOURCE_LABELS.auto, t("Recommended."))}

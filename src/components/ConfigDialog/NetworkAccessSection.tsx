@@ -181,7 +181,7 @@ export function NetworkAccessSection({
             </FieldError>
           )}
           <FieldDescription>
-            {t("Requires app restart. Remote browsers need an HTTPS reverse proxy; port 19384 remains available to Cogpit hubs and device clients.")}
+            {t("Requires app restart. Remote browsers need an HTTPS reverse proxy; port 19384 remains available to CC-Copilot hubs and device clients.")}
           </FieldDescription>
         </Field>
       )}

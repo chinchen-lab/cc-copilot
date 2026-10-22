@@ -44,7 +44,7 @@ function stripControls(text: string): string {
 }
 
 export function buildNtfyPayload(notification: NotificationContent, config: PushConfig): NtfyPayload {
-  const title = truncateBytes(stripControls(notification.title), TITLE_MAX_BYTES) || "Cogpit"
+  const title = truncateBytes(stripControls(notification.title), TITLE_MAX_BYTES) || "CC-Copilot"
   const message =
     truncateBytes(stripControls(notification.body), MESSAGE_MAX_BYTES) || "Needs your attention"
 

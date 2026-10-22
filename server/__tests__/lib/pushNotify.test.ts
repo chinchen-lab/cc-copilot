@@ -35,7 +35,7 @@ describe("buildNtfyPayload", () => {
 
   it("omits click when there is no session to link to", () => {
     const payload = buildNtfyPayload(
-      { title: "Cogpit", body: "Cleaned up 2 leaked processes", nav: { sessionId: null, dirName: null } },
+      { title: "CC-Copilot", body: "Cleaned up 2 leaked processes", nav: { sessionId: null, dirName: null } },
       WITH_PUBLIC,
     )
     expect(payload.click).toBeUndefined()
@@ -58,7 +58,7 @@ describe("buildNtfyPayload", () => {
 
   it("substitutes a fallback when title or body is empty", () => {
     const payload = buildNtfyPayload({ title: "", body: "", nav: NAV }, CONFIG)
-    expect(payload.title).toBe("Cogpit")
+    expect(payload.title).toBe("CC-Copilot")
     expect(payload.message).toBe("Needs your attention")
   })
 

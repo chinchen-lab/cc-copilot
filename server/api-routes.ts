@@ -18,6 +18,7 @@ import { registerDeviceRoutes } from "./routes/devices"
 import { registerEditionRoutes } from "./routes/edition"
 import { registerEditorRoutes } from "./routes/editor"
 import { registerFileContentRoutes } from "./routes/file-content"
+import { registerFileSnapshotRoutes } from "./routes/file-snapshots"
 import { registerFileWatchRoutes } from "./routes/files-watch"
 import { registerFileRoutes } from "./routes/files"
 import { registerFolderRoutes } from "./routes/folders"
@@ -119,6 +120,7 @@ export const API_ROUTE_REGISTRY = [
   apiRoute("files", registerFileRoutes),
   apiRoute("files-watch", registerFileWatchRoutes),
   apiRoute("session-file-changes", registerSessionFileChangesRoutes),
+  apiRoute("file-snapshots", registerFileSnapshotRoutes),
   apiRoute("session-access", registerSessionAccessRoutes),
   apiRoute("session-archive", registerSessionArchiveRoutes),
   apiRoute("session-config", registerSessionConfigRoutes),

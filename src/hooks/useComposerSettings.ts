@@ -76,7 +76,7 @@ export function useComposerSettings({
   const handleModelRejected = useCallback((rejectedModel: string) => {
     setSelectedModel((current) => current === rejectedModel ? "" : current)
     setModelFallbackNotice(
-      `${rejectedModel} is unavailable for this account. Cogpit retried the turn with ${descriptorFor(effectiveAgentKind).displayName}'s default model.`,
+      `${rejectedModel} is unavailable for this account. CC-Copilot retried the turn with ${descriptorFor(effectiveAgentKind).displayName}'s default model.`,
     )
   }, [effectiveAgentKind])
 

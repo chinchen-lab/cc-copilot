@@ -128,7 +128,7 @@ export function WorkflowsPanel({
       if (data?.success) {
         setStopNote("Stop signal sent.")
       } else if (data?.controllable === false) {
-        setStopNote("This workflow runs in a session Cogpit doesn't control.")
+        setStopNote("This workflow runs in a session CC-Copilot doesn't control.")
       } else {
         setStopNote("Couldn't stop. The session may have already exited.")
       }

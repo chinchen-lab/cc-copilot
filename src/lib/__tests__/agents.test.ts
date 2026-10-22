@@ -265,7 +265,7 @@ describe("presentation", () => {
       // The config badge used to omit Copilot entirely.
       expect(agentConfigBadge(kind).letter).toHaveLength(1)
       expect(agentConfigBadge(kind).label).toContain("Loaded by")
-      expect(readOnlySessionNotice(kind)).toContain("Cogpit can only view it")
+      expect(readOnlySessionNotice(kind)).toContain("CC-Copilot can only view it")
     }
   })
 

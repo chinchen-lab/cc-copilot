@@ -38,7 +38,7 @@ export function UpdateBanner() {
     return (
       <Alert className="grid-cols-[auto_minmax(0,1fr)_auto] rounded-none border-x-0 border-t-0 border-success/30 bg-success/10 px-4 py-2 pr-4 text-success has-data-[slot=alert-action]:pr-4">
         <ArrowUpCircle />
-        <AlertTitle>Cogpit v{downloadedInfo.version} {t(" is ready")}</AlertTitle>
+        <AlertTitle>CC-Copilot v{downloadedInfo.version} {t(" is ready")}</AlertTitle>
         <AlertDescription className="text-success/80">{t("Restart to apply the update.")}</AlertDescription>
         <AlertAction className="static col-start-3 row-span-2 row-start-1 self-center">
           <Button
@@ -59,7 +59,7 @@ export function UpdateBanner() {
     return (
       <Alert className="grid-cols-[auto_minmax(0,1fr)_auto] rounded-none border-x-0 border-t-0 border-info/30 bg-info/10 px-4 py-2 pr-4 text-info has-data-[slot=alert-action]:pr-4">
         <ArrowUpCircle />
-        <AlertTitle>Cogpit v{updateInfo.version} {t(" is available")}</AlertTitle>
+        <AlertTitle>CC-Copilot v{updateInfo.version} {t(" is available")}</AlertTitle>
         {updateInfo.platform !== "mac" && (
           <AlertDescription>{t("Update through your package manager.")}</AlertDescription>
         )}

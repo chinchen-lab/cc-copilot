@@ -4,6 +4,7 @@ import {
 } from "lucide-react"
 import type { ToolCall } from "../../../shared/session/types"
 import { cn } from "@/lib/utils"
+import { useTranslation } from "@/hooks/useTranslation"
 
 export function ToolOperationIcon({ styleName }: { styleName: string }) {
   const Icon = ({
@@ -31,13 +32,14 @@ function statusFor(toolCall: ToolCall, failed: boolean, isAgentActive?: boolean)
 }
 
 export function ToolCallStatus({ toolCall, failed = Boolean(toolCall.isError), isAgentActive }: { toolCall: ToolCall; failed?: boolean; isAgentActive?: boolean }) {
+  const { t } = useTranslation()
   const status = statusFor(toolCall, failed, isAgentActive)
   const { Icon, label, description } = TOOL_STATUS[status]
   const running = status === "running"
   return (
-    <span className={cn("flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground", failed && "text-destructive", running && "text-info")} title={label}>
-      <Icon role="img" aria-label={`Tool call ${description}`} className={cn("size-3.5", running && "motion-safe:animate-spin")} />
-      <span className={cn(status === "completed" && "sr-only")}>{label}</span>
+    <span className={cn("flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground", failed && "text-destructive", running && "text-info")} title={t(label)}>
+      <Icon role="img" aria-label={t(`Tool call ${description}`)} className={cn("size-3.5", running && "motion-safe:animate-spin")} />
+      <span className={cn(status === "completed" && "sr-only")}>{t(label)}</span>
     </span>
   )
 }

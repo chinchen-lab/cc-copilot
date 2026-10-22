@@ -47,7 +47,7 @@ function ResourceField({ connection, resourceId, target, client, disabled, save 
     <FieldDescription>{resource.scope === "project" ? "Applies to the selected project." : "Applies to all projects using this connection."}</FieldDescription>
     {selected && <p className="text-sm">Selected: {selected.label}</p>}
     {missingParent && <p className="text-sm text-muted-foreground">Choose {connection.definition.resources[missingParent].label} first.</p>}
-    {resource.scope === "project" && !target.projectId && <p className="text-sm text-muted-foreground">Choose a Cogpit project above.</p>}
+    {resource.scope === "project" && !target.projectId && <p className="text-sm text-muted-foreground">Choose a CC-Copilot project above.</p>}
     {resource.options && <div className="flex flex-wrap gap-2">
       <Button type="button" variant="outline" size="sm" disabled={unavailable || loading} onClick={() => { void loadOptions() }}>{loading ? "Loading choices…" : options ? "Refresh choices" : "Browse choices"}</Button>
       {options && <Select items={choices.map((choice) => ({ value: choice.id, label: choice.label }))} value={selected?.id ?? null} disabled={unavailable || loading}
@@ -77,7 +77,7 @@ function ConnectionForm({ connection, target, client, disabled, save }: {
   const [replaceExisting, setReplaceExisting] = useState(false)
   return <section className="flex flex-col gap-4 rounded-lg border p-4" aria-label={connection.label}>
     <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-medium">{connection.label}</h3><Badge variant="outline">{connection.status === "disconnected" ? "Needs connection" : connection.readOnly ? "Configured by host" : "Connected"}</Badge></div>
-    <p className="text-sm text-muted-foreground">Cogpit keeps this credential on the selected host. Plugin code cannot read it.</p>
+    <p className="text-sm text-muted-foreground">CC-Copilot keeps this credential on the selected host. Plugin code cannot read it.</p>
     <p className="break-all text-xs text-muted-foreground">Credential destinations: {[...new Set(Object.values(connection.definition.operations).map((operation) => operation.origin))].join(", ")}</p>
     {connection.legacyImportAvailable && <div className="flex flex-col gap-3 rounded-md bg-muted p-3">
       <p className="text-sm">An existing host connection has saved settings available to import.</p>

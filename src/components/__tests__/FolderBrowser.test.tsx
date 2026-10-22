@@ -288,10 +288,10 @@ describe("FolderBrowser", () => {
 
   it("shows why a folder cannot be read and tries again", async () => {
     const user = userEvent.setup()
-    mocks.failing = { status: 403, error: "Cogpit is not allowed to open /home/me" }
+    mocks.failing = { status: 403, error: "CC-Copilot is not allowed to open /home/me" }
     renderSwitcher("folders")
 
-    expect(await screen.findByText("Cogpit is not allowed to open /home/me")).toBeInTheDocument()
+    expect(await screen.findByText("CC-Copilot is not allowed to open /home/me")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Start session here" })).toBeDisabled()
 
     mocks.failing = null
@@ -299,10 +299,10 @@ describe("FolderBrowser", () => {
     expect(await screen.findByRole("option", { name: /code/ })).toBeInTheDocument()
   })
 
-  it("says so when the device's Cogpit predates the folder browser", async () => {
+  it("says so when the device's CC-Copilot predates the folder browser", async () => {
     mocks.failing = { status: 404, error: "Not found" }
     renderSwitcher("folders")
-    expect(await screen.findByText("Browsing folders needs a newer Cogpit on this machine.")).toBeInTheDocument()
+    expect(await screen.findByText("Browsing folders needs a newer CC-Copilot on this machine.")).toBeInTheDocument()
   })
 
   it("never starts in a folder it is still leaving", async () => {

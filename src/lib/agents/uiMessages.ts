@@ -1,7 +1,7 @@
 /** Traditional Chinese interface messages; English source text is the fallback. */
 export const agentZhTW: Readonly<Record<string, string>> = {
   "Resolve this approval in Codex": "在 Codex 中處理此核准請求",
-  "Claude sessions, browsers, and scripts running outside Cogpit.": "在 Cogpit 外執行的 Claude 對話、瀏覽器與指令碼。",
+  "Claude sessions, browsers, and scripts running outside CC-Copilot.": "在 CC-Copilot 外執行的 Claude 對話、瀏覽器與指令碼。",
   "Valid .claude directory found": "已找到有效的 .claude 目錄",
   "Claude directory": "Claude 目錄",
   "The directory containing your Claude configuration.": "包含 Claude 設定的目錄。",

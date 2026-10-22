@@ -51,7 +51,7 @@ export function TaskNotificationCard({ notification, action }: { notification: T
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium text-foreground">{notification.summary}</span>
             <Badge variant={statusStyle.badgeVariant} className={statusStyle.color}>
-              {statusStyle.label}
+              {t(statusStyle.label)}
             </Badge>
             {action && <div className="ml-auto">{action}</div>}
           </div>
@@ -68,7 +68,7 @@ export function TaskNotificationCard({ notification, action }: { notification: T
                 )}
               >
                 <Chevron data-icon="inline-start" />
-                {expanded ? "Hide detail" : "Show detail"}
+                {expanded ? t("Hide detail") : t("Show detail")}
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="mt-2 border-t border-border/30 pt-2 text-sm text-foreground/90">

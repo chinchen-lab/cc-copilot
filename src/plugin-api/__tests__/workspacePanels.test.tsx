@@ -50,12 +50,12 @@ describe("workspace panel registry", () => {
   it("rejects invalid and duplicate ids during registration", () => {
     expect(() => collectWorkspacePanels([
       { id: "Not Valid", workspacePanels: [] },
-    ])).toThrow('Invalid Cogpit plugin id "Not Valid"')
+    ])).toThrow('Invalid CC-Copilot plugin id "Not Valid"')
 
     expect(() => collectWorkspacePanels([
       { id: "git", workspacePanels: [] },
       { id: "git", workspacePanels: [] },
-    ])).toThrow('Duplicate Cogpit plugin id "git"')
+    ])).toThrow('Duplicate CC-Copilot plugin id "git"')
 
     expect(() => collectWorkspacePanels([{
       id: "git",
@@ -63,6 +63,6 @@ describe("workspace panel registry", () => {
         { id: "actions", title: "One", icon: Circle, component: EmptyPanel },
         { id: "actions", title: "Two", icon: Circle, component: EmptyPanel },
       ],
-    }])).toThrow('Duplicate Cogpit workspace panel id "git.actions"')
+    }])).toThrow('Duplicate CC-Copilot workspace panel id "git.actions"')
   })
 })

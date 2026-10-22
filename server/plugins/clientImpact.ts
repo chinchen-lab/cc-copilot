@@ -14,7 +14,7 @@ export function clientImpact(preview: PluginInstallPreview, clients: readonly Cl
       || issue.code === "API_VERSION" && issue.required === "common API version")
     if (!incompatible) continue
     const api = [...new Set(client.apiVersions.map(coarseVersion).filter((version): version is string => version !== null))].sort().join(", ") || "unavailable"
-    warnings.add(`Cogpit ${knownApp ?? "unknown"} · API ${api}`.slice(0, 256))
+    warnings.add(`CC-Copilot ${knownApp ?? "unknown"} · API ${api}`.slice(0, 256))
     if (warnings.size === 256) break
   }
   const result = structuredClone(preview)

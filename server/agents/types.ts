@@ -1,4 +1,5 @@
 import type { AgentDescriptor, AgentKind, TranscriptRoot } from "../../shared/session/agent-descriptors"
+import type { FileSnapshot } from "../../shared/contracts/fileSnapshots"
 
 /** One transcript found by walking an agent's storage root. */
 export interface SessionFileInfo {
@@ -121,6 +122,8 @@ export interface SessionAddress {
  * stores live in `server/` while the pure `AgentDescriptor` lives in `shared/`.
  */
 export interface AgentStore {
+  /** Full historical file contents, when the CLI records recoverable backups. */
+  readFileSnapshot?(transcriptPath: string, transcript: string, filePath: string): Promise<FileSnapshot | null>
   readonly instanceId?: string
   readonly kind: AgentKind
   readonly descriptor: AgentDescriptor

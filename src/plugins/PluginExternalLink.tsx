@@ -33,7 +33,7 @@ export function usePluginExternalLink(pluginName: string) {
   const dialog = link ? <Dialog open onOpenChange={(open) => { if (!open) pending.current?.finish(false) }}>
     <DialogContent>
       <DialogTitle>Open link from {pluginName}?</DialogTitle>
-      <DialogDescription>This opens a website outside Cogpit.</DialogDescription>
+      <DialogDescription>This opens a website outside CC-Copilot.</DialogDescription>
       <p className="max-h-48 overflow-auto break-all rounded-md bg-muted p-3 text-sm" dir="ltr">{link?.url}</p>
       <DialogFooter>
         <Button variant="outline" onClick={() => pending.current?.finish(false)}>Cancel</Button>

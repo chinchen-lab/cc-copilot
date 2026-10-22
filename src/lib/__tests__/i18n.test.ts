@@ -46,6 +46,11 @@ describe("interface language", () => {
   })
 
   it("translates UI messages with interpolation while retaining English fallback and JSX spacing", () => {
+    for (const [source, translated] of [["Config", "設置"], ["Plugin", "外掛"], ["Plugins", "外掛"], ["Browser", "瀏覽器"], ["Running", "執行中"], ["Archive session", "封存對話"]]) {
+      expect(translate(source, undefined, "zh-TW")).toBe(translated)
+      expect(translate(source, undefined, "en")).toBe(source)
+    }
+    expect(translate("CC-Copilot detects ", undefined, "zh-TW")).toBe("CC-Copilot 會自動偵測 ")
     expect(translate("Settings", undefined, "zh-TW")).toBe("設定")
     expect(translate(" Settings ", undefined, "zh-TW")).toBe(" 設定 ")
     expect(translate("Describe the task for {0}", { "0": "Billing {1}" }, "zh-TW")).toContain("Billing {1}")

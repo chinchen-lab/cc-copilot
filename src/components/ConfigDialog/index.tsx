@@ -277,10 +277,10 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
                   <FieldContent>
                     <FieldLabel htmlFor="use-built-in-editor">
                       <PanelsTopLeft data-icon="inline-start" className="size-4 text-muted-foreground" />
-                      {t("Open files in Cogpit")}
+                      {t("Open files in CC-Copilot")}
                     </FieldLabel>
                     <FieldDescription>
-                      {t("Files and diffs open in Cogpit’s file workspace instead of launching an external editor.")}
+                      {t("Files and diffs open in CC-Copilot’s file workspace instead of launching an external editor.")}
                     </FieldDescription>
                   </FieldContent>
                 </Field>
@@ -292,7 +292,7 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
                   </FieldLabel>
                   <FieldDescription>
                     {useBuiltInEditor
-                      ? t("Not used while files open in Cogpit.")
+                      ? t("Not used while files open in CC-Copilot.")
                       : t("Leave blank to use $VISUAL or automatic detection.")}
                   </FieldDescription>
                   <Input

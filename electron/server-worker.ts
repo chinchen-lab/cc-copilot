@@ -53,7 +53,7 @@ async function start({ staticDir, userDataDir, isDev }: WorkerConfig): Promise<v
     writePortFile(port)
     process.on("exit", removePortFile)
 
-    console.log(`[server-worker] Cogpit server listening on http://${listenHost}:${port}`)
+    console.log(`[server-worker] CC-Copilot server listening on http://${listenHost}:${port}`)
     startSessionActivityMonitor()
     startDelegatedRequestWatcher()
     process.parentPort.postMessage({ type: "ready", port })

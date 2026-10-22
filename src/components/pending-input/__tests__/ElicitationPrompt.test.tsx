@@ -90,7 +90,7 @@ describe("ElicitationPrompt", () => {
       sessionId: "session-1",
       requestId: "req-url",
       serverName: "linear",
-      message: "Authorize Cogpit in your browser",
+      message: "Authorize CC-Copilot in your browser",
       mode: "url",
       url: "https://linear.app/oauth/authorize",
       askedAt: 0,

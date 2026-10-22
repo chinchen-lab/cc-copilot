@@ -11,7 +11,7 @@ vi.mock("@/components/ui/scroll-area", () => ({
 const projects = [{
   dirName: "-workspace-cogpit",
   path: "/workspace/cogpit",
-  shortName: "Cogpit",
+  shortName: "CC-Copilot",
   sessionCount: 7,
   lastModified: "2026-08-19T12:00:00.000Z",
 }]

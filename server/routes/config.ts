@@ -250,7 +250,7 @@ export function registerConfigRoutes(use: UseFn) {
     if (strengthError) {
       sendJson(res, 403, {
         valid: false,
-        error: `${strengthError}. Update it from the local Cogpit app.`,
+        error: `${strengthError}. Update it from the local CC-Copilot app.`,
       })
       return
     }

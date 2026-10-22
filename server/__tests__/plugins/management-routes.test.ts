@@ -108,7 +108,7 @@ describe("plugin management routes with the real manager and store", () => {
     expect(other.status).toBe(200)
     const preview = await stage()
     expect(preview.status).toBe(200)
-    expect(preview.data.incompatibleClients).toEqual(["Cogpit 2.6 · API 0.1"])
+    expect(preview.data.incompatibleClients).toEqual(["CC-Copilot 2.6 · API 0.1"])
     expect(JSON.stringify(preview.data)).not.toContain(other.data.sessionId)
     await call("DELETE", "/session", { session: other.data.sessionId })
     expect((await stage()).data.incompatibleClients).toBeUndefined()

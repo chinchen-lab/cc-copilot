@@ -61,7 +61,7 @@ export function AppStatusToasts({
   const editionUiUnavailable = useEditionUiUnavailable()
   useEffect(() => {
     if (!editionUiUnavailable) return
-    toast.info("This server offers features this build of Cogpit doesn’t include.", { id: "edition-ui-unavailable" })
+    toast.info("This server offers features this build of CC-Copilot doesn’t include.", { id: "edition-ui-unavailable" })
   }, [editionUiUnavailable])
 
   return (

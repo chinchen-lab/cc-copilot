@@ -84,7 +84,8 @@ function isOwned(path: string): boolean {
 function countAgentLines(source: string): number {
   let count = 0
   for (const line of source.split("\n")) {
-    const lowered = line.toLowerCase()
+    // The product wordmark is not a reference to an agent CLI.
+    const lowered = line.replaceAll("CC-Copilot", "").toLowerCase()
     if (AGENT_WORDS.some((word) => lowered.includes(word))) count += 1
   }
   return count

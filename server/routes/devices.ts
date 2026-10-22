@@ -59,8 +59,8 @@ type ProbeResult =
 
 const PROBE_MESSAGES: Record<ProbeCode, string> = {
   UNREACHABLE: "Could not reach the device. Check the host, port, and that it is running.",
-  NOT_COGPIT: "That address responded, but it is not a Cogpit device.",
-  LEGACY_NO_HELLO: "That device runs an older Cogpit without hub support. Update it, then try again.",
+  NOT_COGPIT: "That address responded, but it is not a CC-Copilot device.",
+  LEGACY_NO_HELLO: "That device runs an older CC-Copilot without hub support. Update it, then try again.",
   SELF_ADD: "That is this device — you cannot add the hub to itself.",
 }
 

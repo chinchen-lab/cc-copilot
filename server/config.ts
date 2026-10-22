@@ -62,7 +62,7 @@ export function setConfigPath(p: string): void {
  */
 const CONFIGURED_HOME_AGENT = soleDescriptorWhere(
   (descriptor) => !descriptor.cli.homeIsDiscoverable,
-  "a home Cogpit has to be told about",
+  "a home CC-Copilot has to be told about",
 )
 
 export interface AppConfig {
@@ -86,7 +86,7 @@ export interface AppConfig {
   networkPassword?: string
   terminalApp?: string
   editorApp?: string
-  /** Route "open in editor" affordances to Cogpit's own file workspace. */
+  /** Route "open in editor" affordances to CC-Copilot's own file workspace. */
   useBuiltInEditor?: boolean
   /** Which binary the configured-home agent is spawned from; absent means auto. */
   agentExecutable?: ExecutableChoice

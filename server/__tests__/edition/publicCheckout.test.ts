@@ -80,13 +80,13 @@ describe("an empty editions/team", () => {
     lay(layout)
     expect(loadEditions()).toEqual({
       personal: "personal",
-      team: "Cogpit Team is not installed in this build — set COGPIT_EDITION=personal or remove edition from config.local.json",
+      team: "CC-Copilot Team is not installed in this build — set COGPIT_EDITION=personal or remove edition from config.local.json",
     })
   }, 30_000)
 
   it("reaches the package through the same path once its entry file is there", () => {
     lay("present")
-    expect(loadEditions().team).toMatch(/^@cogpit\/team does not match this build of Cogpit; it lacks /)
+    expect(loadEditions().team).toMatch(/^@cogpit\/team does not match this build of CC-Copilot; it lacks /)
   }, 30_000)
 })
 

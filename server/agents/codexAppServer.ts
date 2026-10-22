@@ -600,14 +600,14 @@ export class CodexAppServer {
     child: CodexAppServerProcess,
   ): Promise<InitializeResult> {
     try {
-      validateCodexRequest("initialize", { clientInfo: { name: "cogpit", title: "Cogpit", version: this.clientVersion }, capabilities: CODEX_CLIENT_CAPABILITIES })
+      validateCodexRequest("initialize", { clientInfo: { name: "cogpit", title: "CC-Copilot", version: this.clientVersion }, capabilities: CODEX_CLIENT_CAPABILITIES })
       const result = await this.request<InitializeResult>(
         child,
         "initialize",
         {
           clientInfo: {
             name: "cogpit",
-            title: "Cogpit",
+            title: "CC-Copilot",
             version: this.clientVersion,
           },
           capabilities: CODEX_CLIENT_CAPABILITIES,

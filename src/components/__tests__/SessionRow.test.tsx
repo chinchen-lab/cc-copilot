@@ -1,8 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, fireEvent } from "@testing-library/react"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { render, screen, fireEvent, cleanup } from "@testing-library/react"
+import { setLanguage } from "@/lib/i18n/language"
 import * as React from "react"
 import { SessionRow } from "../LiveSessions/SessionRow"
 import type { ActiveSessionInfo, RunningProcess } from "../LiveSessions/types"
+
+afterEach(() => { cleanup(); setLanguage("en") })
 
 // SessionRow uses Tooltip from base-ui — provide simple pass-through components
 // so tests don't need to wire up full portal infrastructure.
@@ -52,6 +55,16 @@ function makeProcess(overrides: Partial<RunningProcess> = {}): RunningProcess {
 }
 
 describe("SessionRow — deferred state", () => {
+  it("translates the running session badge", () => {
+    setLanguage("zh-TW")
+    render(<SessionRow session={makeSession({isActive:true,agentStatus:"idle"})} isActiveSession={false} proc={undefined} killingPids={new Set()} onSelectSession={vi.fn()} />)
+    expect(screen.getByText("執行中")).toHaveAttribute("data-session-live-state")
+  })
+  it("translates the archive action and its tooltip", () => {
+    setLanguage("zh-TW")
+    render(<SessionRow session={makeSession({agentStatus:"completed"})} isActiveSession={false} proc={undefined} killingPids={new Set()} onSelectSession={vi.fn()} onArchiveSession={vi.fn()} />)
+    expect(screen.getByRole("button", {name:"封存對話"})).toHaveAttribute("title", "封存對話")
+  })
   beforeEach(() => {
     vi.clearAllMocks()
   })

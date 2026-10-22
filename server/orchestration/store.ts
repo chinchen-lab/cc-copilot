@@ -50,7 +50,7 @@ export class OrchestrationStore {
     try {
       this.db.exec("PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")
       const version = Number((this.db.prepare("PRAGMA user_version").get() as Row).user_version)
-      if (version > 4) throw new Error("Orchestration database was created by a newer Cogpit; upgrade before opening it")
+      if (version > 4) throw new Error("Orchestration database was created by a newer CC-Copilot; upgrade before opening it")
       this.transaction(() => {
         this.db.exec(`
           CREATE TABLE IF NOT EXISTS conversations(id TEXT PRIMARY KEY, native_key TEXT UNIQUE NOT NULL, data TEXT NOT NULL);

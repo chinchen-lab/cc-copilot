@@ -56,7 +56,7 @@ function DeliveryProblems({ storageKey, commands: receipts, readOnly, onAction }
         <Button size="xs" variant="outline" disabled={busy} onClick={() => void action({ action: "resolve", commandId: command.id, disposition: "failed" })}>{t("History confirms failure")}</Button>
         <Button size="xs" variant="outline" disabled={busy} onClick={() => setResending(command.id)}>{t("Resend…")}</Button>
       </div>}
-      {resending === command.id && <Alert><AlertTitle>{t("This may send a duplicate")}</AlertTitle><AlertDescription>{t("Review the conversation first. Cogpit could not confirm the original delivery.")}<Button size="xs" variant="destructive" disabled={busy} onClick={() => void action({ action: "resend", commandId: command.id, newCommandId: randomUUID(), confirmDuplicateRisk: true })}>{t("Confirm resend")}</Button><Button size="xs" variant="ghost" onClick={() => setResending(null)}>{t("Keep waiting")}</Button></AlertDescription></Alert>}
+      {resending === command.id && <Alert><AlertTitle>{t("This may send a duplicate")}</AlertTitle><AlertDescription>{t("Review the conversation first. CC-Copilot could not confirm the original delivery.")}<Button size="xs" variant="destructive" disabled={busy} onClick={() => void action({ action: "resend", commandId: command.id, newCommandId: randomUUID(), confirmDuplicateRisk: true })}>{t("Confirm resend")}</Button><Button size="xs" variant="ghost" onClick={() => setResending(null)}>{t("Keep waiting")}</Button></AlertDescription></Alert>}
     </div>)}
   </section>
 }

@@ -72,7 +72,7 @@ describe("probeMessage", () => {
     expect(probeMessage({ ok: false, code: "LEGACY_NO_HELLO" }, "box", 19384).text)
       .toMatch(/too old for multi-device/)
     expect(probeMessage({ ok: false, code: "NOT_COGPIT" }, "box", 19384).text)
-      .toMatch(/isn't Cogpit/)
+      .toMatch(/isn't CC-Copilot/)
     expect(probeMessage({ ok: false, code: "SELF_ADD" }, "box", 19384).text)
       .toMatch(/this machine/)
     expect(probeMessage({ ok: true, hello: { networkAccess: false } }, "box", 19384).text)
@@ -80,7 +80,7 @@ describe("probeMessage", () => {
     expect(probeMessage({ ok: true, hello: { configured: false } }, "box", 19384).text)
       .toMatch(/setup screen/)
     expect(probeMessage({ ok: true, hello: { name: "Studio", version: "1.0.1" } }, "box", 19384))
-      .toEqual({ tone: "ok", text: 'Found Cogpit "Studio" (v1.0.1).' })
+      .toEqual({ tone: "ok", text: 'Found CC-Copilot "Studio" (v1.0.1).' })
   })
 })
 
@@ -129,7 +129,7 @@ describe("DevicesDialog", () => {
 
     await user.type(screen.getByLabelText("Host"), "10.0.0.5")
     await user.tab()
-    expect(await screen.findByText(/Found Cogpit "Studio"/)).toBeInTheDocument()
+    expect(await screen.findByText(/Found CC-Copilot "Studio"/)).toBeInTheDocument()
 
     await user.type(screen.getByLabelText("Password"), "hunter2hunter2")
     await user.click(screen.getByRole("button", { name: "Add device" }))
@@ -157,7 +157,7 @@ describe("DevicesDialog", () => {
 
     await user.type(screen.getByLabelText("Host"), "10.0.0.8")
     await user.tab()
-    expect(await screen.findByText(/Found Cogpit "Team Studio"/)).toBeInTheDocument()
+    expect(await screen.findByText(/Found CC-Copilot "Team Studio"/)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Add device" })).toBeDisabled()
 
     await user.type(screen.getByLabelText("Username"), " Alice ")
@@ -350,7 +350,7 @@ describe("DevicesDialog", () => {
 
     await user.type(screen.getByLabelText("Host"), "10.0.0.5")
     await user.tab()
-    await screen.findByText(/Found Cogpit/)
+    await screen.findByText(/Found CC-Copilot/)
     await user.type(screen.getByLabelText("Password"), "wrong-pass-1")
     await user.click(screen.getByRole("button", { name: "Add device" }))
 

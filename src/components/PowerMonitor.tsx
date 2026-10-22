@@ -109,10 +109,10 @@ function processHint(metric: ElectronProcessMetric): string {
 function diagnosis(totalCpu: number, hottest?: ElectronProcessMetric, systemLeaks = 0): string {
   if (systemLeaks > 0) {
     return systemLeaks === 1
-      ? '1 agent process outside Cogpit looks leaked. See "Agent processes" below.'
-      : `${systemLeaks} agent processes outside Cogpit look leaked. See "Agent processes" below.`
+      ? '1 agent process outside CC-Copilot looks leaked. See "Agent processes" below.'
+      : `${systemLeaks} agent processes outside CC-Copilot look leaked. See "Agent processes" below.`
   }
-  if (totalCpu < 5) return "Cogpit is currently idle. Leave this open while the power spike happens."
+  if (totalCpu < 5) return "CC-Copilot is currently idle. Leave this open while the power spike happens."
   if (!hottest) return "The server is active. The lists below show its busiest recent work."
   if (hottest.name === "Server") {
     return "The server is doing the most work. Compare the activity and API lists below to find the hot loop."
@@ -123,7 +123,7 @@ function diagnosis(totalCpu: number, hottest?: ElectronProcessMetric, systemLeak
   if (hottest.name === "GPU") {
     return "The GPU process is doing the most work, which points to continuous compositing or visual effects."
   }
-  return `${hottest.name} is currently the busiest Cogpit process.`
+  return `${hottest.name} is currently the busiest CC-Copilot process.`
 }
 
 function ProcessRow({ metric }: { metric: ElectronProcessMetric }) {
@@ -194,7 +194,7 @@ function CpuHistory({ values }: { values: number[] }) {
     <div
       className="flex h-14 items-end gap-1 rounded-md bg-muted/50 p-2"
       role="img"
-      aria-label={t("Recent Cogpit CPU: {0}", { "0": values.map((value) => formatCpu(value)).join(", ") })}
+      aria-label={t("Recent CC-Copilot CPU: {0}", { "0": values.map((value) => formatCpu(value)).join(", ") })}
     >
       {values.length === 0 ? (
         <span className="self-center text-xs text-muted-foreground">{t("Collecting samples…")}</span>
@@ -358,7 +358,7 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
             <Card size="sm">
               <CardHeader>
                 <CardTitle>{t("Processes")}</CardTitle>
-                <CardDescription>{t("Which part of Cogpit is consuming CPU and memory.")}</CardDescription>
+                <CardDescription>{t("Which part of CC-Copilot is consuming CPU and memory.")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {processes.length > 0 ? processes.map((metric, index) => (
@@ -385,7 +385,7 @@ export function PowerMonitor({ open, onOpenChange }: PowerMonitorProps) {
                 <CardHeader>
                   <CardTitle>{t("Agent processes")}</CardTitle>
                   <CardDescription>
-                    {t("Claude sessions, browsers, and scripts running outside Cogpit.")}
+                    {t("Claude sessions, browsers, and scripts running outside CC-Copilot.")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
