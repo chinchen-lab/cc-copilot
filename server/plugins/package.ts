@@ -15,7 +15,7 @@ const bundleSchema = z.strictObject({
 })
 const archiveSchema = z.strictObject({
   archiveVersion: z.literal(1),
-  files: z.array(z.strictObject({ path: z.string().min(1).max(240), mime: z.string().max(80), content: z.string().max(PACKAGE_LIMITS.expanded) })).min(2).max(PACKAGE_LIMITS.files),
+  files: z.array(z.strictObject({ path: z.string().min(1).max(240), mime: z.string().max(80), content: z.string().max(PACKAGE_LIMITS.expanded) })).min(1).max(PACKAGE_LIMITS.files),
 })
 
 export interface InstallBundle {
@@ -115,7 +115,7 @@ export function inspectPackage(payload: Buffer, publisher: string): InspectedPac
   if (!manifestBytes) throw new Error("Missing plugin.json")
   const manifest = parseManifest(parseJsonText(manifestBytes, PACKAGE_LIMITS.manifest))
   if (manifest.publisher !== publisher) throw new Error("The signing publisher does not own this package")
-  if (files.get(manifest.entry)?.mime !== "text/javascript") throw new Error("Missing JavaScript entry")
+  if (manifest.entry && files.get(manifest.entry)?.mime !== "text/javascript") throw new Error("Missing JavaScript entry")
   if (manifest.style && files.get(manifest.style)?.mime !== "text/css") throw new Error("Missing stylesheet")
   for (const [path, file] of files) {
     if (file.mime === "text/javascript" && path !== manifest.entry) throw new Error("Only the declared JavaScript entry is permitted")
@@ -124,6 +124,13 @@ export function inspectPackage(payload: Buffer, publisher: string): InspectedPac
   for (const panel of manifest.contributes.panels) {
     if (panel.icon && !files.get(panel.icon)?.mime.startsWith("image/")) throw new Error(`Missing raster icon: ${panel.icon}`)
   }
+  let skillBytes = 0
+  for (const skill of manifest.contributes.skills ?? []) {
+    const file = files.get(skill.source)
+    if (!file || file.mime !== "text/plain" || file.bytes.length > 16384) throw new Error(`Missing or oversized skill source: ${skill.source}`)
+    skillBytes += file.bytes.length
+  }
+  if (skillBytes > 65536) throw new Error("Plugin skill sources exceed 64 KiB")
   const connections = new Map<string, ConnectionDefinition>()
   for (const grant of manifest.permissions.connections ?? []) {
     const definition = files.get(grant.definition)

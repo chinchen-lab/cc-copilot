@@ -27,6 +27,23 @@ function fixture(timeoutMs?: number) {
 afterEach(() => { for (const client of clients) client.dispose(); clients.clear(); vi.useRealTimers() })
 
 describe("plugin client", () => {
+  it("receives audio through a separate bounded binary reply and exposes a Blob", async () => {
+    const { port, client } = fixture()
+    const pending = client.connections.media("speech", "synthesize", { input: "Hello" })
+    expect(port.sent[0]).toMatchObject({ method: "connections.media" })
+    const bytes = new Uint8Array([255, 251, 1]).buffer
+    port.receive({ protocol: 1, type: "media-result", id: "r_1", value: { mimeType: "audio/mpeg", bytes } })
+    const blob = await pending
+    expect(blob.type).toBe("audio/mpeg")
+    expect(await blob.arrayBuffer()).toEqual(bytes)
+  })
+  it("rejects JSON masquerading as an audio reply", async () => {
+    const { port, client } = fixture()
+    const pending = client.connections.media("speech", "synthesize", { input: "Hello" })
+    const rejected = expect(pending).rejects.toMatchObject({ code: "INVALID_RESPONSE" })
+    port.reply(0, { url: "https://unapproved.example/audio" })
+    await rejected
+  })
   it("uses the supplied port and sends readiness exactly once", async () => {
     const { port, client } = fixture()
     expect(port.started).toBe(true)

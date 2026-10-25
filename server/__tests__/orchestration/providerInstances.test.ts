@@ -11,6 +11,7 @@ import { parseSession } from "../../../shared/session/parser"
 import { scopeParsedSession } from "../../../shared/session/instances"
 import type { AgentRuntime } from "../../agents/runtimeTypes"
 import { subscribe, type StreamBusEvent } from "../../lib/streamBus"
+import { registerPluginSkills } from "../../plugins/skillContext"
 const originalBrowserHome = process.env.COGPIT_BROWSER_HOME
 beforeEach(() => { process.env.COGPIT_BROWSER_HOME = join(process.env.COGPIT_ORCHESTRATION_ROOT!, "browser") })
 afterEach(() => { if (originalBrowserHome === undefined) delete process.env.COGPIT_BROWSER_HOME; else process.env.COGPIT_BROWSER_HOME = originalBrowserHome })
@@ -24,6 +25,26 @@ async function instance(label: string, args: string[] = []) {
 }
 async function until(predicate: () => boolean, timeout = 10000) { const deadline = Date.now() + timeout; while (!predicate()) { if (Date.now() > deadline) throw new Error("Provider state did not arrive"); await new Promise((resolve) => setTimeout(resolve, 20)) } }
 describe("provider instances and ACP", () => {
+  it.each(["interrupt", "stop"] as const)("does not submit a prompt when %s arrives during plugin skill loading", async action => {
+    const account = await instance("Canceled preparation")
+    const cwd = process.env.COGPIT_ORCHESTRATION_ROOT!
+    const started = await account.runtime.start({ cwd, dirName: descriptorFor("acp").dirName.encode(cwd) })
+    let release!: (text: string) => void
+    let entered = false
+    const unregister = registerPluginSkills(() => { entered = true; return new Promise(resolve => { release = resolve }) })
+    try {
+      const pending = account.runtime.send(started.sessionId, { message: "must not be dispatched" })
+      await until(() => entered && account.runtime.activity(started.sessionId).running)
+      expect(account.runtime.activity(started.sessionId).running).toBe(true)
+      await account.runtime[action](started.sessionId)
+      release("Private skill context")
+      expect((await pending).delivery).toBe("busy")
+      expect(await readFile(started.filePath, "utf8")).not.toContain("must not be dispatched")
+    } finally { release?.(""); unregister() }
+    const next = await account.runtime.send(started.sessionId, { message: "after cancellation", filePath: started.filePath })
+    expect(next.delivery).toBe("started")
+    expect(await next.completion).toMatchObject({ isError: false })
+  }, 20000)
   it("qualifies isolated native plans and sends answers only to their owning worker", async () => {
     let executable = resolve("server/__tests__/fixtures/plan-provider.mjs")
     if (process.platform === "win32") {

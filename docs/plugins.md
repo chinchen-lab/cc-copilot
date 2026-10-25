@@ -1,5 +1,41 @@
 # Workspace plugins
 
+Plugins can contribute workspace panels, settings fields, agent skills, inline chat cards and buttons that request an agent task. These contributions are independent: a skills-only or settings-only package needs no JavaScript entry or placeholder panel. New contribution APIs require plugin API 1.2.0. The Text to speech package is a minimal example under `plugins/tts/`.
+
+## Settings, skills and chat cards
+
+`contributes.settings` declares a `plugin` or `project` scope and up to 32 fields. Supported field types are `string`, `number`, `boolean` and `select`, with validated defaults and bounds. They appear under Configuration → Manage plugins → the installed plugin's Settings button. Credentials belong in a declared connection, not a settings field. Values are private to the authenticated principal and host; project settings are additionally isolated by canonical project identity. Saves use an expected revision, so a stale form cannot overwrite another client's changes. Disable retains settings; explicit own-data deletion removes them with the plugin's other saved data.
+
+Settings use a separate namespace from general plugin storage. The host returns declared fields only, supplies defaults for new fields and retains removed fields for rollback. If an older saved value no longer matches a field's bounds, the form explains which fields are showing defaults until saved. `client.settings.get()` reads the current validated values. The settings value limit is 32 KiB; default values must fit within 16 KiB. Incompatible `stateVersion` changes retain the existing recovery behavior.
+
+`contributes.skills` declares `{ id, title, description, source }`, where `source` is a signed Markdown asset. Each source is limited to 16 KiB and each package to 64 KiB of skill sources. Cogpit supplies enabled, workspace-scoped skills through its agent adapters, including isolated account workers. These supplementary instructions contain no connections or credentials and do not replace the user's or repository's instructions. They are refreshed when an agent query/thread is started or resumed; an already-running persistent query keeps its instruction snapshot until it is restarted. No user-owned global skill files are written or removed. The ACP adapter includes the same context with each prompt. Uninstalled/disabled/out-of-scope plugins and host safe mode contribute no new instructions.
+
+`contributes.chatBlocks` declares `{ id, title, height }`. An agent writes a fenced block with language `cogpit:<publisher.plugin>:<block-id>`, for example:
+
+````text
+```cogpit:cogpit.tts:speech
+Here are the words the user can turn into speech.
+```
+````
+
+The host activates the registered package's existing sandbox with `context.surface = { type: "chat-block", id, source }`. The package receives only that block's source, capped at 16 KiB, plus its permitted public context. Blocks activate only inside agent replies in an authorized workspace, after normal compatibility and scope checks. Quoted prompts, streaming text and shared views without a plugin host remain ordinary Markdown. Missing, disabled, incompatible or failed plugins leave readable source text. Frames activate near the viewport and are disposed outside it, when the reply changes, or when host/user/permissions change. Opening a card must not perform a provider write; the package's explicit controls request those operations. `client.ui.resize(height)` requests a bounded height of 80–800 pixels.
+
+`contributes.sessionActions` declares `{ id, title, skill, prompt }`. The referenced skill must be in the same manifest. Cogpit renders a composer button for the enabled, compatible plugin; clicking it sends the declared prompt through the session's existing send-permission and delivery path. A frame cannot invoke these buttons programmatically. Install/update review includes these actions and the instruction/card contributions.
+
+## Declared POST operations and audio
+
+Connection operations can declare `POST` and a JSON `body` using the same literal, argument, validated-resource and identity bindings as query fields. New numeric arguments support fractional values; bounded multiline string arguments must opt into `multiline`. Setup/credential-validation operations remain GET requests returning JSON. Arbitrary origins, paths, headers, CLI arguments and credentials are still unavailable to a package; the existing public-HTTPS destination policy, DNS pinning, authorization, cancellation and response limits apply.
+
+An audio operation declares `response: { type: "audio", mimeTypes, maxBytes }` and is called through `client.connections.media(handle, operationId, args)`. JSON calls cannot consume audio operations or vice versa. The host buffers at most 8 MiB of declared audio per request, permits four simultaneous audio requests, validates the MIME type and stream completion, and transfers bytes to the frame as an ArrayBuffer. The SDK returns a Blob. The plugin creates a local blob URL and revokes it when no longer needed. No credential or provider download URL enters the frame. The sandbox permits blob audio only and still has no direct network access. The same media cap applies through hub relays.
+
+## Text to speech MVP
+
+Install Text to speech from Browse, open its Settings, connect the speech service and choose a voice. The API key stays on the selected Cogpit host. Speed and MP3/WAV preferences live in the declared settings. A speech card generates audio only when its button is pressed, supports cancellation, and presents playback controls. Audio is ephemeral and is released when the card leaves the viewport or its session closes; the original text remains in the transcript.
+
+The composer’s Spoken summary action asks the current agent for the shortest useful summary in ordinary spoken prose, with no lists, numbered points or headings. Users can also ask directly, or tell the agent to summarize after every turn. The plugin skill explains these choices; it does not add a summary to every reply by default.
+
+The bundled example targets an OpenAI-compatible speech service and binds synthesis to the voice selected through its authenticated discovery operation. Provider errors that occur after a streaming 200 response can still result in partial audio: the host rejects empty/incomplete HTTP bodies and the card reports browser playback errors, but cannot prove a successfully decoded audio stream contains the entire intended speech. The service should validate parameters before sending response headers.
+
 ClickUp, GitHub, Vercel and Cloudflare render in Cogpit's existing right sidebar. Their panels are separate runtime packages, loaded after installation without rebuilding or restarting Cogpit. The host owns installation, so desktop and remote browser clients share the installed versions and enabled state.
 
 Fresh hosts start with no optional plugins installed. Open Plugins, choose Browse, and review a bundled package's access before installing. Existing hosts migrate the three original panels once to preserve current behavior; Cloudflare is new and is only ever installed on request. Disable keeps settings and connections. Uninstall retains data unless the user explicitly chooses to delete their saved data on that host. An uninstall is remembered across app updates.

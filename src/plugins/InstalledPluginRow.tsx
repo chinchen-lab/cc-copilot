@@ -37,7 +37,7 @@ export function InstalledPluginRow({ plugin, status, client, busy, run, onPrevie
     </AlertDescription></Alert>}
     <div className="flex flex-wrap gap-2">
       <Button size="sm" variant="outline" disabled={busy} onClick={() => change("enabled", { enabled: !plugin.enabled })}>{plugin.enabled ? "Disable" : "Enable"}</Button>
-      {plugin.manifest.permissions.connections.length > 0 && <Button size="sm" variant="outline" disabled={busy} onClick={() => onConnections(plugin.id)}>Connections</Button>}
+      {(plugin.manifest.permissions.connections.length > 0 || plugin.manifest.contributes.settings) && <Button size="sm" variant="outline" disabled={busy} onClick={() => onConnections(plugin.id)}>{plugin.manifest.contributes.settings ? "Settings" : "Connections"}</Button>}
       <Button size="sm" variant="outline" disabled={busy || plugin.pinned} onClick={() => onUpdate(plugin)}>Update from file</Button>
       {repairSeed && <Button size="sm" variant="outline" disabled={busy} onClick={() => run(async () => onPreview(await client.stageSeed(plugin.id, plugin.scope)))}>Review bundled repair</Button>}
       <Button size="sm" variant="outline" disabled={busy} onClick={() => change("pin", { pinned: !plugin.pinned })}>{plugin.pinned ? "Unpin version" : "Pin version"}</Button>

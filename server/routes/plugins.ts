@@ -12,6 +12,9 @@ import { PACKAGE_LIMITS } from "../plugins/package"
 import { pluginRuntimeDescriptor } from "../plugins/runtime"
 import { PLUGIN_SHELL_HEADERS, PLUGIN_SHELL_HTML } from "../plugins/shell"
 import { parseJsonText } from "../plugins/json"
+import { canReadPluginManifest, canReadConnection, pluginSnapshotForClient } from "../plugins/presentation"
+import type { ClientRuntimeDescriptor } from "@cogpit/plugin-contracts"
+import type { PluginInstallPreview } from "../../shared/contracts/plugins"
 
 const revisionSchema = z.strictObject({ expectedRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) })
 const uninstallSchema = z.union([revisionSchema.extend({ deleteData: z.literal(false).optional() }), revisionSchema.extend({ deleteData: z.literal(true), expectedConnectionRevision: revisionSchema.shape.expectedRevision })])
@@ -39,7 +42,7 @@ export function registerPluginRoutes(use: UseFn): void {
       sendJson(res, 200, pluginRuntimeDescriptor(manager?.snapshot().revision))
       return
     }
-    const recognized = ["/session", "/status", "/workspace/resolve", "/publishers", "/stage", "/stage-seed", "/leases", "/connections", "/connections/credential", "/connections/options", "/connections/select", "/connections/disconnect", "/connections/clear-data", "/connections/import-legacy"].includes(path)
+    const recognized = ["/session", "/status", "/settings", "/workspace/resolve", "/publishers", "/stage", "/stage-seed", "/leases", "/connections", "/connections/credential", "/connections/options", "/connections/select", "/connections/disconnect", "/connections/clear-data", "/connections/import-legacy"].includes(path)
       || /^\/(?:transactions|payload|installed|leases)\/[a-zA-Z0-9.-]+(?:\/(?:trial|commit|enabled|scope|pin|rollback|renew|call|session|session-handle))?$/.test(path)
     if (!recognized) { sendJson(res, 404, { code: "NOT_FOUND", error: "Unknown plugin endpoint" }); return }
     const requestAbort = new AbortController()
@@ -56,10 +59,19 @@ export function registerPluginRoutes(use: UseFn): void {
       }
       const binding = manager.authorization.resolve(req)
       const checkBinding = manager.authorize(req, binding)
+      const wireSnapshot = () => pluginSnapshotForClient(manager.snapshot(), manager.authorization.clientDescriptor(binding))
       const socket = req.socket
       const authorize = () => {
         if (requestAbort.signal.aborted || req.aborted || socket.destroyed || res.destroyed) throw new PluginAuthorizationError(409, "STALE_ACTIVATION", "The coordinating client disconnected")
         checkBinding()
+      }
+      const reviewPreview = async (preview: PluginInstallPreview, client?: ClientRuntimeDescriptor, cancel = true) => {
+        if (!canReadPluginManifest(preview.manifest, client) || preview.previousManifest && !canReadPluginManifest(preview.previousManifest, client)
+          || [...preview.connectionDefinitions, ...preview.previousConnectionDefinitions ?? []].some(definition => !canReadConnection(definition, client))) {
+          if (cancel) await manager.store.cancel(preview.transactionId, binding.sessionId, { authorize })
+          throw new PluginAuthorizationError(409, "INVALID_REQUEST", "Update the Cogpit client to review this package's contributions.")
+        }
+        return clientImpact(preview, manager.authorization.activeClients(binding.sessionId), pluginRuntimeDescriptor())
       }
       if (method === "DELETE" && path === "/session") {
         manager.authorization.revokeSession(req)
@@ -69,7 +81,7 @@ export function registerPluginRoutes(use: UseFn): void {
       if (method === "GET" && path === "/status") {
         const projects = await manager.projects.list()
         authorize()
-        const store = manager.snapshot()
+        const store = wireSnapshot()
         const { name, instanceId, ...runtime } = pluginRuntimeDescriptor(store.revision)
         sendJson(res, 200, { runtime, host: { name, instanceId }, store, projects, safeMode: manager.safeMode, connectionRevision: manager.connectionRevision })
         return
@@ -87,6 +99,18 @@ export function registerPluginRoutes(use: UseFn): void {
         if (query.size !== new Set(query.keys()).size) throw new HttpBodyError("Duplicate connection query fields", 400)
         const input = pluginConnectionTargetSchema.parse({ ...Object.fromEntries(query), projectId: query.get("projectId") })
         const result = await manager.listConnections(req, input, { authorize, signal: requestAbort.signal })
+        if (result.connections.some(connection => !canReadConnection(connection.definition, manager.authorization.clientDescriptor(binding)))) throw new PluginAuthorizationError(409, "INVALID_REQUEST", "Update the Cogpit client to configure this connection.")
+        authorize()
+        sendJson(res, 200, result)
+        return
+      }
+      if (path === "/settings" && (method === "GET" || method === "POST")) {
+        const query = new URL(req.url ?? "/", "http://localhost").searchParams
+        if (query.size !== new Set(query.keys()).size) throw new HttpBodyError("Duplicate settings query fields", 400)
+        const input = method === "GET"
+          ? pluginConnectionTargetSchema.parse({ ...Object.fromEntries(query), projectId: query.get("projectId") })
+          : pluginConnectionTargetSchema.extend({ values: z.unknown(), expectedRevision: revisionSchema.shape.expectedRevision }).parse(await readJsonBody(req, { maxBytes: 32768 }))
+        const result = await manager.settings(req, input, { authorize, signal: requestAbort.signal })
         authorize()
         sendJson(res, 200, result)
         return
@@ -120,7 +144,7 @@ export function registerPluginRoutes(use: UseFn): void {
         parseJsonText(root, PACKAGE_LIMITS.metadata)
         if (createHash("sha256").update(root).digest("hex") !== input.fingerprint) throw new HttpBodyError("Developer root fingerprint changed", 400)
         await manager.store.enrollDeveloper(input.publisher, input.label, root, { authorize })
-        sendJson(res, 200, manager.snapshot())
+        sendJson(res, 200, wireSnapshot())
         return
       }
       if (method === "POST" && path === "/stage") {
@@ -130,7 +154,7 @@ export function registerPluginRoutes(use: UseFn): void {
         await manager.validateScope(scope)
         authorize()
         const preview = await manager.store.stage(bytes, { owner: binding.sessionId, client, scope, authorize })
-        sendJson(res, 200, clientImpact(preview, manager.authorization.activeClients(binding.sessionId), pluginRuntimeDescriptor()))
+        sendJson(res, 200, await reviewPreview(preview, client))
         return
       }
       if (method === "POST" && path === "/stage-seed") {
@@ -138,7 +162,7 @@ export function registerPluginRoutes(use: UseFn): void {
         await manager.validateScope(input.scope)
         authorize()
         const preview = await manager.store.stageSeed(input.pluginId, { owner: binding.sessionId, client: input.client, scope: input.scope, authorize })
-        sendJson(res, 200, clientImpact(preview, manager.authorization.activeClients(binding.sessionId), pluginRuntimeDescriptor()))
+        sendJson(res, 200, await reviewPreview(preview, input.client))
         return
       }
       const [category, id, operation] = path.slice(1).split("/")
@@ -159,12 +183,13 @@ export function registerPluginRoutes(use: UseFn): void {
         if (method === "POST" && operation === "commit") {
           const { expectedRevision } = revisionSchema.parse(await readJsonBody(req))
           await manager.store.commit(id, binding.sessionId, { authorize, expectedRevision })
-          sendJson(res, 200, manager.snapshot())
+          sendJson(res, 200, wireSnapshot())
           return
         }
         if (method === "GET" && !operation) {
           const outcome = await manager.store.transactionOutcome(id, binding.sessionId)
           authorize()
+          await reviewPreview(outcome.preview, manager.authorization.clientDescriptor(binding), false)
           sendJson(res, 200, outcome)
           return
         }
@@ -192,10 +217,10 @@ export function registerPluginRoutes(use: UseFn): void {
           const parsed = z.strictObject({ digest: z.string().regex(/^[a-f0-9]{64}$/), client: clientRuntimeSchema, scope: pluginScopeSchema }).parse(input)
           await manager.validateScope(parsed.scope)
           const preview = await manager.store.rollback(id, parsed.digest, { owner: binding.sessionId, client: parsed.client, scope: parsed.scope, authorize })
-          sendJson(res, 200, clientImpact(preview, manager.authorization.activeClients(binding.sessionId), pluginRuntimeDescriptor()))
+          sendJson(res, 200, await reviewPreview(preview, parsed.client))
           return
         } else { sendJson(res, 404, { code: "NOT_FOUND", error: "Unknown plugin action" }); return }
-        sendJson(res, 200, manager.snapshot())
+        sendJson(res, 200, wireSnapshot())
         return
       }
       if (method === "POST" && path === "/leases") {
@@ -231,6 +256,15 @@ export function registerPluginRoutes(use: UseFn): void {
         if (method === "POST" && operation === "call") {
           const request = parseFrameMessage(await readJsonBody(req))
           if (request.type !== "request") throw new HttpBodyError("Expected a plugin request", 400)
+          if (request.method === "connections.media") {
+            const value = await manager.callMedia(req, id, request, { signal: requestAbort.signal })
+            authorize()
+            res.setHeader("Content-Type", value.mimeType)
+            res.setHeader("Content-Length", value.bytes.byteLength)
+            res.setHeader("X-Content-Type-Options", "nosniff")
+            res.end(Buffer.from(value.bytes))
+            return
+          }
           const value = await manager.call(req, id, request, { signal: requestAbort.signal })
           authorize()
           sendJson(res, 200, { value })

@@ -1,5 +1,5 @@
 import { CONTRACT_LIMITS, connectionResourceDependencies, parseConnectionDefinition, parseJson, utf8Length,
-  type ConnectionDefinition, type ConnectionOperation, type JsonValue } from "@cogpit/plugin-contracts"
+  parsePluginMedia, type PluginMedia, type ConnectionDefinition, type ConnectionOperation, type JsonValue } from "@cogpit/plugin-contracts"
 import type { PluginHttpsInput } from "./httpsTransport"
 
 export const CONNECTION_LIMITS = Object.freeze({ options: 100, secretBytes: 4096, stringBytes: 1024 })
@@ -57,10 +57,11 @@ function argsFor(operation: ConnectionOperation, value: unknown): Record<string,
   for (const [key, candidate] of Object.entries(args)) {
     const spec = operation.args[key]
     if (spec.type === "string") {
-      const value = text(candidate, spec.maxLength)
+      const value = spec.multiline ? (typeof candidate === "string" && candidate.length > 0 && utf8Length(candidate) <= spec.maxLength
+        && [...candidate].every(character => { const code = character.charCodeAt(0); return code !== 127 && (code >= 32 || code === 9 || code === 10 || code === 13) }) ? candidate : deny()) : text(candidate, spec.maxLength)
       if (spec.enum && !spec.enum.includes(value)) deny()
-    } else if (spec.type === "integer") {
-      if (!Number.isSafeInteger(candidate) || (candidate as number) < spec.min || (candidate as number) > spec.max) deny()
+    } else if (spec.type === "integer" || spec.type === "number") {
+      if ((spec.type === "integer" ? !Number.isSafeInteger(candidate) : typeof candidate !== "number" || !Number.isFinite(candidate)) || (candidate as number) < spec.min || (candidate as number) > spec.max) deny()
     } else if (typeof candidate !== "boolean") deny()
   }
   return args as Record<string, string | number | boolean>
@@ -108,7 +109,7 @@ export function createConnectionExecutor(rawDefinition: unknown, rawConnection: 
   }
   function build(call: unknown, audience: "setup" | "panel"): PluginHttpsInput {
     canceled()
-    const request = record(parseJson(call, { maxBytes: CONTRACT_LIMITS.argumentBytes }), ["operation", "args"])
+    const request = record(parseJson(call, { maxBytes: CONTRACT_LIMITS.messageBytes }), ["operation", "args"])
     if (typeof request.operation !== "string" || !Object.hasOwn(definition.operations, request.operation)) return deny()
     const operation = definition.operations[request.operation]
     if (operation.audience !== audience || (audience === "panel" && !allowed.has(request.operation))) return deny()
@@ -117,7 +118,7 @@ export function createConnectionExecutor(rawDefinition: unknown, rawConnection: 
       : encodeURIComponent(pathValue("arg" in part ? args[part.arg] : requireResource(part.resource).id))).join("/")
     const url = new URL(`${operation.origin}/${path}`)
     if (url.origin !== operation.origin || url.pathname !== `/${path}`) return deny()
-    for (const [key, part] of Object.entries(operation.query)) {
+    const bindingValue = (part: import("@cogpit/plugin-contracts").ConnectionQueryValue) => {
       let value: string | number | boolean | undefined
       if (typeof part === "string") value = args[part]
       else if ("arg" in part) value = args[part.arg]
@@ -127,14 +128,20 @@ export function createConnectionExecutor(rawDefinition: unknown, rawConnection: 
         value = connection.identity?.[part.identity]
         if (value === undefined) throw new Rejected("RESOURCE_REQUIRED")
       }
-      if (value !== undefined) url.searchParams.set(key, String(value))
+      return value
     }
+    for (const [key, part] of Object.entries(operation.query)) { const value = bindingValue(part); if (value !== undefined) url.searchParams.set(key, String(value)) }
+    const body = operation.body ? Object.fromEntries(Object.entries(operation.body).flatMap(([key, part]) => { const value = bindingValue(part); return value === undefined ? [] : [[key, value]] })) : undefined
     return { origin: operation.origin, path: url.pathname + url.search,
-      credential: { header: definition.auth.header, scheme: definition.auth.scheme, secret: connection.secret }, signal }
+      credential: { header: definition.auth.header, scheme: definition.auth.scheme, secret: connection.secret }, signal,
+      ...(operation.method === "POST" ? { method: "POST" as const } : {}), ...(body ? { body } : {}), ...(operation.response ? { response: operation.response } : {}) }
   }
-  async function execute(call: unknown, audience: "setup" | "panel"): Promise<ConnectionResult> {
+  function execute(call: unknown, audience: "setup" | "panel", media: true): Promise<ConnectionResult<PluginMedia>>
+  function execute(call: unknown, audience: "setup" | "panel", media?: false): Promise<ConnectionResult>
+  async function execute(call: unknown, audience: "setup" | "panel", media = false): Promise<ConnectionResult<JsonValue | PluginMedia>> {
     let request: PluginHttpsInput
     try { request = build(call, audience) } catch (error) { return resultError(error, "INVALID_REQUEST") }
+    if (!!request.response !== media) return { ok: false, error: "INVALID_REQUEST" }
     let data: unknown
     try {
       data = await new Promise<unknown>((resolve, reject) => {
@@ -146,6 +153,11 @@ export function createConnectionExecutor(rawDefinition: unknown, rawConnection: 
       canceled()
     } catch (error) { return resultError(error, "UPSTREAM_FAILED") }
     try {
+      if (media) {
+        const value = parsePluginMedia(data)
+        if (!request.response!.mimeTypes.includes(value.mimeType) || value.bytes.byteLength > request.response!.maxBytes) throw new Rejected("INVALID_RESPONSE")
+        return { ok: true, data: value }
+      }
       const value = parseJson(data, { maxBytes: CONTRACT_LIMITS.responseBytes, maxNodes: CONTRACT_LIMITS.responseNodes })
       if (containsSecret(value, connection.secret)) throw new Rejected("INVALID_RESPONSE")
       return { ok: true, data: value }
@@ -228,7 +240,8 @@ export function createConnectionExecutor(rawDefinition: unknown, rawConnection: 
     return next
   }
   return Object.freeze({
-    request: (call: unknown): Promise<ConnectionResult> => execute(call, "panel"),
+    request: (call: unknown) => execute(call, "panel"),
+    media: (call: unknown) => execute(call, "panel", true),
     async validate(): Promise<ConnectionResult<{ identity: Record<string, string> }>> {
       const result = await execute({ operation: definition.validationOperation, args: {} }, "setup")
       if (!result.ok) return result

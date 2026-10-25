@@ -40,6 +40,15 @@ export interface CompatibilityResult {
   unavailableOptional: { side: "client" | "host"; name: string; required: string; actual: string | null }[]
 }
 
+export function supportsPluginHost(manifest: PluginManifest, host: HostRuntimeDescriptor, options: { allowPrerelease?: boolean } = {}): boolean {
+  const matches = (version: string, range: string) => !!valid(version) && !!validRange(range) && satisfies(version, range, { includePrerelease: options.allowPrerelease === true })
+  return (!prerelease(manifest.version) || options.allowPrerelease === true)
+    && matches(host.appVersion, manifest.engines.host)
+    && host.manifestVersions.includes(manifest.manifestVersion) && host.protocolVersions.includes(manifest.protocol) && host.runtimes.includes(manifest.runtime)
+    && host.apiVersions.some(version => matches(version, manifest.engines.pluginApi))
+    && Object.entries(manifest.requires.host).every(([name, range]) => matches(host.capabilities[name] ?? "", range))
+}
+
 export function evaluateCompatibility(
   manifest: PluginManifest, client: ClientRuntimeDescriptor, host: HostRuntimeDescriptor,
   options: { allowPrerelease?: boolean; revoked?: boolean } = {},

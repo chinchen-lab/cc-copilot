@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react"
-import type { JsonValue, PluginContext, PluginRequest } from "@cogpit/plugin-contracts"
+import type { PluginExecutionResult, PluginContext, PluginRequest } from "@cogpit/plugin-contracts"
 import { createRuntimeFrame, type RuntimeFrameController } from "./runtimeFrame"
 
 export interface PluginFrameProps {
@@ -7,7 +7,7 @@ export interface PluginFrameProps {
   digest: string
   activationKey: string
   context: PluginContext
-  execute: (request: PluginRequest, signal: AbortSignal) => Promise<JsonValue>
+  execute: (request: PluginRequest, signal: AbortSignal) => Promise<PluginExecutionResult>
   active?: boolean
   title?: string
   onReady?: () => void

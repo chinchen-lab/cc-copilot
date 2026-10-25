@@ -9,6 +9,7 @@ import { instanceDirName, instanceSessionId, splitInstanceSessionId, splitInstan
 import type { ProviderInstance } from "../../shared/contracts/orchestration"
 import { isRecord } from "../../shared/objects"
 import { orchestrationStore } from "../orchestration/storage"
+import { pluginSkillContext } from "../plugins/skillContext"
 import type { CodexAsyncQuestion } from "./codexQuestions"
 import type { UsageCostRecord } from "./usageScanners"
 import * as streamBus from "../lib/streamBus"
@@ -67,6 +68,13 @@ export function createInstanceRuntime(instance: ProviderInstance, dataRoot: stri
     worker.on("exit", () => { if (child === worker) disconnect(new Error("Provider instance worker exited; native input channels expired")) })
     worker.on("message", (message: unknown) => {
       if (child !== worker || !isRecord(message)) return
+      if (message.type === "plugin-skills" && Number.isSafeInteger(message.requestId) && typeof message.cwd === "string" && message.cwd.length <= 8192) {
+        const requestId = message.requestId
+        void Promise.resolve(pluginSkillContext(message.cwd)).then(instructions => {
+          if (child === worker && worker.connected) worker.send({ type: "plugin-skills-result", requestId, instructions: instructions ?? "" }, () => {})
+        })
+        return
+      }
       if (message.type === "stream" && typeof message.sessionId === "string" && isRecord(message.event) && watched.has(message.sessionId)) { streamBus.forwardEvent(qualified(message.sessionId), message.event as unknown as streamBus.StreamBusEvent); return }
       if (message.type === "snapshot" && isRecord(message.value)) {
         const value = message.value

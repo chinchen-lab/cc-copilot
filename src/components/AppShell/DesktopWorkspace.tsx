@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils"
 import { BUILT_IN_WORKSPACE_PANEL_IDS } from "@/plugins/builtInPanelIds"
 import type { ProjectPromptContext, WorkspacePanelContext } from "@/plugin-api"
 import { useRuntimePlugins } from "@/plugins/useRuntimePlugins"
+import { RuntimePluginContributions } from "@/plugins/RuntimePluginContributions"
 import { useRuntimeWorkspacePanels } from "@/plugins/runtimeWorkspacePanels"
 import { SessionInputFooter } from "./SessionInputFooter"
 import { NewSessionHeadline } from "./NewSessionHero"
@@ -342,6 +343,7 @@ export function DesktopWorkspace({
   )
 
   return (
+    <RuntimePluginContributions runtime={runtimePlugins} workspacePath={project.currentCwd ?? null}>
     <div className="relative flex min-h-0 flex-1 overflow-hidden">
       {sidebarRendered && (
         <div className="view-transition-sidebar panel-enter w-80 shrink-0 border-r bg-sidebar text-sidebar-foreground">
@@ -416,5 +418,6 @@ export function DesktopWorkspace({
       </Suspense>}
 
     </div>
+    </RuntimePluginContributions>
   )
 }

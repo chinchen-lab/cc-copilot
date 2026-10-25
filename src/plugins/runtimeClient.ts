@@ -1,5 +1,6 @@
 import { z } from "zod"
-import { PLUGIN_API_VERSION, PROTOCOL_MAJOR, RUNTIME, parseMethodResult, type ClientRuntimeDescriptor, type PluginRequest } from "@cogpit/plugin-contracts"
+import { PLUGIN_API_VERSION, PROTOCOL_MAJOR, RUNTIME, MEDIA_LIMIT_BYTES, parsePluginMedia, parseMethodResult, type PluginMedia, type ClientRuntimeDescriptor, type PluginRequest } from "@cogpit/plugin-contracts"
+import { pluginSettingsSnapshotSchema } from "../../shared/contracts/pluginSettings"
 import { pluginHostStatusSchema, pluginPreviewSchema, pluginSnapshotSchema, pluginProjectSchema, type PluginHostStatus, type PluginProjectSummary } from "../../shared/contracts/pluginManagement"
 import { pluginConnectionSnapshotSchema, pluginResourceOptionsSchema, type PluginConnectionTarget } from "../../shared/contracts/pluginConnections"
 import type { PluginInstallPreview, PluginScope } from "../../shared/contracts/plugins"
@@ -21,7 +22,7 @@ export function clientRuntimeDescriptor(): ClientRuntimeDescriptor {
   return {
     appVersion: version, apiVersions: [PLUGIN_API_VERSION], manifestVersions: [1], protocolVersions: [PROTOCOL_MAJOR],
     runtimes: support.supported ? [RUNTIME] : [],
-    capabilities: support.supported ? { "workspace.panel": "1.0.0", "composer.append": "1.0.0", "navigation.external": "1.0.0", "navigation.session": "1.0.0" } : {},
+    capabilities: support.supported ? { "workspace.panel": "1.0.0", "composer.append": "1.0.0", "navigation.external": "1.0.0", "navigation.session": "1.0.0", "chat.blocks": "1.0.0", "session.actions": "1.0.0", "media.audio": "1.0.0", "settings.fields": "1.0.0" } : {},
     browser: support.browser,
   }
 }
@@ -208,6 +209,22 @@ export class RuntimePluginClient {
     signal?.throwIfAborted()
     return bytes
   }
+  async settings(target: PluginConnectionTarget, signal?: AbortSignal) {
+    const query = new URLSearchParams({ pluginId: target.pluginId, ...(target.projectId ? { projectId: target.projectId } : {}) })
+    return pluginSettingsSnapshotSchema.parse(await this.json(`settings?${query}`, undefined, "GET", signal))
+  }
+  async saveSettings(target: PluginConnectionTarget, values: Record<string, string | number | boolean>, expectedRevision: number, signal?: AbortSignal) {
+    return pluginSettingsSnapshotSchema.parse(await this.json("settings", { ...target, values, expectedRevision }, "POST", signal))
+  }
+  async media(leaseId: string, request: Extract<PluginRequest, { method: "connections.media" }>, signal?: AbortSignal): Promise<PluginMedia> {
+    const owner = this.controller.signal
+    const response = await this.request(`leases/${encodeURIComponent(leaseId)}/call`, { method: "POST", body: JSON.stringify(request), headers: { "Content-Type": "application/json" }, signal })
+    if (!response.ok) await readResponse(response)
+    const bytes = await boundedBytes(response, MEDIA_LIMIT_BYTES)
+    this.assertCurrent(owner)
+    signal?.throwIfAborted()
+    return parsePluginMedia({ mimeType: response.headers.get("Content-Type")?.split(";")[0], bytes })
+  }
   private acceptStore(value: unknown): void {
     const store = pluginSnapshotSchema.parse(value)
     const status = this.state.status
@@ -240,6 +257,7 @@ export class RuntimePluginClient {
   async renewLease(id: string, signal: AbortSignal): Promise<RuntimeLease> { return leaseSchema.parse(await this.json(`leases/${encodeURIComponent(id)}/renew`, undefined, "POST", signal)) }
   async revokeLease(id: string): Promise<void> { await this.json(`leases/${encodeURIComponent(id)}`, undefined, "DELETE") }
   async call(id: string, request: PluginRequest, signal: AbortSignal) {
+    if (request.method === "connections.media") throw new Error("Use the binary media transport for audio")
     const response = z.strictObject({ value: z.unknown() }).parse(await this.json(`leases/${encodeURIComponent(id)}/call`, request, "POST", signal))
     return parseMethodResult(request.method, response.value)
   }

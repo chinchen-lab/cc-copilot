@@ -4,6 +4,8 @@ import { mkdtemp, readFile, readdir, rm, writeFile, utimes, mkdir, symlink, read
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { parseConnectionDefinition } from "@cogpit/plugin-contracts"
+import { webcrypto } from "node:crypto"
+import { prepareRuntimePackage } from "../../../src/plugins/runtimePayload"
 import { MAX_RETAINED_VERSIONS, openPluginStore, type PluginStore, type PluginStoreOptions } from "../../plugins/store"
 import { createAuthority, createRoot, type Authority } from "./fixtures/signing"
 import { authorize, client, host, owner, signedPackage, type SignedPackage } from "./fixtures/storeSigning"
@@ -40,6 +42,15 @@ afterEach(async () => {
 })
 
 describe("durable host plugin store", () => {
+  it("installs a signed settings-only package containing just its manifest", async () => {
+    const candidate = signedPackage(authority, { declarative: true, contributes: { panels: [], settings: { scope: "plugin", fields: [{ id: "enabled", label: "Enabled", type: "boolean", default: true }] } } })
+    expect(JSON.parse(candidate.payload.toString()).files).toHaveLength(1)
+    const prepared = await prepareRuntimePackage(Uint8Array.from(candidate.payload).buffer, candidate.digest, webcrypto as unknown as Crypto)
+    expect(prepared.manifest.entry).toBeUndefined()
+    expect(prepared.entry).toBe("")
+    await install(candidate)
+    expect(store.snapshot().plugins[0].manifest).toEqual(prepared.manifest)
+  })
   it("previews verified connection declarations for installation and rollback", async () => {
     const operation = { origin: "https://api.example.com", method: "GET", path: [{ literal: "items" }], args: {}, query: {} }
     const definition = parseConnectionDefinition({ version: 1, id: "catalog", label: "Catalog", secret: { id: "token", label: "Token" }, auth: { header: "Authorization", scheme: "bearer" }, validationOperation: "validate", resources: { item: { label: "Item", options: { operation: "validate", items: "/items", id: "/id", label: "/name" } } }, operations: { validate: { ...operation, audience: "setup" }, read: { ...operation, audience: "panel" } } })

@@ -9,6 +9,7 @@ vi.mock("../../security", () => ({ onSessionRevoked: () => () => {}, isSessionTo
 vi.mock("../../routes/hello", () => ({ getInstanceId: () => "fixture-host", getAppVersion: () => "2.6.6" }))
 vi.mock("../../agents", () => ({ allStores: () => [] }))
 import { setRequestAuthentication } from "../../requestAuthentication"
+import * as hello from "../../routes/hello"
 import { PluginManager } from "../../plugins/manager"
 import { PluginConnectionStore } from "../../plugins/connectionStore"
 import { PluginStateStore } from "../../plugins/stateStore"
@@ -75,6 +76,44 @@ beforeEach(async () => {
 afterEach(async () => { await manager.close(); vi.restoreAllMocks(); await rm(directory, { recursive: true, force: true }) })
 
 describe("host-owned plugin connections and state", () => {
+  it("stores declared settings per principal with revision checks and retains them across disable", async () => {
+    const settings = { scope: "plugin" as const, fields: [{ id: "speed", label: "Speed", type: "number" as const, min: 0.5, max: 2, default: 1 }] }
+    await install(signedPackage(authority, { version: "1.1.0", metadataVersion: 2, retained: [installed], contributes: { panels: [], settings } }))
+    const initial = await manager.settings(req, target(null), options)
+    expect(initial).toEqual({ values: { speed: 1 }, revision: 0 })
+    const saved = await manager.settings(req, { ...target(null), values: { speed: 0.75 }, expectedRevision: 0 }, options)
+    expect(saved).toEqual({ values: { speed: 0.75 }, revision: 1 })
+    await expect(manager.settings(req, { ...target(null), values: { speed: 1.5 }, expectedRevision: 0 }, options)).rejects.toMatchObject({ code: "STALE_ACTIVATION" })
+    await expect(manager.settings(req, { ...target(null), values: { token: "forged" }, expectedRevision: 1 }, options)).rejects.toMatchObject({ code: "INVALID_REQUEST" })
+    expect(await manager.settings(session("admin-other"), target(null), options)).toEqual(initial)
+    const activation = await lease()
+    expect(await manager.call(req, activation.id, request("settings.get", {}))).toEqual({ speed: 0.75 })
+    await expect(manager.call(req, activation.id, request("storage.set", { key: "cogpit.settings", value: { speed: 2 } }))).rejects.toMatchObject({ code: "PERMISSION_REQUIRED" })
+    await manager.store.setEnabled("dev-test.probe", false, { expectedRevision: manager.snapshot().revision, authorize })
+    expect(await manager.settings(req, target(null), options)).toEqual(saved)
+    await expect(manager.call(req, activation.id, request("settings.get", {}))).rejects.toMatchObject({ code: "STALE_ACTIVATION" })
+  })
+
+  it("provides only enabled project-scoped signed skill sources and removes them in safe mode", async () => {
+    const skill = { id: "speech", title: "Speech", description: "Speak text", source: "skills/speech/SKILL.md" }
+    await install(signedPackage(authority, { version: "1.1.0", metadataVersion: 2, retained: [installed], contributes: { panels: [], skills: [skill] }, skillSources: { [skill.source]: "Use a speech fence." } }))
+    vi.spyOn(manager.projects, "resolveWorkspaceProject").mockResolvedValue({ id: project1, name: "Fixture", paths: [directory] })
+    expect(await manager.skillInstructions(directory)).toContain("Use a speech fence.")
+    expect(await manager.skillInstructions(directory)).not.toContain(token)
+    await manager.store.setScope("dev-test.probe", { type: "projects", projectIds: [project2] }, { expectedRevision: manager.snapshot().revision, authorize })
+    expect(await manager.skillInstructions(directory)).toBe("")
+    await manager.store.setScope("dev-test.probe", { type: "all" }, { expectedRevision: manager.snapshot().revision, authorize })
+    await manager.store.setEnabled("dev-test.probe", false, { expectedRevision: manager.snapshot().revision, authorize })
+    expect(await manager.skillInstructions(directory)).toBe("")
+  })
+  it("does not load retained plugin instructions after an incompatible host downgrade", async () => {
+    const source = "skills/speech/SKILL.md"
+    await install(signedPackage(authority, { version: "1.1.0", metadataVersion: 2, retained: [installed], contributes: { panels: [], skills: [{ id: "speech", title: "Speech", description: "Speak text", source }] }, skillSources: { [source]: "Use a speech fence." } }))
+    vi.spyOn(manager.projects, "resolveWorkspaceProject").mockResolvedValue(null)
+    expect(await manager.skillInstructions(directory)).toContain("Use a speech fence.")
+    vi.spyOn(hello, "getAppVersion").mockReturnValue("1.0.0")
+    expect(await manager.skillInstructions(directory)).toBe("")
+  })
   it("preserves two clients' acknowledged writes through failed trials, update and rollback", async () => {
     const secondClient = session()
     const activation = await lease()

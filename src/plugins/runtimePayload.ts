@@ -6,7 +6,7 @@ const MAX_UPLOAD = 4 * 1024 * 1024
 const MAX_EXPANDED = 16 * 1024 * 1024
 const archiveSchema = z.strictObject({ archiveVersion: z.literal(1), files: z.array(z.strictObject({
   path: z.string().min(1).max(240), mime: z.string().max(80), content: z.string().max(MAX_EXPANDED),
-})).min(2).max(256) })
+})).min(1).max(256) })
 
 export interface RuntimeAsset { path: string; mime: string; bytes: ArrayBuffer }
 export interface PreparedRuntimePackage { manifest: PluginManifest; entry: string; style: string | null; assets: RuntimeAsset[] }
@@ -117,8 +117,8 @@ export async function prepareRuntimePackage(payload: ArrayBuffer, digest: string
   const manifestFile = files.get("plugin.json")
   if (!manifestFile || manifestFile.mime !== "application/json" || manifestFile.bytes.byteLength > 65536) throw new Error("Missing or invalid plugin manifest")
   const manifest = parseManifest(JSON.parse(decoder.decode(manifestFile.bytes)))
-  const entry = files.get(manifest.entry)
-  if (!entry || entry.mime !== "text/javascript") throw new Error("Missing plugin entry")
+  const entry = manifest.entry ? files.get(manifest.entry) : null
+  if (manifest.entry && (!entry || entry.mime !== "text/javascript")) throw new Error("Missing plugin entry")
   const assets: RuntimeAsset[] = []
   for (const [path, file] of files) {
     if (file.mime === "text/javascript" && path !== manifest.entry) throw new Error("Undeclared JavaScript entry")
@@ -133,5 +133,5 @@ export async function prepareRuntimePackage(payload: ArrayBuffer, digest: string
   if (manifest.contributes.panels.some((panel) => !images.has(panel.icon))) throw new Error("Missing panel raster icon")
   const stylesheet = manifest.style ? files.get(manifest.style) : null
   if (manifest.style && (!stylesheet || stylesheet.mime !== "text/css")) throw new Error("Missing plugin stylesheet")
-  return { manifest, entry: decoder.decode(entry.bytes), style: stylesheet ? prepareStyle(decoder.decode(stylesheet.bytes), manifest.style!, images) : null, assets }
+  return { manifest, entry: entry ? decoder.decode(entry.bytes) : "", style: stylesheet ? prepareStyle(decoder.decode(stylesheet.bytes), manifest.style!, images) : null, assets }
 }

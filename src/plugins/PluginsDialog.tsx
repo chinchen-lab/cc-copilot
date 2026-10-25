@@ -14,6 +14,7 @@ import { PluginScopeEditor } from "./PluginScopeEditor"
 import { PluginPublisherForm } from "./PluginPublisherForm"
 import { PluginInstallTrial } from "./PluginInstallTrial"
 import { PluginConnections } from "./PluginConnections"
+import { PluginSettings } from "./PluginSettings"
 import { InstalledPluginRow } from "./InstalledPluginRow"
 import { PluginInstallReview } from "./PluginInstallReview"
 import { setBrowserSafeMode, useBrowserSafeMode } from "./browserSafeMode"
@@ -90,8 +91,10 @@ export function PluginsDialog({ client, state, currentPath, onClose, initialPlug
         {status?.store.recoveryCode && <p className="text-sm text-muted-foreground">{status.store.recoveryCode === "STORE_LOCKED" ? "Close the other Cogpit process using this data directory, then restart this host." : status.store.recoveryCode === "STORE_VERSION" ? "Open this host with the Cogpit version that last used its plugin store, or a newer compatible version." : "Keep the plugin data directory intact. Restart with plugin safe mode enabled and check the host log before restoring a verified backup."}</p>}
         {!status && <Button variant="outline" disabled={busy} onClick={() => { void run(() => client.refresh()) }}><RefreshCw data-icon="inline-start" />Retry connection</Button>}
         {status && connectionPlugin && !preview && <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-medium">{connectionPlugin.manifest.name} connections</h2><Button variant="outline" size="sm" onClick={() => setConnectionsId(undefined)}>Back to installed</Button></div>
-          <PluginConnections key={`${connectionPlugin.id}:${status.store.revision}`} client={client} status={status} pluginId={connectionPlugin.id} initialProjectId={currentProject?.id ?? null} />
+          <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-medium">{connectionPlugin.manifest.name}</h2><Button variant="outline" size="sm" onClick={() => setConnectionsId(undefined)}>Back to installed</Button></div>
+          {connectionPlugin.manifest.permissions.connections.length > 0 && connectionPlugin.manifest.contributes.settings && <p className="text-sm text-muted-foreground">Connect the service first. Its settings below take effect once it is connected.</p>}
+          {connectionPlugin.manifest.permissions.connections.length > 0 && <PluginConnections key={`${connectionPlugin.id}:${status.store.revision}`} client={client} status={status} pluginId={connectionPlugin.id} initialProjectId={currentProject?.id ?? null} />}
+          {connectionPlugin.manifest.contributes.settings && <PluginSettings key={`settings:${connectionPlugin.id}:${status.store.revision}`} client={client} pluginId={connectionPlugin.id} projectId={currentProject?.id ?? null} definition={connectionPlugin.manifest.contributes.settings} />}
         </div>}
         {status && !connectionPlugin && !preview && <Tabs value={tab} onValueChange={(value) => { setTab(String(value)); setUpdateTarget(null); setFile(null) }}>
           <TabsList className="h-auto flex-wrap"><TabsTrigger value="installed">Installed</TabsTrigger><TabsTrigger value="browse">Browse</TabsTrigger><TabsTrigger value="install">Install from file</TabsTrigger><TabsTrigger value="publishers">Publishers</TabsTrigger></TabsList>

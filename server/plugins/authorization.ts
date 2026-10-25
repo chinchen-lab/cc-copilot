@@ -117,6 +117,12 @@ export class PluginAuthorization {
     return [...this.sessions.entries()].flatMap(([id, session]) => id !== excludeSessionId && session.descriptor ? [structuredClone(session.descriptor)] : [])
   }
 
+  clientDescriptor(binding: PluginAuthorizationBinding): ClientRuntimeDescriptor | undefined {
+    this.assertBinding(binding)
+    const value = this.sessions.get(binding.sessionId)?.descriptor
+    return value ? structuredClone(value) : undefined
+  }
+
   resolve(req: IncomingMessage): PluginAuthorizationBinding {
     const authentication = requirePluginAuthentication(req)
     const id = pluginSessionHeader(req)

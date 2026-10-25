@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react"
+import { lazy, Suspense, useState, useCallback, useEffect } from "react"
 import { FolderOpen, CheckCircle, XCircle, Loader2, TerminalSquare, Code2, PanelsTopLeft } from "lucide-react"
 import {
   Dialog,
@@ -37,6 +37,9 @@ import {
 } from "../../../shared/contracts/agentExecutable"
 import { allDescriptors } from "../../../shared/session/agent-descriptors"
 import { PASSWORD_MIN_LENGTH } from "../../../shared/contracts/password"
+import { useRuntimePlugins } from "@/plugins/useRuntimePlugins"
+
+const PluginsDialog = lazy(() => import("@/plugins/PluginsDialog").then(module => ({ default: module.PluginsDialog })))
 
 /** Agents with more than one binary on offer, so a picker is worth showing. */
 const EXECUTABLE_CHOICE_KINDS = allDescriptors()
@@ -95,6 +98,8 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
   const remoteDevice = isRemoteDeviceActive()
   // An account without configWrite gets a read-only view (the server refuses writes anyway).
   const canWriteConfig = can("configWrite")
+  const [pluginsOpen, setPluginsOpen] = useState(false)
+  const runtimePlugins = useRuntimePlugins(open && pluginsOpen && canWriteConfig)
 
   // Network access state
   const [networkAccess, setNetworkAccess] = useState(false)
@@ -220,6 +225,7 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
   const canSave = computeCanSave()
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
@@ -230,6 +236,11 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
         </DialogHeader>
 
         <FieldGroup>
+          {canWriteConfig && <Field>
+            <FieldLabel>Plugins</FieldLabel>
+            <FieldDescription>Manage installed plugins, their settings, and service connections.</FieldDescription>
+            <Button type="button" variant="outline" onClick={() => setPluginsOpen(true)}>Manage plugins</Button>
+          </Field>}
           <Field>
             <FieldLabel htmlFor="claude-directory">Claude directory</FieldLabel>
             <FieldDescription>The directory containing your Claude configuration.</FieldDescription>
@@ -357,5 +368,7 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {open && pluginsOpen && canWriteConfig && <Suspense fallback={null}><PluginsDialog client={runtimePlugins.client} state={runtimePlugins} currentPath={null} onClose={() => setPluginsOpen(false)} /></Suspense>}
+    </>
   )
 }

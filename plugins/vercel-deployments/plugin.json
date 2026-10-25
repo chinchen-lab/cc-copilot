@@ -3,7 +3,7 @@
   "id": "cogpit.vercel",
   "publisher": "cogpit",
   "name": "Vercel Deployments",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "runtime": "browser-iife-v1",
   "entry": "plugin.js",
   "style": "plugin.css",

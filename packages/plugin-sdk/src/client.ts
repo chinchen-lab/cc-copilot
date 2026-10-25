@@ -15,7 +15,10 @@ export interface PluginClient {
   connections: {
     status(handle: string, options?: RequestOptions): Promise<MethodMap["connections.status"]["result"]>
     request(handle: string, operationId: string, args: Record<string, string | number | boolean>, options?: RequestOptions): Promise<JsonValue>
+    media(handle: string, operationId: string, args: Record<string, string | number | boolean>, options?: RequestOptions): Promise<Blob>
   }
+  settings: { get(options?: RequestOptions): Promise<JsonValue> }
+  ui: { resize(height: number, options?: RequestOptions): Promise<null> }
   storage: {
     get(key: string, options?: RequestOptions): Promise<JsonValue>
     set(key: string, value: JsonValue, options?: RequestOptions): Promise<null>
@@ -42,6 +45,7 @@ interface PendingRequest {
 function immutableContext(value: unknown): PluginContext {
   const context = parsePluginContext(value)
   if (context.project) Object.freeze(context.project)
+  if (context.surface) Object.freeze(context.surface)
   Object.freeze(context.theme.tokens)
   Object.freeze(context.theme)
   return Object.freeze(context)
@@ -110,13 +114,16 @@ export function createPluginClient({ port, context: initialContext, timeoutMs = 
     if (disposed) return
     let message: FrameMessage
     try { message = parseFrameMessage(event.data) } catch { dispose(); return }
-    if (message.type === "result" || message.type === "error") {
+    if (message.type === "result" || message.type === "media-result" || message.type === "error") {
       const current = pending.get(message.id)
       if (!current) return
       pending.delete(message.id); current.cleanup()
       if (message.type === "error") current.reject(new PluginRequestError(message.error.code, message.error.message))
       else {
-        try { current.resolve(parseMethodResult(current.method, message.value)) }
+        try {
+          if ((current.method === "connections.media") !== (message.type === "media-result")) throw new Error("Unexpected response type")
+          current.resolve(parseMethodResult(current.method, message.value))
+        }
         catch { current.reject(new PluginRequestError("INVALID_RESPONSE", "Host returned an invalid response")) }
       }
       return
@@ -160,7 +167,13 @@ export function createPluginClient({ port, context: initialContext, timeoutMs = 
     connections: Object.freeze({
       status: (handle: string, options?: RequestOptions) => request("connections.status", { handle }, options),
       request: (handle: string, operationId: string, args: Record<string, string | number | boolean>, options?: RequestOptions) => request("connections.request", { handle, operationId, args }, options),
+      media: async (handle: string, operationId: string, args: Record<string, string | number | boolean>, options?: RequestOptions) => {
+        const result = await request("connections.media", { handle, operationId, args }, options)
+        return new Blob([result.bytes], { type: result.mimeType })
+      },
     }),
+    settings: Object.freeze({ get: (options?: RequestOptions) => request("settings.get", {}, options) }),
+    ui: Object.freeze({ resize: (height: number, options?: RequestOptions) => request("ui.resize", { height }, options) }),
     storage: Object.freeze({
       get: (key: string, options?: RequestOptions) => request("storage.get", { key }, options),
       set: (key: string, value: JsonValue, options?: RequestOptions) => request("storage.set", { key, value }, options),

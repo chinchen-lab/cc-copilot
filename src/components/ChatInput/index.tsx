@@ -10,6 +10,7 @@ import { PermissionRequestBar } from "./PermissionRequestBar"
 import { useImageUpload } from "./useImageUpload"
 import { keepRefusedDraft, takeRefusedDraft } from "./refusedDrafts"
 import { ActionButtons } from "./ActionButtons"
+import { RuntimePluginActions } from "@/plugins/RuntimePluginActions"
 import { ErrorBanner } from "./ErrorBanner"
 import { PromptSuggestionBar } from "./PromptSuggestionBar"
 import { capabilitiesFor, DEFAULT_AGENT_KIND, type AgentKind } from "@/lib/agents"
@@ -537,6 +538,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
               getActionRowClass(stacked, isMultiline),
             )}>
               {footer}
+              <RuntimePluginActions />
               <ActionButtons hasContent={hasContent} onSubmit={handleSubmit} submitLabel={isSteering ? "Steer active turn" : "Send message"} />
             </div>
           </div>

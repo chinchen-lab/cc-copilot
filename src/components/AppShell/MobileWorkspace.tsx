@@ -7,6 +7,7 @@ import { BuiltInPanelServicesProvider } from "@/components/workspace-panels/Buil
 import { MobileWorkspacePanels } from "@/components/workspace-panels/MobileWorkspacePanels"
 import type { WorkspacePanelContext } from "@/plugin-api"
 import { useRuntimePlugins } from "@/plugins/useRuntimePlugins"
+import { RuntimePluginContributions } from "@/plugins/RuntimePluginContributions"
 import { useRuntimeWorkspacePanels } from "@/plugins/runtimeWorkspacePanels"
 import { resolvePluginPanelPreference } from "@/plugins/panelAliases"
 import { useCapability } from "@/hooks/useCapability"
@@ -67,6 +68,7 @@ export function MobileWorkspace({ navigation, sessionView, project, active }: Mo
   }
 
   return (
+    <RuntimePluginContributions runtime={runtimePlugins} workspacePath={project.currentCwd ?? null}>
     <BuiltInPanelServicesProvider value={{
       projectFilesRoot: project.projectFilesRoot ?? project.currentCwd ?? null,
       projectFilesRequest: project.projectFilesRequest,
@@ -111,5 +113,6 @@ export function MobileWorkspace({ navigation, sessionView, project, active }: Mo
           onClose={() => { setPluginsOpen(false); setPluginSettingsId(undefined) }} />
       </Suspense>}
     </BuiltInPanelServicesProvider>
+    </RuntimePluginContributions>
   )
 }

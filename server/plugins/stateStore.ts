@@ -22,12 +22,15 @@ export class PluginStateStore {
     return new PluginStateStore(store)
   }
   get(scope: PluginStateNamespace, key: string): JsonValue {
+    return this.versioned(scope, key).value
+  }
+  versioned(scope: PluginStateNamespace, key: string): { value: JsonValue; revision: number } {
     const state = this.store.read().namespaces[keyFor(scope)]
     if (state && state.stateVersion !== scope.stateVersion) throw new PluginDataError("CAPABILITY_UNAVAILABLE", "Plugin saved state schema is incompatible")
-    return state && Object.hasOwn(state.values, key) ? parseJson(state.values[key], { maxBytes: CONTRACT_LIMITS.storageValueBytes }) : null
+    return { value: state && Object.hasOwn(state.values, key) ? parseJson(state.values[key], { maxBytes: CONTRACT_LIMITS.storageValueBytes }) : null, revision: state?.revision ?? 0 }
   }
   drain(): Promise<void> { return this.store.drain() }
-  async write(scope: PluginStateNamespace, key: string, value: JsonValue | undefined, guard: DataGuard): Promise<void> {
+  async write(scope: PluginStateNamespace, key: string, value: JsonValue | undefined, guard: DataGuard, expectedRevision?: number): Promise<void> {
     if (!/^[A-Za-z][A-Za-z0-9_.-]{0,127}$/.test(key)) throw new PluginDataError("INVALID_REQUEST", "Invalid plugin storage key")
     let parsed: JsonValue | undefined
     try { parsed = value === undefined ? undefined : parseJson(value, { maxBytes: CONTRACT_LIMITS.storageValueBytes }) } catch { throw new PluginDataError("INVALID_REQUEST", "Plugin state value exceeds its limit") }
@@ -36,6 +39,7 @@ export class PluginStateStore {
     await this.store.update(document.revision, guard, next => {
       const key = keyFor(scope)
       const existing = next.namespaces[key]
+      if (expectedRevision !== undefined && (existing?.revision ?? 0) !== expectedRevision) throw new PluginDataError("STALE_ACTIVATION", "Plugin settings changed; refresh and retry")
       if (existing && existing.stateVersion !== scope.stateVersion) throw new PluginDataError("CAPABILITY_UNAVAILABLE", "Plugin saved state schema is incompatible")
       const state = existing ?? { principalId: scope.principalId, publisher: scope.publisher, pluginId: scope.pluginId, projectKey: scope.projectKey, stateVersion: scope.stateVersion, revision: 0, values: {} }
       if (parsed === undefined) delete state.values[argumentsKey]
