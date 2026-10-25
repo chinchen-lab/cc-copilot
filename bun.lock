@@ -17,6 +17,7 @@
         "node-pty": "^1.1.0",
         "proper-lockfile": "4.1.2",
         "semver": "7.8.5",
+        "signal-exit": "3.0.7",
         "smol-toml": "1.9.0",
         "tuf-js": "3.1.0",
         "vscode-jsonrpc": "8.2.1",
@@ -46,6 +47,7 @@
         "@types/react": "^19.0.2",
         "@types/react-dom": "^19.0.2",
         "@types/semver": "7.7.1",
+        "@types/signal-exit": "3.0.4",
         "@types/ws": "^8.18.1",
         "@vitejs/plugin-react": "^4.3.4",
         "@vitest/coverage-v8": "^4.1.12",
@@ -659,6 +661,8 @@
     "@types/send": ["@types/send@1.2.1", "", { "dependencies": { "@types/node": "*" } }, "sha512-arsCikDvlU99zl1g69TcAB3mzZPpxgw0UQnaHeC1Nwb015xp8bknZv5rIfri9xTOcMuaVgvabfIRA7PSZVuZIQ=="],
 
     "@types/serve-static": ["@types/serve-static@2.2.0", "", { "dependencies": { "@types/http-errors": "*", "@types/node": "*" } }, "sha512-8mam4H1NHLtu7nmtalF7eyBH14QyOASmcxHhSfEoRyr0nP/YdoesEtU+uSRvMe96TW/HPTtkoKqQLl53N7UXMQ=="],
+
+    "@types/signal-exit": ["@types/signal-exit@3.0.4", "", {}, "sha512-e7EUPfU9afHyWc5CXtlqbvVHEshrb05uPlDCenWIbMgtWoFrTuTDVYNLKk6o4X2/4oHTfNqrJX/vaJ3uBhtXTg=="],
 
     "@types/unist": ["@types/unist@3.0.3", "", {}, "sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q=="],
 
