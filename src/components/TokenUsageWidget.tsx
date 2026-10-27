@@ -33,9 +33,9 @@ const USAGE_TEXT_COLOR: Record<UsageLevel, string> = {
 
 function TooltipBody({ usage }: { usage: UsageData }) {
   const { t } = useTranslation()
-  const rows: { label: string; pct: number; resetsAt?: string }[] = []
+  const rows: { label: string; pct: number; resetsAt?: string; remaining?: number; limit?: number }[] = []
 
-  if (usage.fiveHour) rows.push({ label: usage.fiveHour.label ?? "5-hour", pct: usage.fiveHour.utilization, resetsAt: usage.fiveHour.resetsAt })
+  if (usage.fiveHour) rows.push({ label: usage.fiveHour.label ?? "5-hour", pct: usage.fiveHour.utilization, resetsAt: usage.fiveHour.resetsAt, remaining: usage.fiveHour.remaining, limit: usage.fiveHour.limit })
   if (usage.sevenDay) rows.push({ label: usage.sevenDay.label ?? "7-day", pct: usage.sevenDay.utilization, resetsAt: usage.sevenDay.resetsAt })
   if (usage.sevenDayOpus) rows.push({ label: "Opus", pct: usage.sevenDayOpus.utilization, resetsAt: usage.sevenDayOpus.resetsAt })
   if (usage.sevenDaySonnet) rows.push({ label: "Sonnet", pct: usage.sevenDaySonnet.utilization, resetsAt: usage.sevenDaySonnet.resetsAt })
@@ -74,6 +74,7 @@ function TooltipBody({ usage }: { usage: UsageData }) {
               </span>
             </div>
             <Progress value={Math.min(r.pct, 100)} />
+            {r.remaining != null && r.limit != null && <div className="text-xs text-muted-foreground">{t("Remaining: {0} / {1}", { "0": r.remaining.toLocaleString(undefined, { maximumFractionDigits: 3 }), "1": r.limit.toLocaleString() })}</div>}
             {resetH != null && (
               <div className="text-xs text-muted-foreground">{t("Resets in ")}{resetLabel}</div>
             )}

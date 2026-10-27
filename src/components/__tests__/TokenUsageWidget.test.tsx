@@ -22,6 +22,12 @@ beforeEach(() => { mocks.useTokenUsage.mockReset() })
 afterEach(() => { cleanup(); setLanguage("en") })
 
 describe("usage tooltip", () => {
+  it("shows small quota changes as an exact remaining allowance", async () => {
+    setUsage({ agentKind: "copilot", fiveHour: { utilization: 0.0125, label: "Premium interactions", remaining: 7999, limit: 8000 } })
+    render(<TokenUsageIndicator agentKind="copilot" />)
+    await userEvent.hover(screen.getByRole("button"))
+    expect(await screen.findByText("Remaining: 7,999 / 8,000")).toBeInTheDocument()
+  })
   it.each([
     ["2026-10-22T00:00:00Z", "1 Day"],
     ["2026-10-22T01:00:00Z", "1 Day 1h"],

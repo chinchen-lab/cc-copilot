@@ -56,6 +56,7 @@ const { sdk, codex, copilot, registry } = vi.hoisted(() => ({
     destroySession: vi.fn(async () => {}),
     deleteSession: vi.fn(async () => ({ success: true })),
     getAccountQuota: vi.fn(async () => ({ entitlement: 1 })),
+    getLiveAccountQuota: vi.fn(async () => ({ entitlement: 1 })),
     getSessionUsage: vi.fn(async (_sessionId: string) => ({})),
     shutdown: vi.fn(async () => [] as Error[]),
   },
@@ -140,6 +141,11 @@ beforeEach(() => {
 })
 
 describe("runtime registry", () => {
+  it("forwards forced quota refresh without restarting live sessions", async () => {
+    await runtimeFor("copilot").describeRuntime(true)
+    expect(copilot.getLiveAccountQuota).toHaveBeenCalledWith(true)
+    expect(copilot.shutdown).not.toHaveBeenCalled()
+  })
   it("exposes one runtime per agent, in detection order", () => {
     expect(allRuntimes().map(({ kind }) => kind)).toEqual(["acp", "codex", "copilot", "claude"])
   })

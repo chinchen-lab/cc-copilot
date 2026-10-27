@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from "react"
 import { openSessionStream } from "@/lib/sessionStream"
 import type { ParsedSession } from "../../shared/session/types"
 import type { RateLimitBlock } from "../../shared/session/rateLimit"
-import type { AgentKind } from "@/lib/agents"
+import { agentKindForDirName, type AgentKind } from "@/lib/agents"
+import { getActiveDeviceScope } from "@/lib/device"
+import { announceUsageRefresh } from "@/lib/usageRefreshEvents"
+import { quotaSourceFor } from "@/lib/agents/quota"
 import { createStreamingOverlayStore } from "@/lib/streamingOverlayStore"
 import { sessionCache } from "@/lib/sessionCache"
 import {
@@ -126,6 +129,8 @@ export function useLiveSession(
 
     const url = `/api/watch/${encodeURIComponent(dirName)}/${encodeURIComponent(fileName)}?offset=${watchOffset}`
     const stream = openSessionStream(url)
+    const usageScope = getActiveDeviceScope()
+    const usageKind = source?.agentKind ?? agentKindForDirName(dirName)
     const es = stream.source
     let staleTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -331,10 +336,12 @@ export function useLiveSession(
         } else if (data.type === "stream_clear") {
           clearOverlay()
           setIsCompacting(false)
+          announceUsageRefresh(usageKind, usageScope)
         } else if (data.type === "lines") {
           // Lines the server left out still moved the file on.
           if (typeof data.skippedBytes === "number") trackedOffset += data.skippedBytes
           if (data.lines.length === 0) return
+          if (quotaSourceFor(usageKind).hasUsageUpdate?.(data.lines)) announceUsageRefresh(usageKind, usageScope)
           setIsLive(true)
           setIsCompacting(false)
           resetStaleTimer()
@@ -379,7 +386,7 @@ export function useLiveSession(
       overlayRef.current = EMPTY_OVERLAY
       streamingOverlayStore.publish(EMPTY_OVERLAY)
     }
-  }, [dirName, fileName, rawText, watchOffset, streamingOverlayStore])
+  }, [dirName, fileName, rawText, watchOffset, streamingOverlayStore, source?.agentKind])
 
   return { isLive, sseState, isCompacting, streamingOverlayStore, turnError, agentProgress, promptSuggestion, rateLimit }
 }

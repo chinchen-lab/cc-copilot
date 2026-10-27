@@ -15,6 +15,7 @@ import {
   mapCopilotRuntimeResponse,
 } from "@/lib/agents/quota"
 import { useTokenUsage } from "../useTokenUsage"
+import { announceUsageRefresh } from "@/lib/usageRefreshEvents"
 
 const mockedAuthFetch = vi.mocked(authFetch)
 
@@ -121,6 +122,7 @@ describe("mapCopilotRuntimeResponse", () => {
         utilization: 5.5,
         resetsAt: "2026-10-01T00:00:00Z",
         label: "Chat",
+        remaining: 189, limit: 200,
       },
     })
   })
@@ -159,7 +161,7 @@ describe("mapCopilotRuntimeResponse", () => {
       },
     })).toEqual({
       accountLogin: "company-user", subscriptionType: "business",
-      fiveHour: { utilization: 30, label: "Premium interactions" },
+      fiveHour: { utilization: 30, label: "Premium interactions", remaining: 210, limit: 300 },
     })
   })
 
@@ -177,7 +179,7 @@ describe("mapCopilotRuntimeResponse", () => {
         chat: { hasQuota: false, remainingPercentage: 100 },
         premium_interactions: { entitlementRequests: 300, usedRequests: 120 },
       } },
-    })?.fiveHour).toEqual({ utilization: 40, label: "Premium interactions" })
+    })?.fiveHour).toEqual({ utilization: 40, label: "Premium interactions", remaining: 180, limit: 300 })
   })
 
   it("keeps account details available when an organization reports no personal quota", () => {
@@ -203,7 +205,7 @@ describe("mapCopilotRuntimeResponse", () => {
         premium_interactions: { entitlementRequests: 0, usedRequests: 0, remainingPercentage: 100 },
         [key]: { entitlementRequests: 8000, usedRequests: 2000, remainingPercentage: 75 },
       } },
-    })?.fiveHour).toEqual({ utilization: 25, label })
+    })?.fiveHour).toEqual({ utilization: 25, label, remaining: 6000, limit: 8000 })
   })
 
   it("prefers a known finite allowance over an incomplete zero-usage Chat snapshot", () => {
@@ -213,7 +215,7 @@ describe("mapCopilotRuntimeResponse", () => {
         chat: { remainingPercentage: 100 },
         premium_interactions: { entitlementRequests: 8000, usedRequests: 2000, remainingPercentage: 75 },
       } },
-    })?.fiveHour).toEqual({ utilization: 25, label: "Premium interactions" })
+    })?.fiveHour).toEqual({ utilization: 25, label: "Premium interactions", remaining: 6000, limit: 8000 })
   })
 
   it("keeps an exhausted finite allowance visible even when hasQuota is false", () => {
@@ -222,7 +224,7 @@ describe("mapCopilotRuntimeResponse", () => {
       quota: { quotaSnapshots: {
         premium_interactions: { entitlementRequests: 8000, usedRequests: 8000, remainingPercentage: 0, hasQuota: false },
       } },
-    })?.fiveHour).toEqual({ utilization: 100, label: "Premium interactions" })
+    })?.fiveHour).toEqual({ utilization: 100, label: "Premium interactions", remaining: 0, limit: 8000 })
   })
 })
 
@@ -235,6 +237,7 @@ describe("useTokenUsage", () => {
   afterEach(() => {
     __resetCapabilitiesForTest()
     vi.restoreAllMocks()
+    vi.useRealTimers()
   })
 
   it("does not fetch or schedule polling when provider usage is unavailable to a member", async () => {
@@ -280,6 +283,34 @@ describe("useTokenUsage", () => {
     )
     expect(intervalSpy).toHaveBeenCalled()
     expect(result.current).toMatchObject({ loading: false, available: true })
+  })
+
+  it("bypasses the runtime cache on manual refresh", async () => {
+    mockedAuthFetch.mockResolvedValue(jsonResponse({ available: true, quota: { quotaSnapshots: { chat: { remainingPercentage: 75 } } } }))
+    const { result } = renderHook(() => useTokenUsage("copilot"))
+    await vi.waitFor(() => expect(result.current.loading).toBe(false))
+    await act(async () => { result.current.refresh() })
+    expect(mockedAuthFetch).toHaveBeenLastCalledWith("/api/copilot/runtime?refresh=1", expect.objectContaining({ cache: "no-store" }))
+  })
+
+  it("refreshes on completion and retries delayed settlement, without crossing providers or devices", async () => {
+    vi.useFakeTimers()
+    mockedAuthFetch.mockResolvedValue(jsonResponse({ available: true, quota: { quotaSnapshots: { chat: { remainingPercentage: 75 } } } }))
+    const { unmount } = renderHook(() => useTokenUsage("copilot"))
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { announceUsageRefresh("claude"); announceUsageRefresh("copilot", "another-device") })
+    expect(mockedAuthFetch).toHaveBeenCalledTimes(1)
+    await act(async () => { announceUsageRefresh("copilot") })
+    expect(mockedAuthFetch).toHaveBeenLastCalledWith("/api/copilot/runtime?refresh=1", expect.any(Object))
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+    expect(mockedAuthFetch).toHaveBeenCalledTimes(3)
+    await act(async () => { await vi.advanceTimersByTimeAsync(8000) })
+    expect(mockedAuthFetch).toHaveBeenCalledTimes(4)
+    await act(async () => { await vi.advanceTimersByTimeAsync(20000) })
+    expect(mockedAuthFetch).toHaveBeenCalledTimes(5)
+    unmount()
+    await act(async () => { announceUsageRefresh("copilot"); await vi.advanceTimersByTimeAsync(60000) })
+    expect(mockedAuthFetch).toHaveBeenCalledTimes(5)
   })
 
   it("ignores a stale provider response after the selected agent changes", async () => {

@@ -614,9 +614,9 @@ export const copilotRuntime: AgentRuntime = {
     return { sessionId: forked.sessionId, fileName: descriptor.sessionFile.name(forked.sessionId) }
   },
 
-  async describeRuntime() {
+  async describeRuntime(force = false) {
     try {
-      return { available: true, quota: await transport.getAccountQuota(), errors: {} }
+      return { available: true, quota: await transport.getLiveAccountQuota(force), errors: {} }
     } catch (error) {
       return {
         available: false,

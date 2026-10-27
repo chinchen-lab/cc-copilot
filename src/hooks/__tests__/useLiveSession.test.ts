@@ -6,6 +6,7 @@ import type { SessionSource } from "../useLiveSession"
 import type { ParsedSession } from "../../../shared/session/types"
 import { SESSION_ACCESS_LOST_EVENT } from "@/lib/sessionAccessEvents"
 import { sessionCache } from "@/lib/sessionCache"
+import { USAGE_REFRESH_EVENT } from "@/lib/usageRefreshEvents"
 
 // Mock auth
 vi.mock("@/lib/auth", () => ({
@@ -139,6 +140,29 @@ describe("useLiveSession", () => {
   function getLastEventSource(): MockEventSource {
     return MockEventSource.instances[MockEventSource.instances.length - 1]
   }
+
+  it("announces a quota refresh when a turn clears its stream", () => {
+    const listener = vi.fn()
+    window.addEventListener(USAGE_REFRESH_EVENT, listener)
+    const { unmount } = renderHook(() => useLiveSession({ dirName: "copilot__project", agentKind: "copilot", fileName: "session.jsonl", rawText: "{}" }, onUpdate, workerParse, workerAppend))
+    act(() => { getLastEventSource().simulateMessage({ type: "stream_clear" }) })
+    expect(listener).toHaveBeenCalledOnce()
+    expect(listener.mock.calls[0][0].detail.agentKind).toBe("copilot")
+    unmount()
+    window.removeEventListener(USAGE_REFRESH_EVENT, listener)
+  })
+
+  it("refreshes quota from durable turn-end records when no stream clear is emitted", () => {
+    const listener = vi.fn()
+    window.addEventListener(USAGE_REFRESH_EVENT, listener)
+    const { unmount } = renderHook(() => useLiveSession({ dirName: "copilot__project", agentKind: "copilot", fileName: "session.jsonl", rawText: "{}" }, onUpdate, workerParse, workerAppend))
+    act(() => { getLastEventSource().simulateMessage({ type: "lines", lines: [JSON.stringify({ type: "assistant.message", data: {} })] }) })
+    expect(listener).not.toHaveBeenCalled()
+    act(() => { getLastEventSource().simulateMessage({ type: "lines", lines: [JSON.stringify({ type: "assistant.turn_end", data: {} })] }) })
+    expect(listener).toHaveBeenCalledOnce()
+    unmount()
+    window.removeEventListener(USAGE_REFRESH_EVENT, listener)
+  })
 
   it("returns initial disconnected state with null source", () => {
     const { result } = renderHook(() => useLiveSession(null, onUpdate, workerParse, workerAppend))

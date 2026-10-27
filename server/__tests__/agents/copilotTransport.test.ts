@@ -151,6 +151,42 @@ afterEach(async () => {
 })
 
 describe("CopilotRuntime", () => {
+  it("reads live quota in disposable processes while preserving the session transport", async () => {
+    const owner = createHarness()
+    owner.handle("session.create", () => ({ sessionId: "active" }))
+    await owner.runtime.createSession({ sessionId: "active" })
+    const fresh = createHarness()
+    fresh.handle("account.getQuota", () => ({ quotaSnapshots: { premium_interactions: { entitlementRequests: 8000, usedRequests: 1 } } }))
+    vi.mocked(owner.spawn).mockImplementationOnce(() => fresh.process)
+    const results = await Promise.all([owner.runtime.getLiveAccountQuota(), owner.runtime.getLiveAccountQuota()])
+    expect(results[0].quotaSnapshots.premium_interactions.usedRequests).toBe(1)
+    expect(results[1]).toEqual(results[0])
+    expect(fresh.process.killed).toBe(true)
+    expect(owner.process.killed).toBe(false)
+    expect(owner.runtime.isSessionActive("active")).toBe(true)
+    await owner.runtime.getLiveAccountQuota()
+    expect(owner.spawn).toHaveBeenCalledTimes(2)
+
+    const newer = createHarness()
+    newer.handle("account.getQuota", () => ({ quotaSnapshots: { premium_interactions: { entitlementRequests: 8000, usedRequests: 2 } } }))
+    vi.mocked(owner.spawn).mockImplementationOnce(() => newer.process)
+    expect((await owner.runtime.getLiveAccountQuota(true)).quotaSnapshots.premium_interactions.usedRequests).toBe(2)
+    expect(newer.process.killed).toBe(true)
+    expect(owner.process.killed).toBe(false)
+  })
+
+  it("cleans up failed quota readers and permits a fresh retry", async () => {
+    const owner = createHarness(), failed = createHarness()
+    failed.handle("account.getQuota", () => { throw new Error("quota unavailable") })
+    vi.mocked(owner.spawn).mockImplementationOnce(() => failed.process)
+    await expect(owner.runtime.getLiveAccountQuota()).rejects.toThrow("quota unavailable")
+    expect(failed.process.killed).toBe(true)
+    const recovered = createHarness()
+    recovered.handle("account.getQuota", () => ({ quotaSnapshots: {} }))
+    vi.mocked(owner.spawn).mockImplementationOnce(() => recovered.process)
+    await expect(owner.runtime.getLiveAccountQuota()).resolves.toEqual({ quotaSnapshots: {} })
+    expect(recovered.process.killed).toBe(true)
+  })
   it("reports a missing CLI before opening the JSON-RPC transport", async () => {
     const runtime = new CopilotRuntime({ env: { PATH: "" } })
 

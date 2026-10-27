@@ -339,6 +339,8 @@ export class CopilotRuntime {
   private shutdownPromise: Promise<Error[]> | null = null
   private stopped = false
   private permissionModeRpc: "unknown" | "stable" | "current" = "unknown"
+  private quotaSnapshot: { value: CopilotAccountQuota; fetchedAt: number } | null = null
+  private quotaRead: Promise<CopilotAccountQuota> | null = null
 
   private readonly activeSessions = new Set<string>()
   private readonly activeTurns = new Set<string>()
@@ -415,6 +417,28 @@ export class CopilotRuntime {
       throw new CopilotRuntimeError("Copilot CLI models.list returned no models")
     }
     return response.models.filter(isRecord) as CopilotModel[]
+  }
+
+  /** The CLI caches account.getQuota for its entire lifetime. Never restart a
+   * session-owning transport just to update the account meter. */
+  async getLiveAccountQuota(force = false): Promise<CopilotAccountQuota> {
+    if (this.quotaRead) return this.quotaRead
+    if (!force && this.quotaSnapshot && Date.now() - this.quotaSnapshot.fetchedAt < 30_000) return this.quotaSnapshot.value
+    const reader = new CopilotRuntime({
+      command: this.command, cwd: this.cwd, env: this.env, spawn: this.spawn,
+      transportTimeoutMs: this.transportTimeoutMs, requestTimeoutMs: this.requestTimeoutMs,
+    })
+    const read = (async () => {
+      try {
+        const value = await reader.getAccountQuota()
+        this.quotaSnapshot = { value, fetchedAt: Date.now() }
+        return value
+      } finally {
+        await reader.shutdown()
+      }
+    })()
+    this.quotaRead = read
+    try { return await read } finally { if (this.quotaRead === read) this.quotaRead = null }
   }
 
   async getAccountQuota(): Promise<CopilotAccountQuota> {

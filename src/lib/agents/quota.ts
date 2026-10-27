@@ -11,6 +11,8 @@ export interface UsageBucket {
   utilization: number
   resetsAt?: string
   label?: string
+  remaining?: number
+  limit?: number
 }
 
 export interface UsageData {
@@ -203,11 +205,16 @@ function copilotQuotaBucket(
   if (raw.hasQuota === false && !(entitlement !== undefined && entitlement > 0)) return undefined
 
   let utilization: number | undefined
-  if (remaining !== undefined) utilization = 100 - remaining
-  else if (used !== undefined && entitlement !== undefined && entitlement > 0) {
+  if (used !== undefined && used >= 0 && entitlement !== undefined && entitlement > 0) {
     utilization = used / entitlement * 100
   }
-  return usageBucket(utilization, str(raw.resetDate), label)
+  else if (remaining !== undefined) utilization = 100 - remaining
+  const bucket = usageBucket(utilization, str(raw.resetDate), label)
+  if (bucket && used !== undefined && used >= 0 && entitlement !== undefined && entitlement > 0) {
+    bucket.remaining = Math.max(0, entitlement - used)
+    bucket.limit = entitlement
+  }
+  return bucket
 }
 
 /** Map Copilot's account quota into the primary shared usage meter. */
@@ -237,6 +244,11 @@ export function mapCopilotRuntimeResponse(data: Record<string, unknown>): UsageD
 // ── The table ─────────────────────────────────────────────────────────────
 
 export interface QuotaSource {
+  pollIntervalMs?: number
+  /** Durable completion signals for runtimes without token-stream clear events. */
+  hasUsageUpdate?(lines: readonly string[]): boolean
+  /** Retry after a turn so delayed billing settlement is picked up too. */
+  completionRefreshDelaysMs?: readonly number[]
   /** Endpoint carrying this agent's live quota. */
   endpoint: string
   /** Reads that endpoint's own response shape into the shared meter. */
@@ -253,7 +265,13 @@ const QUOTA_SOURCES: Record<AgentKind, QuotaSource> = {
     legacy: { endpoint: "/api/usage", read: mapLegacyClaudeUsage },
   },
   codex: { endpoint: "/api/codex/runtime", read: mapCodexRuntimeResponse },
-  copilot: { endpoint: "/api/copilot/runtime", read: mapCopilotRuntimeResponse },
+  copilot: {
+    endpoint: "/api/copilot/runtime", read: mapCopilotRuntimeResponse, pollIntervalMs: 30_000, completionRefreshDelaysMs: [0, 2_000, 10_000],
+    hasUsageUpdate: lines => lines.some(line => {
+      try { return ["assistant.turn_end", "session.idle", "session.shutdown"].includes(JSON.parse(line)?.type) }
+      catch { return false }
+    }),
+  },
 }
 
 export function quotaSourceFor(kind: AgentKind): QuotaSource {

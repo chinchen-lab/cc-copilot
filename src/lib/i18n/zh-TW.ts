@@ -1403,6 +1403,7 @@ export const zhTW: Readonly<Record<string, string>> = {
   "Unified": "統一",
   "Before": "修改前",
   "After": "修改後",
+  "Remaining: {0} / {1}": "剩餘額度：{0} / {1}",
   "Review {0} flagged process": "檢查 {0} 個標記的程序",
   "Review {0} flagged processes": "檢查 {0} 個標記的程序",
   "Leak monitor. No flagged processes": "程序監控：沒有標記的程序",

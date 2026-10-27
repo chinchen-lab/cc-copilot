@@ -19,6 +19,7 @@ export function registerAgentRuntimeRoutes(use: UseFn): void {
       if (req.method !== "GET") return next()
       const url = new URL(req.url ?? "/", "http://localhost")
       if (url.pathname !== "/" && url.pathname !== "") return next()
+      res.setHeader("Cache-Control", "no-store")
 
       void runtime.describeRuntime(url.searchParams.get("refresh") === "1").then(
         (snapshot) => { sendJson(res, 200, snapshot as Record<string, unknown>) },
