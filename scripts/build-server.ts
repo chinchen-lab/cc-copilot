@@ -23,7 +23,9 @@ function run(args: string[]) {
   if (child.status !== 0) process.exit(child.status ?? 1)
 }
 run(["install", "--frozen-lockfile", "--ignore-scripts"])
-run(["run", "build:web"])
+// Vite's node shebang would otherwise use the system Node, which may lack
+// server APIs imported by vite.config.ts (for example zstd on Node 18).
+run(["run", "--bun", "build:web"])
 const output = packageServer({ root, bun: process.execPath })
 const archive = `${output}.tar.gz`
 const packed = spawnSync("tar", ["-czf", archive, "-C", dirname(output), basename(output)], { stdio: "inherit" })

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { spawnSync } from "node:child_process"
@@ -26,6 +26,49 @@ function fixture() {
 }
 
 describe("portable server package", () => {
+  it.skipIf(process.platform === "win32")("builds with Bun even when a tool's node shebang would select an unsupported system Node", () => {
+    const { root, write } = fixture()
+    const runtime = spawnSync("bun", ["-p", "process.execPath"], { encoding: "utf8" })
+    expect(runtime.status).toBe(0)
+    const bun = runtime.stdout.trim()
+    write("package.json", JSON.stringify({
+      name: "server-build-fixture", private: true, type: "module", workspaces: ["packages/example"],
+      dependencies: { example: "workspace:*" },
+      scripts: { "build:web": "bun run build:plugins && vite build", "build:plugins": "fixture-plugin-build" },
+    }))
+    write("packages/example/package.json", JSON.stringify({
+      name: "example", version: "1.0.0", type: "module",
+      bin: { "fixture-plugin-build": "fixture-plugin-build.js", vite: "vite.js" },
+    }))
+    rmSync(join(root, "bun.lock"))
+    for (const file of ["scripts/build-server.ts", "scripts/lib/serverPackage.ts"]) {
+      mkdirSync(dirname(join(root, file)), { recursive: true })
+      copyFileSync(new URL(`../../${file}`, import.meta.url), join(root, file))
+    }
+    // Both nested plugin builds and Vite normally run through /usr/bin/env node.
+    for (const tool of ["fixture-plugin-build", "vite"]) {
+      write(`packages/example/${tool}.js`, `#!/usr/bin/env node
+import { writeFileSync } from "node:fs"
+import { createZstdDecompress } from "node:zlib"
+if (!process.versions.bun) throw new Error("Build tool must use Bun")
+createZstdDecompress().destroy()
+writeFileSync(${JSON.stringify(join(root, `${tool}.runtime`))}, process.versions.bun)
+`)
+      chmodSync(join(root, "packages/example", `${tool}.js`), 0o755)
+    }
+    write("bin/node", '#!/bin/sh\necho "Unsupported system Node was invoked" >&2\nexit 99\n')
+    chmodSync(join(root, "bin/node"), 0o755)
+    symlinkSync(bun, join(root, "bin/bun"))
+    mkdirSync(join(root, "tmp"))
+    const env = { ...process.env, PATH: `${join(root, "bin")}:${process.env.PATH}`, TMPDIR: join(root, "tmp"), BUN_INSTALL_CACHE_DIR: join(root, "cache") }
+    const install = spawnSync(bun, ["install", "--ignore-scripts"], { cwd: root, env, encoding: "utf8" })
+    expect(install.status, install.stdout + install.stderr).toBe(0)
+    const build = spawnSync(bun, ["scripts/build-server.ts"], { cwd: root, env, encoding: "utf8", timeout: 30_000 })
+    expect(build.status, build.stdout + build.stderr).toBe(0)
+    for (const tool of ["fixture-plugin-build", "vite"]) expect(readFileSync(join(root, `${tool}.runtime`), "utf8")).toBeTruthy()
+    expect(existsSync(join(root, `release/cc-copilot-${process.platform}-${process.arch}.tar.gz`))).toBe(true)
+  }, 40_000)
+
   it("ships runtime assets and workers, excludes private files, and installs locked production dependencies", () => {
     const { root, bun } = fixture()
     const run = vi.fn()

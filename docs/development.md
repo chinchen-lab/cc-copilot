@@ -41,6 +41,8 @@ bun run electron:package
 
 `./build-server.sh` requires Bun 1.3.5 or newer with `Bun.Terminal`, plus `tar` and gzip support. It installs frozen dependencies with lifecycle scripts disabled, builds the web app and runtime plugins, then installs production dependencies into a separate package. No Electron packaging or native Node PTY build is needed for this Bun server.
 
+Build tools run with Bun, including tools whose shebang normally selects Node. The portable server build does not depend on the system Node version.
+
 The output is `release/cc-copilot-<os>-<arch>/` and a matching `.tar.gz`, with `CC-Copilot`, `runtime/bun`, and `app/`. Keep the whole directory together. The launcher uses its bundled runtime, keeps the caller's working directory, forwards arguments, and receives shutdown signals through `exec`.
 
 Build on the destination OS and architecture: RHEL 9 x86_64 produces `cc-copilot-linux-x64`, aarch64 produces `cc-copilot-linux-arm64`, and macOS produces a macOS package. This script does not cross-compile. The portable package includes the personal edition, and runtime data stays outside the release directory.
