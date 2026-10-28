@@ -80,7 +80,6 @@ vi.mock("sonner", () => ({
 vi.mock("@/components/TokenUsageWidget", () => ({ TokenUsageIndicator: () => null }))
 vi.mock("@/components/LeakIndicator", () => ({ LeakIndicator: () => null }))
 vi.mock("@/components/DeviceSwitcher", () => ({ DeviceSwitcher: () => null }))
-vi.mock("@/components/NotificationsBell", () => ({ NotificationsBell: () => null }))
 vi.mock("@/components/PowerMonitor", () => ({
   PowerMonitor: ({ open }: { open: boolean }) => (open ? <div data-testid="power-monitor" /> : null),
 }))
@@ -210,6 +209,18 @@ describe("FloatingChrome", () => {
     vi.clearAllMocks()
     __resetCapabilitiesForTest()
     __resetEditionUiForTest()
+  })
+
+  it("syncs the inbox to the edition without rendering a header notification bell", async () => {
+    const onInboxRead = vi.fn()
+    __installEditionUiForTest({ onInboxRead })
+    mocks.authFetch.mockResolvedValue({ ok: true, json: async () => ({ notifications: [] }) })
+
+    renderChrome()
+
+    await vi.waitFor(() => expect(onInboxRead).toHaveBeenCalledWith([]))
+    expect(mocks.authFetch).toHaveBeenCalledWith("/api/notifications?limit=100")
+    expect(screen.queryByRole("button", { name: /Notifications/ })).not.toBeInTheDocument()
   })
 
   it("keeps provider handoff inside the overflow menu", async () => {

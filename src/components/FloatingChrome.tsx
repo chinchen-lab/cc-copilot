@@ -33,7 +33,6 @@ import {
 import { CrewParentPill } from "@/components/CrewParentPill"
 import { DeviceSwitcher } from "@/components/DeviceSwitcher"
 import { LeakIndicator } from "@/components/LeakIndicator"
-import { NotificationsBell } from "@/components/NotificationsBell"
 import { PowerMonitor } from "@/components/PowerMonitor"
 import { SessionPill } from "@/components/SessionPill"
 import { ShareButton } from "@/components/ShareButton"
@@ -47,6 +46,7 @@ import { useSessionInventoryOptional } from "@/contexts/SessionInventoryContext"
 import { useEditionUi } from "@/edition/hooks"
 import { useCapability } from "@/hooks/useCapability"
 import { useCopyWithFeedback } from "@/hooks/useCopyWithFeedback"
+import { useInboxSync } from "@/hooks/useInboxSync"
 import { useSessionArchiveToggle } from "@/hooks/useSessionArchive"
 import { can } from "@/lib/capabilities"
 import { parseSubAgentPath } from "@/lib/format"
@@ -111,6 +111,7 @@ export const FloatingChrome = memo(function FloatingChrome({
   const inventory = useSessionInventoryOptional()
   const { AccountControl, SessionHeaderActions } = useEditionUi()
   const canViewUsage = useCapability("viewUsage")
+  useInboxSync()
   const [usageOpen, setUsageOpen] = useState(false)
   const [monitorOpen, setMonitorOpen] = useState(false)
   const [cmdCopied, copyCmd] = useCopyWithFeedback()
@@ -222,9 +223,6 @@ export const FloatingChrome = memo(function FloatingChrome({
           <ThemeToggleButton className={cn(FLOATING_PILL, "size-8 shrink-0")} />
           <div className={cn(FLOATING_PILL, PILL_ROW, "empty:hidden")}>
             <LeakIndicator onReview={() => setMonitorOpen(true)} />
-          </div>
-          <div className={cn(FLOATING_PILL, PILL_ROW, "empty:hidden")}>
-            <NotificationsBell />
           </div>
           <div className={cn(FLOATING_PILL, PILL_ROW, "empty:hidden")}>
             <TokenUsageIndicator agentKind={activeAgentKind} />

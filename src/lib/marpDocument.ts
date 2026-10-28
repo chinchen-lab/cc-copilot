@@ -26,5 +26,9 @@ export function createMarpDocument(content: string, cwd: string, filePath: strin
     body { margin: 0; padding: 16px; }
     .marpit { display: flex; flex-direction: column; gap: 16px; }
     .marpit > svg[data-marpit-svg] { display: block; width: 100%; height: auto; flex: none; }
+    /* The parent's Marp helper rewrites pre to marp-pre, but its custom element
+       registry does not extend into the sandboxed iframe. Supply pre defaults
+       here so the unregistered element stays one block; theme styles override. */
+    .marpit marp-pre { display: block; white-space: pre; font-family: monospace; margin: 1em 0; }
   `, css)
 }
