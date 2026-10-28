@@ -393,6 +393,8 @@ export interface AgentDescriptor {
   readonly kind: AgentKind
   /** Human-facing product name. */
   readonly displayName: string
+  /** Commands the workspace handles locally instead of sending a model turn. */
+  readonly composerCommands?: readonly { readonly name: string; readonly description: string; readonly action: "usage" }[]
   /** Executable name, as invoked on PATH. */
   readonly binName: string
   readonly dirName: AgentDirNameCodec
@@ -735,6 +737,7 @@ const CODEX_SERVICE_TIER: AgentServiceTier = {
 const codex: AgentDescriptor = {
   kind: "codex",
   displayName: "Codex",
+  composerCommands: [{ name: "usage", description: "Show account quota and reset times", action: "usage" }],
   binName: "codex",
   dirName: base64DirNameCodec(CODEX_DIR_PREFIX),
   projectWorktreeDir: null,
@@ -842,7 +845,7 @@ const codex: AgentDescriptor = {
   capabilities: {
     worktrees: true,
     mcp: false,
-    slashCommands: false,
+    slashCommands: true,
     workflows: false,
     agentTeams: false,
     subagentTranscripts: true,
@@ -887,6 +890,7 @@ function copilotSessionId(fileName: string): string | null {
 const copilot: AgentDescriptor = {
   kind: "copilot",
   displayName: "GitHub Copilot CLI",
+  composerCommands: [{ name: "usage", description: "Show account quota and reset times", action: "usage" }],
   binName: "copilot",
   dirName: base64DirNameCodec(COPILOT_DIR_PREFIX),
   projectWorktreeDir: null,
@@ -973,7 +977,7 @@ const copilot: AgentDescriptor = {
   capabilities: {
     worktrees: false,
     mcp: false,
-    slashCommands: false,
+    slashCommands: true,
     workflows: false,
     agentTeams: false,
     subagentTranscripts: false,
@@ -1012,13 +1016,14 @@ const copilot: AgentDescriptor = {
 
 const acp: AgentDescriptor = {
   ...copilot, kind: "acp", displayName: "ACP agent", binName: "acp",
+  composerCommands: [],
   dirName: base64DirNameCodec("acp__"),
   sessionFile: { name: (id) => `${id}.jsonl`, sessionId: sessionIdFromJsonlName, ...jsonlPathUrlCodec, transcriptRoot: (path) => { const segments = plainPathSegments(path); return segments?.length === 1 ? ownTranscriptRoot(sessionIdFromJsonlName(path)) : null } },
   resume: { command: () => "Resume this session in CC-Copilot", args: () => [] },
   launchArgs: { permissions: () => [], model: () => [], effort: () => [], fastTier: () => [] },
   cli: { ...copilot.cli, packageName: "", homebrew: null, wingetId: null, selfUpdate: null, requiresConfiguration: true, homeDirName: ".cogpit-acp", homeEnvVar: "COGPIT_ACP_HOME", homeIsDiscoverable: true, installMarker: "projects" },
   config: { ...copilot.config, rootDirName: ".cogpit-acp", instructions: [], settings: [], skillsDir: null },
-  capabilities: { ...copilot.capabilities, undo: false, redo: false, nativeRewind: false, nativeFork: false, midTurnSteering: false, activeNotifications: false, externalProcesses: false, autoPermissionMode: "never", toolPermissionRules: false, namedSessions: false },
+  capabilities: { ...copilot.capabilities, slashCommands: false, undo: false, redo: false, nativeRewind: false, nativeFork: false, midTurnSteering: false, activeNotifications: false, externalProcesses: false, autoPermissionMode: "never", toolPermissionRules: false, namedSessions: false },
 }
 
 // ── Registry ────────────────────────────────────────────────────────────────
@@ -1040,7 +1045,7 @@ export function allDescriptors(): readonly AgentDescriptor[] {
 
 /**
  * The one agent with a given property, for code that only makes sense while
- * exactly one has it — the configured home, the slash-command palette. Fails
+ * exactly one has it — for example, a user-configured home directory. Fails
  * loudly on zero or several rather than silently picking the first, so a
  * capability a second agent gains is noticed instead of misrouted.
  */

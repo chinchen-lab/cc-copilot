@@ -1,5 +1,9 @@
 /** Traditional Chinese interface messages; English source text is the fallback. */
 export const zhTW: Readonly<Record<string, string>> = {
+  "Usage": "用量",
+  "Show account quota and reset times": "顯示帳號額度與重置時間",
+  "Account quota and reset times.": "帳號額度與重置時間。",
+  "Usage unavailable. Refresh to try again.": "無法取得用量，請重新整理後再試。",
   "Config": "設置",
   "Plugin": "外掛",
   "Plugins": "外掛",

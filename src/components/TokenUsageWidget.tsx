@@ -31,7 +31,7 @@ const USAGE_TEXT_COLOR: Record<UsageLevel, string> = {
   danger: "text-destructive",
 }
 
-function TooltipBody({ usage }: { usage: UsageData }) {
+export function TokenUsageDetails({ usage }: { usage: UsageData }) {
   const { t } = useTranslation()
   const rows: { label: string; pct: number; resetsAt?: string; remaining?: number; limit?: number }[] = []
 
@@ -127,7 +127,7 @@ export function TokenUsageIndicator({ agentKind = DEFAULT_AGENT_KIND }: { agentK
           </span>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="p-3">
-        <TooltipBody usage={usage} />
+        <TokenUsageDetails usage={usage} />
       </TooltipContent>
     </Tooltip>
   )

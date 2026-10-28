@@ -6,6 +6,7 @@ import { makeTurn } from "@/__tests__/fixtures"
 
 const mocks = vi.hoisted(() => ({
   sendMessage: vi.fn(),
+  authFetch: vi.fn(),
   restoreImages: vi.fn(),
   clearImages: vi.fn(),
   images: [] as Array<{ id: string; data: string; mediaType: string }>,
@@ -13,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   pendingMessages: [] as string[],
   slashSuggestions: [] as SlashSuggestion[],
 }))
+vi.mock("@/lib/auth", () => ({ authFetch: mocks.authFetch }))
 
 vi.mock("@/contexts/SessionContext", () => ({
   useSessionContext: () => ({
@@ -134,11 +136,43 @@ describe("ChatInput sending", () => {
   })
   beforeEach(() => {
     mocks.sendMessage.mockReset()
+    mocks.authFetch.mockReset()
     mocks.restoreImages.mockReset()
     mocks.images = []
     mocks.session = null
     mocks.pendingMessages = []
     mocks.slashSuggestions = []
+  })
+
+  it.each(["copilot", "codex"] as const)("executes /usage for %s as a quota query without sending a model turn", async kind => {
+    const snapshot = kind === "copilot"
+      ? { available: true, quota: { quotaSnapshots: { premium_interactions: { entitlementRequests: 8000, usedRequests: 2000, remainingPercentage: 75 } } } }
+      : { available: true, rateLimits: { rateLimits: { primary: { usedPercent: 25, windowDurationMins: 300 } } } }
+    mocks.authFetch.mockResolvedValue({ ok: true, json: async () => snapshot })
+    mocks.slashSuggestions = [{ name: "usage", description: "Account usage", type: "command", source: "built-in", filePath: "" }]
+    render(<ChatInput agentKind={kind} />)
+    const message = screen.getByRole("combobox", { name: "Message" })
+    fireEvent.change(message, { target: { value: "/usa" } })
+    fireEvent.keyDown(message, { key: "Tab" })
+    expect(message).toHaveValue("/usage ")
+    fireEvent.keyDown(message, { key: "Enter" })
+    expect(await screen.findByRole("dialog", { name: "Usage" })).toBeInTheDocument()
+    expect(await screen.findByText("25.0%")).toBeInTheDocument()
+    expect(mocks.authFetch).toHaveBeenCalledWith(`/api/${kind}/runtime?refresh=1`, expect.objectContaining({ cache: "no-store" }))
+    expect(mocks.sendMessage).not.toHaveBeenCalled()
+    expect(message).toHaveValue("")
+  })
+
+  it("keeps a failed quota query local and allows a retry", async () => {
+    mocks.authFetch.mockResolvedValue({ ok: false, status: 502 })
+    render(<ChatInput agentKind="codex" />)
+    submit("/usage")
+    expect(await screen.findByText("Usage unavailable. Refresh to try again.")).toBeInTheDocument()
+    expect(mocks.sendMessage).not.toHaveBeenCalled()
+    const count = mocks.authFetch.mock.calls.length
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }))
+    await waitFor(() => expect(mocks.authFetch.mock.calls.length).toBeGreaterThan(count))
+    expect(mocks.sendMessage).not.toHaveBeenCalled()
   })
 
   it("recalls existing and newly sent prompts without sending until Enter is pressed", async () => {

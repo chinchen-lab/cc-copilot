@@ -14,6 +14,7 @@ import { storeFor } from "."
 import { codexBrowserConfig } from "./codexBrowser"
 import { AgentRuntimeError } from "./runtimeTypes"
 import { uncompressedTranscriptName } from "./transcriptFile"
+import { prepareSlashPrompt } from "./slashCommands"
 
 export interface CodexExecutionClient {
   start(): Promise<unknown>
@@ -216,7 +217,9 @@ export async function startCodexExecution(
   onThreadStarted?: (threadId: string) => void,
 ): Promise<{ thread: CodexThread; turnId: string }> {
   await ensureCodexAppServer(client)
-  const input = buildCodexUserInput(options.message, options.images)
+  const prompt = await prepareSlashPrompt("codex", options.message, options.cwd)
+  const input = buildCodexUserInput(prompt.message, options.images)
+  if (prompt.skill) input.push({ type: "skill", ...prompt.skill })
   const response = await client.startThread(await threadSettings(client, options))
   onThreadStarted?.(response.thread.id)
   const turn = await client.startTurn({
@@ -234,7 +237,9 @@ export async function continueCodexExecution(
   options: CodexExecutionOptions,
 ): Promise<CodexContinuationResult> {
   await ensureCodexAppServer(client)
-  const input = buildCodexUserInput(options.message, options.images)
+  const prompt = await prepareSlashPrompt("codex", options.message, options.cwd)
+  const input = buildCodexUserInput(prompt.message, options.images)
+  if (prompt.skill) input.push({ type: "skill", ...prompt.skill })
   const knownTurnId = client.getActiveTurnId(threadId)
 
   if (knownTurnId) {
@@ -320,5 +325,6 @@ export function isCodexModelRejection(error: unknown): boolean {
 }
 
 export function codexSendError(error: unknown): AgentRuntimeError {
+  if (error instanceof AgentRuntimeError) return error
   return new AgentRuntimeError(isCodexModelRejection(error) ? 400 : 500, isCodexModelRejection(error) ? "MODEL_REJECTED" : "INTERNAL_ERROR", error instanceof Error ? error.message : "Codex failed to accept the message")
 }

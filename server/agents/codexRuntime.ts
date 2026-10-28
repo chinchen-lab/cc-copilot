@@ -42,6 +42,7 @@ import {
 } from "../processRegistry"
 import { findNewestCodexSessionForCwd } from "../sessionPaths"
 import { resolveSessionCwd } from "./sessionCwd"
+import { prepareSlashPrompt } from "./slashCommands"
 import { storeFor } from "./index"
 import {
   AgentRuntimeError,
@@ -204,11 +205,12 @@ interface LegacyArgs {
   promptArgs: string[]
 }
 
-function legacyArgs(
+async function legacyArgs(
   req: StartSessionRequest | SendRequest,
   imagePaths: string[],
-): LegacyArgs {
-  const prompt = req.message || (imagePaths.length > 0 ? CODEX_IMAGE_ONLY_PROMPT : "")
+): Promise<LegacyArgs> {
+  const prepared = await prepareSlashPrompt("codex", req.message, req.cwd)
+  const prompt = prepared.message || (imagePaths.length > 0 ? CODEX_IMAGE_ONLY_PROMPT : "")
   return {
     permArgs: descriptor.launchArgs.permissions(req.permissions),
     modelArgs: descriptor.launchArgs.model(req.model),
@@ -253,7 +255,7 @@ async function startLegacy(
   knownPaths: Set<string>,
 ): Promise<StartedSession> {
   const imagePaths = await writeTempImageFiles(req.images)
-  const args = legacyArgs(req, imagePaths)
+  const args = await legacyArgs(req, imagePaths)
   const startedAt = Date.now()
 
   const cli = resolveAgentCommand(descriptor.binName, [
@@ -387,7 +389,7 @@ async function sendLegacy(
   req: SendRequest & { cwd: string },
 ): Promise<SendOutcome> {
   const imagePaths = await writeTempImageFiles(req.images)
-  const args = legacyArgs(req, imagePaths)
+  const args = await legacyArgs(req, imagePaths)
 
   const cli = resolveAgentCommand(descriptor.binName, [
     "exec",
@@ -779,6 +781,7 @@ export const codexRuntime: AgentRuntime = {
       // Once the app-server has created the thread, that thread is the session;
       // falling back to the CLI would start a second one.
       if (threadStarted || !isCodexAppServerUnavailable(error)) {
+        if (error instanceof AgentRuntimeError) throw error
         throw new AgentRuntimeError(
           500,
           "INTERNAL_ERROR",

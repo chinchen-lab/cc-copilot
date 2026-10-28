@@ -206,12 +206,12 @@ describe("BUILTIN_SKILLS", () => {
 describe("GET /api/slash-suggestions", () => {
   let handlers: Map<string, Middleware>
 
-  const call = async (cwd = "") => {
+  const call = async (cwd = "", agentKind?: string) => {
     const handler = getRouteHandler(handlers, "/api/slash-suggestions")
     let payload = ""
     const req = asIncomingMessage({
       method: "GET",
-      url: `/api/slash-suggestions?cwd=${encodeURIComponent(cwd)}`,
+      url: `/api/slash-suggestions?cwd=${encodeURIComponent(cwd)}${agentKind ? `&agentKind=${agentKind}` : ""}`,
       headers: {},
     })
     const res = asServerResponse({
@@ -248,6 +248,14 @@ describe("GET /api/slash-suggestions", () => {
     )
     return installPath
   }
+
+  it.each(["codex", "copilot"])("serves the requested %s provider instead of the default provider", async kind => {
+    const cwd = join(fakeHome, "project")
+    await writeSkill(join(cwd, `.${kind}`, "skills", "project-review"), "project-review", "Review project")
+    const suggestions = await call(cwd, kind)
+    expect(suggestions).toContainEqual(expect.objectContaining({ name: "project-review", source: "project" }))
+    expect(suggestions.some(item => item.name !== "usage" && BUILTIN_SKILLS.some(builtin => builtin.name === item.name))).toBe(false)
+  })
 
   it("namespaces a plugin skill by its plugin", async () => {
     const installPath = await installPlugin("superpowers@superpowers-dev")

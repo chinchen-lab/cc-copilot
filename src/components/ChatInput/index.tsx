@@ -24,6 +24,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { useImeComposition } from "@/hooks/useImeComposition"
 import { usePromptHistory } from "@/hooks/usePromptHistory"
 import { ExpandablePromptEditor } from "@/components/ExpandablePromptEditor"
+import { composerCommandFor } from "@/lib/agents/composerCommands"
+import { UsageDialog } from "./UsageDialog"
 
 export interface ChatInputHandle {
   focus: () => void
@@ -139,6 +141,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
   const canInterrupt = isConnected || isLive
 
   const [text, setText] = useState("")
+  const [usageAgent, setUsageAgent] = useState<AgentKind | null>(null)
   const [isMultiline, setIsMultiline] = useState(false)
   const [planResponding, setPlanResponding] = useState(false)
   const [planResponseError, setPlanResponseError] = useState<string | null>(null)
@@ -331,6 +334,15 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
   const handleSubmit = useCallback(async () => {
     const trimmed = text.trim()
     if (!trimmed && images.length === 0) return
+    const kind = agentKind ?? DEFAULT_AGENT_KIND
+    if (composerCommandFor(kind, trimmed) === "usage") {
+      setUsageAgent(kind)
+      setText("")
+      resetHistory()
+      updateMultiline(false)
+      if (textareaRef.current) textareaRef.current.style.height = "auto"
+      return
+    }
     if (!allowImages && images.length > 0) return
     resetHistory()
 
@@ -369,7 +381,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
     clearImages()
     updateMultiline(false)
     if (textareaRef.current) textareaRef.current.style.height = "auto"
-  }, [text, images, allowImages, onSend, clearImages, restoreImages, updateMultiline, pendingInteraction, submitUserQuestion, submitPlanResponse, sessionId, resetHistory])
+  }, [text, images, allowImages, onSend, clearImages, restoreImages, updateMultiline, pendingInteraction, submitUserQuestion, submitPlanResponse, sessionId, resetHistory, agentKind])
 
   const { isComposingEvent, onCompositionStart, onCompositionEnd } = useImeComposition()
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -440,6 +452,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, ChatInputProps>(functi
         </div>
       )}
 
+      {usageAgent && <UsageDialog key={usageAgent} agentKind={usageAgent} onClose={() => setUsageAgent(null)} />}
       {showSlash && (
         <SlashSuggestions suggestions={filteredSlashList} filter={slashFilter} loading={slashSuggestionsLoading} selectedIndex={slashSelectedIndex} onSelect={handleSlashSelect} onHover={setSlashSelectedIndex} onEdit={onEditConfig} />
       )}

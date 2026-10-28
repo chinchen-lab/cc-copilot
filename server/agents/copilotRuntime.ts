@@ -12,6 +12,7 @@ import { join, randomUUID, readFile } from "../helpers"
 import { storeFor } from "./index"
 import { withTimeout } from "./timeout"
 import { resolveSessionCwd } from "./sessionCwd"
+import { prepareSlashPrompt } from "./slashCommands"
 import { initialCopilotScanState, parseCopilotUsageMetrics, type UsageCostRecord } from "./usageScanners"
 import {
   AgentRuntimeError,
@@ -89,14 +90,15 @@ function forkBoundary(
 /** Images ride beside the prompt as blob attachments rather than in it. */
 function buildAttachments(
   images: ImageAttachment[] | undefined,
-): Array<{ type: "blob"; data: string; mimeType: string; displayName: string }> | undefined {
-  if (!images?.length) return undefined
-  return images.map((image, index) => ({
-    type: "blob",
+  skill?: { name: string; path: string },
+): Array<{ type: "blob"; data: string; mimeType: string; displayName: string } | { type: "file"; path: string; displayName: string }> | undefined {
+  if (!images?.length && !skill) return undefined
+  return [...(images ?? []).map((image, index) => ({
+    type: "blob" as const,
     data: image.data,
     mimeType: image.mediaType,
     displayName: `image-${index + 1}`,
-  }))
+  })), ...(skill ? [{ type: "file" as const, path: skill.path, displayName: `${skill.name}/SKILL.md` }] : [])]
 }
 
 /** Cogpit's access picker, as the two knobs Copilot exposes. */
@@ -334,9 +336,11 @@ export const copilotRuntime: AgentRuntime = {
       if (req.permissions?.mode) {
         await transport.setPermissionMode(sessionId, allowAll(req.permissions.mode))
       }
-      const attachments = buildAttachments(req.images)
+      const prompt = await prepareSlashPrompt("copilot", req.message, req.cwd)
+      const attachments = buildAttachments(req.images, prompt.skill)
       await transport.send(sessionId, {
-        prompt: req.message || IMAGE_ONLY_PROMPT,
+        prompt: prompt.message || IMAGE_ONLY_PROMPT,
+        ...(prompt.skill ? { displayPrompt: req.message } : {}),
         agentMode: agentMode(req.permissions?.mode),
         ...(attachments ? { attachments } : {}),
       })
@@ -361,6 +365,7 @@ export const copilotRuntime: AgentRuntime = {
         }
         await transport.deleteSession(sessionId).catch(() => {})
       }
+      if (error instanceof AgentRuntimeError) throw error
       throw new AgentRuntimeError(
         500,
         "SPAWN_FAILED",
@@ -389,14 +394,17 @@ export const copilotRuntime: AgentRuntime = {
       await transport.setPermissionMode(sessionId, allowAll(req.permissions.mode))
     }
 
-    const attachments = buildAttachments(req.images)
+    const prompt = await prepareSlashPrompt("copilot", req.message,
+      req.message?.startsWith("/") ? await resolveSessionCwd(req.cwd, req.filePath) : req.cwd)
+    const attachments = buildAttachments(req.images, prompt.skill)
     const steering = transport.isTurnActive(sessionId)
     if (req.onlyWhileRunning && !steering) return { delivery: "busy" }
     if (steering && req.deliveryIntent === "queue") return { delivery: "busy" }
     const observed = req.commandId ? transport.observeTurn(sessionId) : null
     void observed?.completion.catch(() => {})
     try { await transport.send(sessionId, {
-      prompt: req.message || IMAGE_ONLY_PROMPT,
+      prompt: prompt.message || IMAGE_ONLY_PROMPT,
+      ...(prompt.skill ? { displayPrompt: req.message } : {}),
       agentMode: agentMode(req.permissions?.mode),
       ...(steering ? { mode: "immediate" } : {}),
       ...(attachments ? { attachments } : {}),

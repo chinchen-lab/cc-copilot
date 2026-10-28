@@ -13,6 +13,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { AgentKind } from "../../../shared/session/agent-descriptors"
+import * as slashCommands from "../../agents/slashCommands"
 
 const { sdk, codex, copilot, registry } = vi.hoisted(() => ({
   sdk: {
@@ -141,6 +142,30 @@ beforeEach(() => {
 })
 
 describe("runtime registry", () => {
+  it("never sends /usage to the Copilot model if a client misses local command handling", async () => {
+    copilot.isSessionActive.mockReturnValue(true)
+    await expect(runtimeFor("copilot").send("session-1", { cwd: process.cwd(), message: "/usage" })).rejects.toMatchObject({ status: 400, code: "INVALID_REQUEST" })
+    expect(copilot.send).not.toHaveBeenCalled()
+  })
+  it("attaches the selected Copilot skill while preserving the visible prompt and images", async () => {
+    const path = "/work/.github/skills/review/SKILL.md"
+    const prepare = vi.spyOn(slashCommands, "prepareSlashPrompt").mockResolvedValue({
+      message: `Use the review skill at ${path}`, skill: { name: "review", path },
+    })
+    copilot.isSessionActive.mockReturnValue(true)
+    try {
+      await runtimeFor("copilot").send("session-1", {
+        cwd: process.cwd(), message: "/review staged changes", images: [{ data: "image-data", mediaType: "image/png" }],
+      })
+      expect(copilot.send).toHaveBeenCalledWith("session-1", expect.objectContaining({
+        prompt: `Use the review skill at ${path}`, displayPrompt: "/review staged changes",
+        attachments: [
+          { type: "blob", data: "image-data", mimeType: "image/png", displayName: "image-1" },
+          { type: "file", path, displayName: "review/SKILL.md" },
+        ],
+      }))
+    } finally { prepare.mockRestore() }
+  })
   it("forwards forced quota refresh without restarting live sessions", async () => {
     await runtimeFor("copilot").describeRuntime(true)
     expect(copilot.getLiveAccountQuota).toHaveBeenCalledWith(true)

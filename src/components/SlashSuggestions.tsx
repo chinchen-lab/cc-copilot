@@ -97,7 +97,7 @@ export const SlashSuggestions = memo(function SlashSuggestions({
       >
         <CommandList>
           {groups.map((group) => group.suggestions.length > 0 && (
-            <CommandGroup key={group.heading} heading={group.heading}>
+            <CommandGroup key={group.heading} heading={t(group.heading)}>
               {group.suggestions.map((suggestion, index) => {
                 const globalIndex = group.offset + index
                 return (
@@ -179,7 +179,7 @@ function SuggestionItem({
           </div>
           {suggestion.description && (
             <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-              {suggestion.description}
+              {t(suggestion.description)}
             </p>
           )}
         </div>

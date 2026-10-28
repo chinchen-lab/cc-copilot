@@ -34,6 +34,10 @@ const CLAUDE_DIR = "-tmp-project"
 const SESSION_UUID = "68596e24-db5d-46a4-86fe-9d82425f36d7"
 
 describe("agent registry", () => {
+  it("enables file-backed slash suggestions for each supported CLI", () => {
+    for (const kind of ["claude", "codex", "copilot"] as const) expect(capabilitiesFor(kind).slashCommands).toBe(true)
+    expect(capabilitiesFor("acp").slashCommands).toBe(false)
+  })
   it("resolves the owning agent from a project directory", () => {
     expect(agentKindForDirName(CLAUDE_DIR)).toBe("claude")
     expect(agentKindForDirName(CODEX_DIR)).toBe("codex")

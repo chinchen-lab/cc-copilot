@@ -195,6 +195,7 @@ export default function App() {
   const slashSuggestions = useSlashSuggestions(
     configAdminEnabled ? state.session?.cwd ?? pendingPath ?? undefined : undefined,
     configAdminEnabled && agentCapabilities.slashCommands,
+    currentAgentKind,
   )
 
   const handleEditCommand = useCallback((commandName: string) => {
@@ -213,7 +214,7 @@ export default function App() {
       const res = await authFetch("/api/expand-command", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filePath: match.filePath, args: args || "" }),
+        body: JSON.stringify({ filePath: match.filePath, args: args || "", agentKind: currentAgentKind }),
       })
       if (!res.ok) return null
       const data = await res.json()
@@ -221,7 +222,7 @@ export default function App() {
     } catch {
       return null
     }
-  }, [configAdminEnabled, slashSuggestions.suggestions])
+  }, [configAdminEnabled, slashSuggestions.suggestions, currentAgentKind])
 
   // Project-scoped process panel, terminal/editor actions, and right workspace.
   const openWorkspacePanel = panels.openWorkspacePanel

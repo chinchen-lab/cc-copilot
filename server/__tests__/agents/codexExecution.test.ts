@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { join, resolve } from "node:path"
 import { CodexAppServerError, CodexAppServerRpcError, type CodexThread } from "../../agents/codexAppServer"
 import { codexBrowserConfig } from "../../agents/codexBrowser"
+import * as slashCommands from "../../agents/slashCommands"
 
 vi.mock("../../agents/codexBrowser", () => ({ codexBrowserConfig: vi.fn(async () => ({})) }))
 
@@ -39,6 +40,29 @@ function client(overrides: Partial<CodexExecutionClient> = {}): CodexExecutionCl
 }
 
 describe("Codex execution mappings", () => {
+  it("never starts a thread or sends a turn for a workspace /usage command", async () => {
+    const runtime = client()
+    await expect(startCodexExecution(runtime, { cwd: "/work", message: "/usage" })).rejects.toThrow("workspace command")
+    expect(runtime.startThread).not.toHaveBeenCalled()
+    expect(runtime.startTurn).not.toHaveBeenCalled()
+  })
+  it("sends selected skills as native inputs on new turns and active-turn steering", async () => {
+    const prepare = vi.spyOn(slashCommands, "prepareSlashPrompt").mockResolvedValue({
+      message: "$review staged changes", skill: { name: "review", path: "/work/.agents/skills/review/SKILL.md" },
+    })
+    try {
+      const runtime = client()
+      const input = [
+        { type: "text", text: "$review staged changes", text_elements: [] },
+        { type: "skill", name: "review", path: "/work/.agents/skills/review/SKILL.md" },
+      ]
+      await startCodexExecution(runtime, { cwd: "/work", message: "/review staged changes" })
+      expect(runtime.startTurn).toHaveBeenCalledWith(expect.objectContaining({ input }))
+      vi.mocked(runtime.getActiveTurnId).mockReturnValue("active")
+      await continueCodexExecution(runtime, "thread-1", { cwd: "/work", message: "/review staged changes" })
+      expect(runtime.steerTurn).toHaveBeenCalledWith("thread-1", input, "active")
+    } finally { prepare.mockRestore() }
+  })
   it("never starts or resumes an idle thread for an informational notice", async () => {
     const runtime = client()
     expect(await continueCodexExecution(runtime, "thread-1", { cwd: "/work", message: "Crew notice", onlyWhileRunning: true })).toEqual({ action: "busy", threadId: "thread-1" })

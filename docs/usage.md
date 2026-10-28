@@ -58,6 +58,10 @@ without sending. This is available in chats and the home screen's first message.
 
 The model chip beside Send opens the provider, model, reasoning effort, and available speed controls. You can change several settings before clicking outside to close it. Image drag-and-drop and paste appear for models that accept images. Slash command suggestions include supported built-in commands and project skills and commands. Claude sessions offer `/output-style` to list output styles or switch to one.
 
+In Codex and Copilot conversations, type `/` to find installed user and project skills. Shared `.agents/skills` directories are included; Copilot also reads project `.github/skills`. Codex includes `.system` skills and custom prompts from its configured `prompts` directory as `/prompts:name`. Selecting a skill sends a native skill input to Codex or attaches its instructions for Copilot. Interactive terminal menus such as `/model` use the workspace controls instead.
+
+`/usage` in Codex and Copilot opens the account usage dialog and refreshes quota directly. It does not send a prompt or start a model turn.
+
 Use **Refresh models** beside the model list (or in the mobile session controls)
 after a CLI upgrade or when a newly available model is missing. It bypasses the
 browser and server catalog caches and asks the installed CLIs again. Models and
