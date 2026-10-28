@@ -8,9 +8,10 @@ import { resolveAgentCommand } from "../lib/binaryResolver"
 import * as acp from "@agentclientprotocol/sdk"
 import { descriptorFor } from "../../shared/session/agent-descriptors"
 import { acpStore } from "./acpStore"
+import { pluginSkillContext } from "../plugins/skillContext"
 import { AgentRuntimeError, reportSessionId, selectAvailableDecision, resolvedApproval, type AgentRuntime, type PendingApproval, type ApprovalDecision, type SendRequest, type TurnResult } from "./runtimeTypes"
 
-interface LiveSession { nativeId: string; cwd: string; filePath: string; running: boolean; terminalWritten?: boolean; loading?: boolean; completion?: Promise<TurnResult>; configOptions?: acp.SessionConfigOption[] }
+interface LiveSession { nativeId: string; cwd: string; filePath: string; running: boolean; terminalWritten?: boolean; loading?: boolean; preparing?: AbortController; completion?: Promise<TurnResult>; configOptions?: acp.SessionConfigOption[] }
 interface Permission { approval: PendingApproval; options: acp.PermissionOption[]; resolve: (value: acp.RequestPermissionResponse) => void; timer: ReturnType<typeof setTimeout> }
 const descriptor = descriptorFor("acp")
 const sessions = new Map<string, LiveSession>()
@@ -126,23 +127,31 @@ async function send(id: string, request: SendRequest) {
   if (sending.has(id)) return { delivery: "busy" as const }
   sending.add(id)
   let started = false
+  let preparation: { session: LiveSession; abort: AbortController } | undefined
   try {
     const session = await load(id, request)
     if (session.running) return { delivery: "busy" as const }
     if (requests >= 64) throw error(429, "ACP request limit reached")
     if (request.images?.length && !initialization?.agentCapabilities?.promptCapabilities?.image) throw error(400, "This ACP provider does not accept images")
     if (request.effort || request.fastMode || request.ultracode || request.mcpConfig || request.contextWindowTokens || (request.permissions?.mode && !["default", "manual", "auto"].includes(request.permissions.mode)) || request.permissions?.allowedTools?.length || request.permissions?.disallowedTools?.length) throw error(400, "These settings are not supported by this ACP provider")
+    const abort = new AbortController()
+    preparation = { session, abort }
+    session.preparing = abort; session.running = true; session.terminalWritten = true
     if (request.model) {
       const option = session.configOptions?.find((value) => value.category === "model" && value.type === "select")
       if (!option || option.type !== "select" || !selectOptions(option).some((value) => value.value === request.model)) throw error(400, "The ACP provider did not offer this model")
       const result = await bounded(connection!.agent.request("session/set_config_option", { sessionId: session.nativeId, configId: option.id, value: request.model }), 15000)
       session.configOptions = result.configOptions
     }
-    session.running = true
+    if (abort.signal.aborted || sessions.get(id) !== session || !connection) return { delivery: "busy" as const }
+    const instructions = await pluginSkillContext(session.cwd)
+    if (abort.signal.aborted || sessions.get(id) !== session || !connection) return { delivery: "busy" as const }
+    if (requests >= 64) throw error(429, "ACP request limit reached")
+    session.preparing = undefined; preparation = undefined
     session.terminalWritten = false
     requests++
     append(id, { type: "user", cwd: session.cwd, message: { role: "user", content: request.message ?? "" } })
-    const prompt: acp.ContentBlock[] = [{ type: "text", text: request.message ?? "" }, ...(request.images ?? []).map((image) => ({ type: "image" as const, data: image.data, mimeType: image.mediaType }))]
+    const prompt: acp.ContentBlock[] = [...instructions ? [{ type: "text" as const, text: instructions }] : [], { type: "text", text: request.message ?? "" }, ...(request.images ?? []).map((image) => ({ type: "image" as const, data: image.data, mimeType: image.mediaType }))]
     const completion: Promise<TurnResult> = connection!.agent.request("session/prompt", { sessionId: session.nativeId, prompt }).then((response) => {
       finishPrompt(id, session, response.stopReason, response.stopReason === "cancelled")
       return { isError: response.stopReason === "cancelled", message: response.stopReason }
@@ -150,7 +159,12 @@ async function send(id: string, request: SendRequest) {
     session.completion = completion
     started = true
     return { delivery: "started" as const, completion }
-  } finally { if (!started) sending.delete(id) }
+  } finally {
+    if (!started) {
+      if (preparation && preparation.session.preparing === preparation.abort) { preparation.session.preparing = undefined; preparation.session.running = false }
+      sending.delete(id)
+    }
+  }
 }
 function selectOptions(option: acp.SessionConfigOption): acp.SessionConfigSelectOption[] {
   if (option.type !== "select") return []
@@ -187,6 +201,7 @@ export const acpRuntime: AgentRuntime = {
   send,
   async interrupt(id) {
     const session = sessions.get(id)
+    session?.preparing?.abort()
     if (!session?.running || !connection) return false
     await connection.agent.notify("session/cancel", { sessionId: session.nativeId })
     if (session.completion) await bounded(session.completion, 15000)

@@ -3,7 +3,7 @@
   "id": "cogpit.cloudflare",
   "publisher": "cogpit",
   "name": "Cloudflare Workers",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "runtime": "browser-iife-v1",
   "entry": "plugin.js",
   "style": "plugin.css",

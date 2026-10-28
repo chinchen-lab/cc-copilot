@@ -12,6 +12,7 @@ import {
 import { findExecutableOnPath, resolveAgentCommand } from "../lib/binaryResolver"
 import { cogpitAgentEnv } from "../browser/agentEnv"
 import { NO_COGPIT_SESSION } from "../browser/paths"
+import { pluginSkillContext } from "../plugins/skillContext"
 import { isRecord } from "../../shared/objects"
 
 export type CopilotJsonObject = Record<string, unknown>
@@ -106,6 +107,13 @@ export interface CopilotSessionOptions extends CopilotJsonObject {
 export interface CopilotResumeOptions extends CopilotSessionOptions {
   disableResume?: boolean
   continuePendingWork?: boolean
+}
+
+async function withPluginSkills<T extends CopilotSessionOptions>(options: T): Promise<T> {
+  const instructions = await pluginSkillContext(options.workingDirectory ?? process.cwd())
+  if (!instructions) return options
+  const existing = isRecord(options.systemMessage) ? options.systemMessage : {}
+  return { ...options, systemMessage: { mode: "append", ...existing, content: [typeof existing.content === "string" ? existing.content : "", instructions].filter(Boolean).join("\n\n") } }
 }
 
 export interface CopilotSessionOpenResult extends CopilotJsonObject {
@@ -550,6 +558,7 @@ export class CopilotRuntime {
   }
 
   async createSession(options: CopilotSessionOptions = {}): Promise<CopilotSessionOpenResult> {
+    options = await withPluginSkills(options)
     const sessionId = options.sessionId ?? randomUUID()
     this.assertSessionAvailable(sessionId)
     this.openingSessions.add(sessionId)
@@ -576,6 +585,7 @@ export class CopilotRuntime {
     sessionId: string,
     options: CopilotResumeOptions = {},
   ): Promise<CopilotSessionOpenResult> {
+    options = await withPluginSkills(options)
     this.assertSessionAvailable(sessionId)
     this.openingSessions.add(sessionId)
     this.conflictingResumes.delete(sessionId)

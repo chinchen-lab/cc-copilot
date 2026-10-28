@@ -5,6 +5,7 @@ import { request as httpsRequest, type RequestOptions } from "node:https"
 import { isIP, type LookupFunction } from "node:net"
 import ipaddr from "ipaddr.js"
 import { parseJsonText } from "./json"
+import { MEDIA_LIMIT_BYTES, audioMimeSchema, type PluginMedia } from "@cogpit/plugin-contracts"
 
 export const HTTPS_RESPONSE_LIMIT = 4 * 1024 * 1024
 export const HTTPS_DEADLINE_MS = 20_000
@@ -19,6 +20,9 @@ export interface PluginHttpsInput {
   signal: AbortSignal
   maxBytes?: number
   timeoutMs?: number
+  method?: "GET" | "POST"
+  body?: Record<string, string | number | boolean>
+  response?: { type: "audio"; mimeTypes: string[]; maxBytes: number }
 }
 export interface HttpsTransportDependencies {
   lookup?: (hostname: string) => Promise<LookupAddress[]>
@@ -45,7 +49,7 @@ export function isPublicAddress(address: string, family: number): boolean {
 
 function validate(input: PluginHttpsInput): { hostname: string; headerValue: string; maxBytes: number; timeoutMs: number } {
   const invalid = () => { throw new HttpsTransportError("INVALID_REQUEST") }
-  if (!input || Object.keys(input).some((key) => !["origin", "path", "credential", "signal", "maxBytes", "timeoutMs"].includes(key))) invalid()
+  if (!input || Object.keys(input).some((key) => !["origin", "path", "credential", "signal", "maxBytes", "timeoutMs", "method", "body", "response"].includes(key))) invalid()
   if (typeof input.origin !== "string" || input.origin.length > 256 || typeof input.path !== "string" || input.path.length > 8192 || !/^\/(?!\/)[\x21-\x7e]*$/.test(input.path) || /[#\\]/.test(input.path)) invalid()
   let url: URL
   try {
@@ -69,8 +73,15 @@ function validate(input: PluginHttpsInput): { hostname: string; headerValue: str
     || !["raw", "bearer"].includes(credential.scheme) || typeof credential.secret !== "string"
     || credential.secret.length > 4096 || credential.secret.trim() !== credential.secret || !/^[\x21-\x7e](?:[\x20-\x7e]*[\x21-\x7e])?$/.test(credential.secret)
     || !(input.signal instanceof AbortSignal)) invalid()
-  const maxBytes = input.maxBytes ?? HTTPS_RESPONSE_LIMIT, timeoutMs = input.timeoutMs ?? HTTPS_DEADLINE_MS
-  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > HTTPS_RESPONSE_LIMIT
+  if (input.method !== undefined && input.method !== "GET" && input.method !== "POST") invalid()
+  if (input.body !== undefined && (input.method !== "POST" || !input.body || typeof input.body !== "object" || Array.isArray(input.body)
+    || Object.keys(input.body).length > 16 || Buffer.byteLength(JSON.stringify(input.body)) > 32768
+    || Object.entries(input.body).some(([key, value]) => ["__proto__", "constructor", "prototype"].includes(key) || !["string", "number", "boolean"].includes(typeof value) || typeof value === "number" && !Number.isFinite(value)))) invalid()
+  const audio = input.response
+  if (audio && (audio.type !== "audio" || !Array.isArray(audio.mimeTypes) || !audio.mimeTypes.length || audio.mimeTypes.length > 6 || audio.mimeTypes.some(type => !audioMimeSchema.safeParse(type).success)
+    || !Number.isSafeInteger(audio.maxBytes) || audio.maxBytes < 1 || audio.maxBytes > MEDIA_LIMIT_BYTES)) invalid()
+  const maxBytes = input.maxBytes ?? audio?.maxBytes ?? HTTPS_RESPONSE_LIMIT, timeoutMs = input.timeoutMs ?? HTTPS_DEADLINE_MS
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > (audio ? Math.min(audio.maxBytes, MEDIA_LIMIT_BYTES) : HTTPS_RESPONSE_LIMIT)
     || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > HTTPS_DEADLINE_MS) invalid()
   return { hostname: url!.hostname, headerValue: credential.scheme === "bearer" ? `Bearer ${credential.secret}` : credential.secret, maxBytes, timeoutMs }
 }
@@ -123,7 +134,8 @@ export function createPluginHttpsTransport(dependencies: HttpsTransportDependenc
           seen.add(name)
         }
         const type = response.headers["content-type"], encoding = response.headers["content-encoding"], length = response.headers["content-length"]
-        if (typeof type !== "string" || !/^application\/(?:json|[a-z0-9!#$&^_.+-]+\+json)(?:\s*;\s*charset\s*=\s*(?:utf-8|"utf-8"))?\s*$/i.test(type)
+        const mime = typeof type === "string" ? type.split(";")[0].trim().toLowerCase() : ""
+        if (typeof type !== "string" || (input.response ? !input.response.mimeTypes.includes(mime) : !/^application\/(?:json|[a-z0-9!#$&^_.+-]+\+json)(?:\s*;\s*charset\s*=\s*(?:utf-8|"utf-8"))?\s*$/i.test(type))
           || (encoding !== undefined && encoding.toLowerCase() !== "identity")
           || (length !== undefined && (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length)) || Number(length) > maxBytes))) { fail("INVALID_RESPONSE"); return }
         bytes = Buffer.allocUnsafe(maxBytes)
@@ -140,8 +152,14 @@ export function createPluginHttpsTransport(dependencies: HttpsTransportDependenc
           if (!response.complete || (length !== undefined && Number(length) !== size)) { fail("INVALID_RESPONSE"); return }
           let value: unknown
           try {
-            value = parseJsonText(bytes!.subarray(0, size), maxBytes, { maxNodes: 100_000, maxDepth: 16 })
-            if (containsSecret(value, secret)) throw new Error()
+            if (input.response) {
+              const body = bytes!.subarray(0, size)
+              if (!body.length || body.includes(Buffer.from(secret))) throw new Error()
+              value = { mimeType: mime, bytes: Uint8Array.from(body).buffer } satisfies PluginMedia
+            } else {
+              value = parseJsonText(bytes!.subarray(0, size), maxBytes, { maxNodes: 100_000, maxDepth: 16 })
+              if (containsSecret(value, secret)) throw new Error()
+            }
           } catch { fail("INVALID_RESPONSE"); return }
           if (Date.now() >= deadline) { fail("TIMEOUT"); return }
           settled = true
@@ -159,14 +177,16 @@ export function createPluginHttpsTransport(dependencies: HttpsTransportDependenc
           if (options.all) callback(null, [{ address: address.address, family: address.family }])
           else callback(null, address.address, address.family)
         }
-        const options: RequestOptions & { autoSelectFamily: boolean } = { protocol: "https:", hostname, port: 443, servername: hostname, method: "GET", path,
+        const body = input.body ? Buffer.from(JSON.stringify(input.body)) : undefined
+        const options: RequestOptions & { autoSelectFamily: boolean } = { protocol: "https:", hostname, port: 443, servername: hostname, method: input.method ?? "GET", path,
           agent: false, family: address.family, autoSelectFamily: false, lookup: pinned, rejectUnauthorized: true,
-          maxHeaderSize: 16_384, headers: { Accept: "application/json", "Accept-Encoding": "identity", [header]: headerValue },
+          maxHeaderSize: 16_384, headers: { Accept: input.response?.mimeTypes.join(", ") ?? "application/json", "Accept-Encoding": "identity", [header]: headerValue,
+            ...(body ? { "Content-Type": "application/json", "Content-Length": body.length } : {}) },
         }
         outgoing = request(options, receive)
         outgoing.on("error", () => fail("UPSTREAM_FAILED"))
         outgoing.once("upgrade", (_response, socket) => { socket.destroy(); fail("INVALID_RESPONSE") })
-        outgoing.end()
+        outgoing.end(body)
       }).catch(() => fail("UPSTREAM_FAILED"))
     })
   }

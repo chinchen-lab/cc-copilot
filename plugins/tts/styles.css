@@ -1,0 +1,16 @@
+@import "../../packages/plugin-ui/styles.css";
+@source "./**/*.{ts,tsx}";
+@source "../../packages/plugin-ui/src";
+
+html, body { margin: 0; background: transparent; font-family: var(--font-sans, sans-serif); }
+
+.speech-seek { appearance: none; width: 100%; height: 12px; margin: 0; background: transparent; cursor: pointer; }
+.speech-seek:disabled { cursor: default; }
+.speech-seek:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; border-radius: 2px; }
+.speech-seek::-webkit-slider-runnable-track { height: 2px; border-radius: 1px; background: linear-gradient(var(--foreground), var(--foreground)) 0 0 / var(--played, 0%) 100% no-repeat, var(--border); }
+.speech-seek::-webkit-slider-thumb { appearance: none; width: 10px; height: 10px; margin-top: -4px; border-radius: 50%; background: var(--foreground); opacity: 0; transition: opacity var(--motion-duration-fast); }
+.speech-seek:hover::-webkit-slider-thumb, .speech-seek:focus-visible::-webkit-slider-thumb { opacity: 1; }
+.speech-seek::-moz-range-track { height: 2px; border-radius: 1px; background: var(--border); }
+.speech-seek::-moz-range-progress { height: 2px; border-radius: 1px; background: var(--foreground); }
+.speech-seek::-moz-range-thumb { width: 10px; height: 10px; border: 0; border-radius: 50%; background: var(--foreground); opacity: 0; transition: opacity var(--motion-duration-fast); }
+.speech-seek:hover::-moz-range-thumb, .speech-seek:focus-visible::-moz-range-thumb { opacity: 1; }

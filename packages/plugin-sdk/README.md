@@ -2,6 +2,10 @@
 
 The SDK communicates through the MessagePort supplied by Cogpit's trusted runtime shell. It has no authenticated fetch function or access to the app's React tree.
 
+API 1.2 adds `settings.get()`, `connections.media()` and `ui.resize()`. Media calls return a bounded audio Blob through a separate binary reply, not a URL or JSON payload. Use `URL.createObjectURL(blob)` for playback and revoke that URL during cleanup. The frame can play blob audio but cannot make network requests.
+
+An inline chat contribution receives `context.surface` with its declared block ID and source text. Handle the absence of `surface` during the installation readiness check, and call `ready()` without requesting provider data. Visibility changes, cancellation and disposal apply to chat frames just as they do to panels. Keep provider writes behind explicit user controls. See the [plugin guide](../../docs/plugins.md) and the [speech example](../../plugins/tts/runtime.tsx).
+
 Build a self-contained browser IIFE that sets exactly one activation function:
 
 ```ts

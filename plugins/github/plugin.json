@@ -3,7 +3,7 @@
   "id": "cogpit.github",
   "publisher": "cogpit",
   "name": "GitHub",
-  "version": "1.2.0",
+  "version": "1.2.2",
   "runtime": "browser-iife-v1",
   "entry": "plugin.js",
   "style": "plugin.css",

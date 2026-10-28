@@ -1,5 +1,5 @@
 import { useTranslation } from "@/hooks/useTranslation"
-import { useState, useCallback, useEffect } from "react"
+import { lazy, Suspense, useState, useCallback, useEffect } from "react"
 import { FontScaleSettings } from "@/components/FontScaleSettings"
 import { LanguageSettings } from "@/components/LanguageSettings"
 import { FolderOpen, CheckCircle, XCircle, Loader2, TerminalSquare, Code2, PanelsTopLeft } from "lucide-react"
@@ -41,6 +41,9 @@ import {
 } from "../../../shared/contracts/agentExecutable"
 import { allDescriptors } from "../../../shared/session/agent-descriptors"
 import { PASSWORD_MIN_LENGTH } from "../../../shared/contracts/password"
+import { useRuntimePlugins } from "@/plugins/useRuntimePlugins"
+
+const PluginsDialog = lazy(() => import("@/plugins/PluginsDialog").then(module => ({ default: module.PluginsDialog })))
 
 /** Agents with more than one binary on offer, so a picker is worth showing. */
 const EXECUTABLE_CHOICE_KINDS = allDescriptors()
@@ -102,6 +105,8 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
   const remoteDevice = isRemoteDeviceActive()
   // An account without configWrite gets a read-only view (the server refuses writes anyway).
   const canWriteConfig = can("configWrite")
+  const [pluginsOpen, setPluginsOpen] = useState(false)
+  const runtimePlugins = useRuntimePlugins(open && pluginsOpen && canWriteConfig)
 
   // Network access state
   const [networkAccess, setNetworkAccess] = useState(false)
@@ -228,6 +233,7 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
   const canSave = computeCanSave()
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="flex h-[min(46rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
         <DialogHeader className="shrink-0 px-5 pb-4 pt-5 pr-12">
@@ -250,6 +256,11 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
           <div className="grid min-h-0 flex-1 grid-cols-1 items-start overflow-y-auto border-t px-5 py-5 [&>[data-slot=tabs-content]]:col-start-1 [&>[data-slot=tabs-content]]:row-start-1">
             <TabsContent value="general" keepMounted>
               <FieldGroup>
+                {canWriteConfig && <Field>
+                  <FieldLabel>{t("Plugins")}</FieldLabel>
+                  <FieldDescription>{t("Manage installed plugins, their settings, and service connections.")}</FieldDescription>
+                  <Button type="button" variant="outline" onClick={() => setPluginsOpen(true)}>{t("Manage plugins")}</Button>
+                </Field>}
                 <LanguageSettings />
                 <FontScaleSettings />
                 <Field>
@@ -391,5 +402,7 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {open && pluginsOpen && canWriteConfig && <Suspense fallback={null}><PluginsDialog client={runtimePlugins.client} state={runtimePlugins} currentPath={null} onClose={() => setPluginsOpen(false)} /></Suspense>}
+    </>
   )
 }

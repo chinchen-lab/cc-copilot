@@ -67,6 +67,7 @@ let scriptedMessages: unknown[] | null = null
 // and then throws scriptedError, modeling a CLI spawn/exit failure.
 let scriptedStderr: string | null = null
 let scriptedError: Error | null = null
+let queryFailure: Error | null = null
 let holdQueryOpen = false
 let releaseHeldQuery: (() => void) | null = null
 let holdQueryAfterMessages = false
@@ -75,6 +76,7 @@ let releaseQueryAfterMessages: (() => void) | null = null
 vi.mock("@anthropic-ai/claude-agent-sdk", () => {
   return {
     query: (args: { prompt: unknown; options: CapturedCall["options"] }) => {
+      if (queryFailure) throw queryFailure
       let resolveCompleted: () => void = () => {}
       const completed = new Promise<void>((r) => {
         resolveCompleted = r
@@ -188,6 +190,7 @@ beforeEach(() => {
   scriptedMessages = null
   scriptedStderr = null
   scriptedError = null
+  queryFailure = null
   holdQueryOpen = false
   releaseHeldQuery = null
   holdQueryAfterMessages = false
@@ -204,6 +207,62 @@ afterEach(async () => {
 })
 
 describe("sdk-session browser support", () => {
+  it.each([false, true])("interrupts plugin skill preparation before a query is dispatched (resumed=%s)", async resumed => {
+    const sdk = await loadModule()
+    const id = "interrupted-plugin-skill"
+    let state = resumed ? sdk.createSDKSession({ sessionId: id, cwd: "/tmp", message: "initial" }) : null
+    if (state) await waitUntil(() => !state!.running && !state!.activeQuery)
+    const before = captured.length
+    let release!: (text: string) => void
+    const { registerPluginSkills } = await import("../plugins/skillContext")
+    const unregister = registerPluginSkills(() => new Promise(resolve => { release = resolve }))
+    try {
+      state = resumed ? sdk.sendSDKMessage(id, "must not start")! : sdk.createSDKSession({ sessionId: id, cwd: "/tmp", message: "must not start" })
+      await waitUntil(() => !!release)
+      const onResult = vi.fn()
+      state.onResult = onResult
+      const observer = sdk.observeSDKResult(state)
+      expect(state.pluginSkillLoading).toBe(true)
+      expect(await sdk.interruptSDKTurn(id)).toBe(true)
+      expect(await observer.completion).toMatchObject({ is_error: true, result: "Turn interrupted" })
+      expect(state.abort?.signal.aborted).toBe(true)
+      expect(state.running).toBe(false)
+      expect(state.pluginSkillLoading).toBe(false)
+      expect(onResult).toHaveBeenCalledOnce()
+      unregister()
+      sdk.sendSDKMessage(id, "after interruption")
+      release("Old instructions must not start the old prompt")
+      await waitUntil(() => !state!.running)
+      expect(captured).toHaveLength(before + 1)
+    } finally { release?.(""); unregister() }
+  })
+  it("reports synchronous SDK startup failures after skill loading and releases its pending result", async () => {
+    const sdk = await loadModule()
+    const { registerPluginSkills } = await import("../plugins/skillContext")
+    const unregister = registerPluginSkills(async () => "Plugin instructions")
+    try {
+      queryFailure = new Error("Fixture SDK startup failed")
+      const state = sdk.createSDKSession({ sessionId: "failed-plugin-start", cwd: "/tmp", message: "hi" })
+      const onResult = vi.fn()
+      state.onResult = onResult
+      const observer = sdk.observeSDKResult(state)
+      expect(await observer.completion).toMatchObject({ is_error: true, result: expect.stringContaining("Fixture SDK startup failed") })
+      expect(onResult).toHaveBeenCalledOnce()
+      expect(state.running).toBe(false)
+      expect(state.messageStream).toBeNull()
+      expect(state.pluginSkillLoading).toBe(false)
+    } finally { unregister() }
+  })
+  it("adds workspace-scoped plugin skill instructions to a new query", async () => {
+    const { registerPluginSkills } = await import("../plugins/skillContext")
+    const unregister = registerPluginSkills(async cwd => `Speech skill for ${cwd}`)
+    try {
+      const { createSDKSession } = await loadModule()
+      createSDKSession({ sessionId: "plugin-skill", cwd: "/tmp", message: "hi" })
+      await waitUntil(() => captured.length === 1)
+      expect(captured[0].options.systemPrompt?.append).toContain("Speech skill for /tmp")
+    } finally { unregister() }
+  })
   it("puts the shim first on PATH and loads the browser plugin", async () => {
     const { binDir, pluginDir } = await import("../browser/paths")
     const { ensureShim } = await import("../browser/shim")

@@ -1,5 +1,7 @@
 /** Traditional Chinese interface messages; English source text is the fallback. */
 export const zhTW: Readonly<Record<string, string>> = {
+  "Manage plugins": "管理外掛",
+  "Manage installed plugins, their settings, and service connections.": "管理已安裝的外掛、設定與服務連線。",
   "Usage": "用量",
   "Show account quota and reset times": "顯示帳號額度與重置時間",
   "Account quota and reset times.": "帳號額度與重置時間。",

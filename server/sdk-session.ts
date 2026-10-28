@@ -22,6 +22,7 @@ import { presentTurnError } from "../shared/session/agent-errors"
 import { watchSubagents, type SubagentTask, type SubagentWatcher } from "./subagentWatcher"
 import { claudeCliPath } from "./agents/claudeExecutable"
 import { appendToSystemPrompt, withControlQuery } from "./agents/sdk"
+import { pluginSkillContext } from "./plugins/skillContext"
 import { readSdkRateLimit } from "./agents/rateLimit"
 import type { UserQuestionAnswers } from "./agents/runtimeTypes"
 import { BROWSER_CONTEXT_APPEND, BROWSER_HOOK_TOOL, browserPreToolUseHook } from "./browser/agentContext"
@@ -91,6 +92,7 @@ export type PermissionDecision = "allow" | "allow_always" | "deny"
 export type ImageAttachment = { data: string; mediaType: string }
 
 export interface SDKSessionState {
+  pluginSkillLoading?: boolean
   sessionId: string
   cwd: string
   /** Permission requests awaiting user decision — canUseTool is blocked on the `resolve` promise */
@@ -698,13 +700,34 @@ function runQuery(state: SDKSessionState, prompt: string, opts: {
   worktreeName?: string
   mcpConfig?: string | null
   images?: ImageAttachment[]
-}): void {
-  state.abort = new AbortController()
+}, pluginInstructions?: string, preparation?: AbortController): void {
+  if (pluginInstructions === undefined) {
+    const loading = pluginSkillContext(state.cwd)
+    if (loading) {
+      const abort = new AbortController()
+      state.abort = abort; state.running = true; state.pluginSkillLoading = true
+      void loading.then(instructions => { if (state.abort === abort && !abort.signal.aborted) { state.pluginSkillLoading = false; runQuery(state, prompt, opts, instructions, abort) } }).catch(error => {
+        if (state.abort !== abort || abort.signal.aborted) return
+        state.pluginSkillLoading = false; state.running = false
+        state.messageStream?.close(); state.messageStream = null
+        abort.abort()
+        const result = { type: "result", is_error: true, result: String(error) }
+        notifyResultObservers(state, result, true)
+        const callback = state.onResult
+        state.onResult = null
+        if (callback) callback(result)
+        else streamBus.publishError(state.sessionId, result.result)
+      })
+      return
+    }
+  }
+  state.abort = preparation ?? new AbortController()
   state.running = true
   state.backgroundAgents = NO_BACKGROUND_AGENTS
   state.stderr = ""
 
   const queryOpts = buildQueryOptions(state, opts)
+  if (pluginInstructions) queryOpts.systemPrompt = appendToSystemPrompt(queryOpts.systemPrompt, pluginInstructions)
   const messageStream = new SDKMessageStream()
   const first = buildUserMessage(prompt, opts.images)
   inputTurns.set(state, { sent: [first.uuid!], completed: 0, taken: null })
@@ -1488,6 +1511,7 @@ function teardownState(state: SDKSessionState): void {
     state.activeQuery = null
   }
   state.abort?.abort()
+  state.pluginSkillLoading = false
   state.running = false
   state.backgroundAgents = NO_BACKGROUND_AGENTS
 }
@@ -1502,7 +1526,20 @@ export function stopSDKSession(sessionId: string): boolean {
 
 export async function interruptSDKTurn(sessionId: string): Promise<boolean> {
   const state = sdkSessions.get(sessionId)
-  if (!state?.running || !state.activeQuery) return false
+  if (!state?.running) return false
+  if (state.pluginSkillLoading) {
+    state.abort?.abort()
+    state.pluginSkillLoading = false
+    state.running = false
+    const result = { type: "result", is_error: true, result: "Turn interrupted" }
+    notifyResultObservers(state, result, true)
+    const callback = state.onResult
+    state.onResult = null
+    streamBus.clear(sessionId)
+    callback?.(result)
+    return true
+  }
+  if (!state.activeQuery) return false
   await state.activeQuery.interrupt()
   return true
 }

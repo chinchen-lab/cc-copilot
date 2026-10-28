@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "id": "speech",
+  "label": "Speech service",
+  "secret": { "id": "api-key", "label": "API key" },
+  "auth": { "header": "Authorization", "scheme": "bearer" },
+  "validationOperation": "voices",
+  "resources": {
+    "voice": { "label": "Voice", "options": { "operation": "voices", "items": "/voices", "id": "/id", "label": "/name" } }
+  },
+  "operations": {
+    "voices": { "audience": "setup", "origin": "https://stt.cogpit.dev", "method": "GET", "path": [{ "literal": "v1" }, { "literal": "audio" }, { "literal": "voices" }], "args": {}, "query": {} },
+    "synthesize": {
+      "audience": "panel",
+      "origin": "https://stt.cogpit.dev",
+      "method": "POST",
+      "path": [{ "literal": "v1" }, { "literal": "audio" }, { "literal": "speech" }],
+      "args": {
+        "input": { "type": "string", "required": true, "maxLength": 16384, "multiline": true },
+        "speed": { "type": "number", "required": true, "min": 0.5, "max": 2 },
+        "format": { "type": "string", "required": true, "maxLength": 3, "enum": ["mp3", "wav"] }
+      },
+      "query": {},
+      "body": { "model": { "literal": "tts-1" }, "voice": { "resource": "voice" }, "input": { "arg": "input" }, "speed": { "arg": "speed" }, "response_format": { "arg": "format" } },
+      "response": { "type": "audio", "mimeTypes": ["audio/mpeg", "audio/wav"], "maxBytes": 8388608 }
+    }
+  }
+}

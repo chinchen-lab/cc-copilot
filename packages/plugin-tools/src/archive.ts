@@ -72,13 +72,17 @@ export async function createArchive(directory: string, options: ArchiveOptions =
   const manifest = parseManifest(manifestJson)
   manifestFile.bytes = Buffer.from(JSON.stringify(manifestJson, null, 2))
   const byPath = new Map(files.map(file => [file.path, file]))
-  if (byPath.get(manifest.entry)?.mime !== "text/javascript") throw new Error(`Missing JavaScript entry: ${manifest.entry}`)
+  if (manifest.entry && byPath.get(manifest.entry)?.mime !== "text/javascript") throw new Error(`Missing JavaScript entry: ${manifest.entry}`)
   if (manifest.style && byPath.get(manifest.style)?.mime !== "text/css") throw new Error(`Missing stylesheet: ${manifest.style}`)
   for (const panel of manifest.contributes.panels) {
     if (!byPath.get(panel.icon)?.mime.startsWith("image/")) throw new Error(`Missing raster icon: ${panel.icon}`)
   }
   for (const connection of manifest.permissions.connections) {
     if (byPath.get(connection.definition)?.mime !== "application/json") throw new Error(`Missing connection definition: ${connection.definition}`)
+  }
+  for (const skill of manifest.contributes.skills ?? []) {
+    const file = byPath.get(skill.source)
+    if (!file || file.mime !== "text/plain" || file.bytes.length > 16384) throw new Error(`Missing or oversized skill source: ${skill.source}`)
   }
   files.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0)
   const payload = Buffer.from(JSON.stringify({ archiveVersion: 1, files: files.map(file => ({ path: file.path, mime: file.mime, content: file.bytes.toString("base64") })) }))

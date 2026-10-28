@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -267,6 +267,23 @@ describe("ConfigDialog language preference", () => {
 
 
 describe("ConfigDialog categories", () => {
+  it("opens plugin management from General without losing local preferences or unsaved configuration", async () => {
+    const user = userEvent.setup()
+    mockConfig()
+    renderDialog()
+    const input = await screen.findByLabelText("Editor application")
+    fireEvent.change(input, { target: { value: "my-editor --wait" } })
+    act(() => setLanguage("zh-TW"))
+    await user.click(screen.getByRole("button", { name: "管理外掛" }))
+    const plugins = await screen.findByRole("dialog", { name: "外掛" })
+    await user.click(within(plugins).getByRole("button", { name: "關閉" }))
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "外掛" })).not.toBeInTheDocument())
+    expect(screen.getByRole("tab", { name: "一般" })).toHaveAttribute("aria-selected", "true")
+    expect(screen.getByRole("combobox", { name: "語言" })).toHaveValue("zh-TW")
+    expect(input).toHaveValue("my-editor --wait")
+    expect(mocks.authFetch.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "POST")).toBe(false)
+  })
+
   it("shows one category at a time and preserves edits across all three tabs when saving", async () => {
     const user = userEvent.setup()
     mockConfig()
@@ -327,6 +344,7 @@ describe("ConfigDialog categories", () => {
     renderDialog()
     expect(screen.queryByRole("tab", { name: "Network & sharing" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Manage plugins" })).not.toBeInTheDocument()
     fireEvent.change(screen.getByRole("combobox", { name: "Language" }), { target: { value: "zh-TW" } })
     expect(screen.getByRole("combobox", { name: "語言" })).toHaveValue("zh-TW")
     expect(screen.getByRole("slider", { name: "文字大小" })).toBeEnabled()

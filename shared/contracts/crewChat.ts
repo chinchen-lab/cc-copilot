@@ -1,3 +1,5 @@
+import { CREW_CHAT_DELIVERY_RE } from "../session/automatedPrompts"
+
 export const CREW_CHAT_MAX_LENGTH = 8_000
 
 export interface CrewChatAuthor {
@@ -60,7 +62,6 @@ export function crewChatMentions(text: string, members: readonly Pick<CrewChatMe
   return members.filter((member) => tokens.has(member.handle.toLowerCase()) || tokens.has(member.sessionId.toLowerCase())).map((member) => member.sessionId)
 }
 
-const DELIVERY_SOURCE_RE = /^Crew chat · ([^\n]+) · message (\d+)(?:\n|$)/
 const TAGGED_INTRO = "You were tagged in this message:"
 const TAGGED_OUTRO = "This is a crew message. Use your judgment about whether to respond. Keep following your assigned task and the user's instructions."
 const NOTICE_INTRO = "A new message is available in your crew's shared chat. Fetch it if useful: "
@@ -83,12 +84,12 @@ export interface CrewChatDeliveryPrompt {
 }
 
 export function isCrewChatDelivery(text: string): boolean {
-  return DELIVERY_SOURCE_RE.test(text.trim())
+  return CREW_CHAT_DELIVERY_RE.test(text.trim())
 }
 
 export function parseCrewChatDelivery(text: string): CrewChatDeliveryPrompt | null {
   const trimmed = text.trim()
-  const source = DELIVERY_SOURCE_RE.exec(trimmed)
+  const source = CREW_CHAT_DELIVERY_RE.exec(trimmed)
   if (!source) return null
   const rest = trimmed.slice(source[0].length)
   const rootId = /cogpit-session chat fetch '([^']+)'/.exec(rest)?.[1] ?? null

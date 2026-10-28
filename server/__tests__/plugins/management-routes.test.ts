@@ -103,6 +103,31 @@ afterEach(async () => {
 })
 
 describe("plugin management routes with the real manager and store", () => {
+  it("keeps legacy panels usable when newer contributions enter the catalog and registry", async () => {
+    const older = (await call("POST", "/session", { session: null, body: { client: { ...client, apiVersions: ["1.1.0"] } } })).data.sessionId
+    const newerClient = { ...client, apiVersions: ["1.2.0"] }
+    session = (await call("POST", "/session", { session: null, body: { client: newerClient } })).data.sessionId
+    await install()
+    const modern = signedPackage(authority, { id: "dev-test.preferences", declarative: true, metadataVersion: 2, contributes: { panels: [], settings: { scope: "plugin", fields: [{ id: "enabled", label: "Enabled", type: "boolean", default: true }] } } })
+    const headers = { "x-cogpit-plugin-client": JSON.stringify(newerClient), "x-cogpit-plugin-scope": JSON.stringify({ type: "all" }) }
+    const staged = await call("POST", "/stage", { body: modern.bytes, headers })
+    expect(staged.status).toBe(200)
+    const preview = staged.data as PluginInstallPreview
+    await call("GET", `/payload/${preview.transactionId}`)
+    await call("POST", `/transactions/${preview.transactionId}/trial`)
+    expect((await call("POST", `/transactions/${preview.transactionId}/commit`, { body: { expectedRevision: preview.registryRevision } })).data.plugins).toHaveLength(2)
+    expect((await call("GET", "/status")).data.store.plugins).toHaveLength(2)
+    const legacyStatus = (await call("GET", "/status", { session: older })).data.store
+    expect(legacyStatus.plugins.map((plugin: { id: string }) => plugin.id)).toEqual(["dev-test.probe"])
+    expect(legacyStatus.availableSeeds.some((seed: { manifest: { id: string } }) => seed.manifest.id === "cogpit.tts")).toBe(false)
+    const disabled = await call("POST", "/installed/dev-test.probe/enabled", { session: older, body: { expectedRevision: manager.snapshot().revision, enabled: false } })
+    expect(disabled.status).toBe(200)
+    expect(disabled.data.plugins.map((plugin: { id: string }) => plugin.id)).toEqual(["dev-test.probe"])
+    expect((await call("GET", `/transactions/${preview.transactionId}`, { session: older })).status).toBe(400)
+    const oldReview = await call("POST", "/stage", { session: older, body: modern.bytes, headers: { ...headers, "x-cogpit-plugin-client": JSON.stringify(client) } })
+    expect(oldReview.status).toBe(409)
+    expect(oldReview.data.error).toContain("Update the Cogpit client")
+  })
   it("reports incompatible active clients during review without exposing their sessions", async () => {
     const other = await call("POST", "/session", { session: null, body: { client: { ...client, apiVersions: ["0.1.0"] } } })
     expect(other.status).toBe(200)

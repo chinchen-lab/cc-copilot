@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { CONTRACT_LIMITS } from "./json.js"
 import { identifier, label, parseSchema } from "./schema.js"
+import { audioMimeSchema, MEDIA_LIMIT_BYTES } from "./media.js"
 
 const origin = z.string().max(256).refine((value) => {
   try {
@@ -14,8 +15,9 @@ const pointer = z.string().max(256).refine((value) => (!value || value.startsWit
   && value.split("/").length <= 9 && !value.split("/").some((key) => ["__proto__", "prototype", "constructor"].includes(key)), "Invalid bounded JSON pointer")
 const literalSegment = z.string().min(1).max(1024).regex(/^[a-zA-Z0-9._~-]+$/u).refine((value) => value !== "." && value !== "..")
 const argument = z.discriminatedUnion("type", [
-  z.strictObject({ type: z.literal("string"), required: z.boolean().optional(), maxLength: z.number().int().min(1).max(1024), enum: z.array(label).min(1).max(32).optional() }),
+  z.strictObject({ type: z.literal("string"), required: z.boolean().optional(), maxLength: z.number().int().min(1).max(16384), multiline: z.boolean().optional(), enum: z.array(label).min(1).max(64).optional() }),
   z.strictObject({ type: z.literal("integer"), required: z.boolean().optional(), min: z.number().int().min(Number.MIN_SAFE_INTEGER), max: z.number().int().max(Number.MAX_SAFE_INTEGER) }),
+  z.strictObject({ type: z.literal("number"), required: z.boolean().optional(), min: z.number().finite(), max: z.number().finite() }),
   z.strictObject({ type: z.literal("boolean"), required: z.boolean().optional() }),
 ])
 const segment = z.union([
@@ -27,12 +29,14 @@ const queryValue = z.union([
   z.strictObject({ arg: identifier }), z.strictObject({ resource: identifier }), z.strictObject({ identity: identifier }),
 ])
 const operation = z.strictObject({
-  audience: z.enum(["setup", "panel"]), origin, method: z.literal("GET"),
+  audience: z.enum(["setup", "panel"]), origin, method: z.enum(["GET", "POST"]),
   path: z.array(segment).min(1).max(16),
   args: z.record(identifier, argument).refine((value) => Object.keys(value).length <= 16),
   query: z.record(z.string().max(68).regex(/^[a-zA-Z][a-zA-Z0-9_.-]*(?:\[\])?$/u)
     .refine((value) => !["constructor", "prototype", "__proto__"].includes(value.replace(/\[\]$/u, ""))), queryValue)
     .refine((value) => Object.keys(value).length <= 16),
+  body: z.record(identifier, queryValue).refine(value => Object.keys(value).length <= 16).optional(),
+  response: z.strictObject({ type: z.literal("audio"), mimeTypes: z.array(audioMimeSchema).min(1).max(6), maxBytes: z.number().int().min(1).max(MEDIA_LIMIT_BYTES) }).optional(),
 })
 const optionSource = z.strictObject({ operation: identifier, items: pointer, nested: pointer.optional(), id: pointer, label: pointer })
 const resource = z.strictObject({
@@ -124,10 +128,12 @@ export const connectionDefinitionSchema = definitionShape.superRefine((definitio
   }
   for (const name of Object.keys(definition.resources)) visit(name)
   for (const [name, op] of Object.entries(definition.operations)) {
+    if (op.audience === "setup" && (op.method !== "GET" || op.response)) issue(["operations", name], "Setup operations must return JSON from GET")
+    if (op.body && op.method !== "POST") issue(["operations", name, "body"], "Only POST operations have a body")
     const usedArgs = new Set<string>()
     for (const [key, spec] of Object.entries(op.args)) {
       if (Object.hasOwn(definition.resources, key) || Object.hasOwn(definition.identity ?? {}, key)) issue(["operations", name, "args", key], "Argument shadows a host-owned binding")
-      if (spec.type === "integer" && spec.min > spec.max) issue(["operations", name, "args", key], "Inverted integer bounds")
+      if ((spec.type === "integer" || spec.type === "number") && spec.min > spec.max) issue(["operations", name, "args", key], "Inverted numeric bounds")
       if (spec.type === "string" && spec.enum?.some((value) => new TextEncoder().encode(value).byteLength > spec.maxLength)) issue(["operations", name, "args", key], "Enum exceeds string limit")
     }
     for (const part of op.path) {
@@ -138,7 +144,7 @@ export const connectionDefinitionSchema = definitionShape.superRefine((definitio
         usedArgs.add(part.arg)
       }
     }
-    for (const part of Object.values(op.query)) {
+    for (const part of [...Object.values(op.query), ...Object.values(op.body ?? {})]) {
       const key = typeof part === "string" ? part : "arg" in part ? part.arg : undefined
       if (key !== undefined) {
         if (!Object.hasOwn(op.args, key)) issue(["operations", name, "query"], "Unknown query argument")

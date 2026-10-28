@@ -12,6 +12,7 @@ import {
 import { descriptorFor, type PermissionsConfig } from "../../shared/session/agent-descriptors"
 import { storeFor } from "."
 import { codexBrowserConfig } from "./codexBrowser"
+import { pluginSkillContext } from "../plugins/skillContext"
 import { AgentRuntimeError } from "./runtimeTypes"
 import { uncompressedTranscriptName } from "./transcriptFile"
 import { prepareSlashPrompt } from "./slashCommands"
@@ -150,6 +151,12 @@ async function threadSettings(client: CodexExecutionClient, options: CodexExecut
   if (tier !== undefined) settings.serviceTier = tier
   const browserConfig = await codexBrowserConfig(client, options.cwd, sessionId)
   const config: JsonObject = { ...browserConfig }
+  const instructions = await pluginSkillContext(options.cwd)
+  if (instructions) {
+    const existing = typeof config.developer_instructions === "string" ? config.developer_instructions
+      : (await client.call<{ config: { developer_instructions?: string } }>("config/read", { cwd: options.cwd })).config.developer_instructions
+    config.developer_instructions = [existing, instructions].filter(Boolean).join("\n\n")
+  }
   if (options.contextWindowTokens != null) {
     config.model_context_window = options.contextWindowTokens
   }

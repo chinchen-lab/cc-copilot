@@ -3,6 +3,7 @@ import type { PluginContext } from "@cogpit/plugin-contracts"
 import type { PluginInstallPreview } from "../../shared/contracts/plugins"
 import { PluginFrame, type PluginFrameProps } from "./PluginFrame"
 import type { RuntimePluginClient } from "./runtimeClient"
+import { prepareRuntimePackage } from "./runtimePayload"
 
 const trialContext: PluginContext = { project: null, theme: { mode: "light", tokens: {} }, locale: "en", reducedMotion: true, visible: false }
 type TrialPhase = "loading" | "trial" | "committing" | "recovering" | "finished" | "canceled"
@@ -62,6 +63,7 @@ function startTrial({ client, preview, activation, key, onFrame, onComplete, onE
     try {
       const payload = await client.payload(preview.transactionId, abort.signal)
       if (abort.signal.aborted) return
+      if (!preview.manifest.entry) await prepareRuntimePackage(payload, preview.digest)
       deadline = await client.beginTrial(preview, abort.signal)
       if (abort.signal.aborted) return
       const remaining = deadline - Date.now()
@@ -71,6 +73,7 @@ function startTrial({ client, preview, activation, key, onFrame, onComplete, onE
         if (phase === "committing") { abort.abort(); void recover(expired()) }
         else if (phase === "trial") fail(expired())
       }, remaining)
+      if (!preview.manifest.entry) { await ready(); return }
       onFrame({ key, client, props: {
         payload, digest: preview.digest, activationKey: key, context: trialContext, active: false, title: "Plugin installation check",
         execute: async (request, signal) => {

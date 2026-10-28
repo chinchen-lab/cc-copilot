@@ -3,6 +3,7 @@ import { CONTRACT_LIMITS, type JsonValue, parseJson } from "./json.js"
 import { boundedText, identifier, label, parseSchema } from "./schema.js"
 import { PROTOCOL_MAJOR } from "./manifest.js"
 import { integrationRequestSchema, integrationResultSchema, type PluginIntegrationRequest, type PluginIntegrationResult } from "./integrations.js"
+import { parsePluginMedia, type PluginMedia } from "./media.js"
 
 const json = z.custom<JsonValue>(() => true)
 const empty = z.strictObject({})
@@ -14,8 +15,9 @@ const theme = z.strictObject({
 const sessionHandle = z.string().regex(/^s_[a-f0-9]{48}$/u)
 /** The open chat session as an opaque handle, present only for plugins granted `session.identity`. */
 const session = z.strictObject({ handle: sessionHandle }).nullable().optional()
+const surface = z.strictObject({ type: z.literal("chat-block"), id: identifier, source: boundedText(16384) }).optional()
 export const pluginContextSchema = z.strictObject({
-  project, theme, locale: z.string().min(1).max(64), reducedMotion: z.boolean(), visible: z.boolean(), session,
+  project, theme, locale: z.string().min(1).max(64), reducedMotion: z.boolean(), visible: z.boolean(), session, surface,
 })
 export type PluginContext = z.infer<typeof pluginContextSchema>
 export function parsePluginContext(value: unknown): PluginContext { return parseSchema(pluginContextSchema, value, CONTRACT_LIMITS.responseBytes) }
@@ -35,6 +37,7 @@ const storageKey = identifier
 const paramsSchemas = {
   "lifecycle.ready": empty,
   "connections.request": z.strictObject({ handle: identifier, operationId: identifier, args: z.record(identifier, z.union([z.string(), z.number().finite(), z.boolean()])) }),
+  "connections.media": z.strictObject({ handle: identifier, operationId: identifier, args: z.record(identifier, z.union([z.string(), z.number().finite(), z.boolean()])) }),
   "connections.status": z.strictObject({ handle: identifier }),
   "integrations.request": integrationRequestSchema,
   "storage.get": z.strictObject({ key: storageKey }),
@@ -43,6 +46,8 @@ const paramsSchemas = {
   "composer.append": z.strictObject({ text: boundedText(CONTRACT_LIMITS.composerBytes) }),
   "navigation.openExternal": z.strictObject({ url: httpsUrl }),
   "navigation.openSession": z.strictObject({ handle: identifier }),
+  "settings.get": empty,
+  "ui.resize": z.strictObject({ height: z.number().int().min(80).max(800) }),
 } as const
 
 const connectionStatusSchema = z.strictObject({
@@ -56,6 +61,7 @@ export type PluginConnectionStatus = z.infer<typeof connectionStatusSchema>
 export interface MethodMap {
   "lifecycle.ready": { params: Record<string, never>; result: null }
   "connections.request": { params: { handle: string; operationId: string; args: Record<string, string | number | boolean> }; result: JsonValue }
+  "connections.media": { params: { handle: string; operationId: string; args: Record<string, string | number | boolean> }; result: PluginMedia }
   "connections.status": { params: { handle: string }; result: PluginConnectionStatus }
   "integrations.request": { params: PluginIntegrationRequest; result: PluginIntegrationResult }
   "storage.get": { params: { key: string }; result: JsonValue }
@@ -64,6 +70,8 @@ export interface MethodMap {
   "composer.append": { params: { text: string }; result: null }
   "navigation.openExternal": { params: { url: string }; result: null }
   "navigation.openSession": { params: { handle: string }; result: null }
+  "settings.get": { params: Record<string, never>; result: JsonValue }
+  "ui.resize": { params: { height: number }; result: null }
 }
 export type PluginMethod = keyof MethodMap
 export type PluginRequest = { [M in PluginMethod]: { protocol: 1; type: "request"; id: string; method: M; params: MethodMap[M]["params"] } }[PluginMethod]
@@ -76,6 +84,7 @@ export type PluginEvent =
   | { protocol: 1; type: "event"; event: "dispose"; value: null }
 export type FrameMessage = PluginRequest | PluginEvent
   | { protocol: 1; type: "result"; id: string; value: JsonValue }
+  | { protocol: 1; type: "media-result"; id: string; value: PluginMedia }
   | { protocol: 1; type: "error"; id: string; error: PluginError }
   | { protocol: 1; type: "cancel"; id: string }
 
@@ -94,11 +103,16 @@ const envelopeSchema = z.union([
 ])
 
 export function parseFrameMessage(value: unknown): FrameMessage {
+  if (value && typeof value === "object" && Object.getOwnPropertyDescriptor(value, "type")?.value === "media-result") {
+    const fields = Object.getOwnPropertyDescriptors(value)
+    if (Object.keys(fields).length !== 4 || fields.protocol?.value !== 1) throw new Error("Invalid media envelope")
+    return { protocol: 1, type: "media-result", id: requestId.parse(fields.id?.value), value: parsePluginMedia(fields.value?.value) }
+  }
   const resultEnvelope = value !== null && typeof value === "object" && Object.getOwnPropertyDescriptor(value, "type")?.value === "result"
   const message = parseSchema(envelopeSchema, value, resultEnvelope ? CONTRACT_LIMITS.resultMessageBytes : CONTRACT_LIMITS.messageBytes,
     resultEnvelope ? CONTRACT_LIMITS.responseNodes + 16 : CONTRACT_LIMITS.nodes)
   if (message.type === "request") {
-    const maxBytes = message.method === "composer.append" ? CONTRACT_LIMITS.composerBytes + 64
+    const maxBytes = message.method === "connections.media" ? CONTRACT_LIMITS.messageBytes : message.method === "composer.append" ? CONTRACT_LIMITS.composerBytes + 64
       : message.method === "storage.set" ? CONTRACT_LIMITS.storageValueBytes : CONTRACT_LIMITS.argumentBytes
     const params = parseSchema(paramsSchemas[message.method] as z.ZodType, message.params, maxBytes)
     return { ...message, params } as PluginRequest
@@ -108,7 +122,8 @@ export function parseFrameMessage(value: unknown): FrameMessage {
 }
 
 export function parseMethodResult<M extends PluginMethod>(method: M, value: unknown): MethodMap[M]["result"] {
+  if (method === "connections.media") return parsePluginMedia(value) as MethodMap[M]["result"]
   const schema = method === "integrations.request" ? integrationResultSchema : method === "connections.status" ? connectionStatusSchema
-    : method === "connections.request" || method === "storage.get" ? json : z.null()
+    : method === "connections.request" || method === "storage.get" || method === "settings.get" ? json : z.null()
   return parseSchema(schema, value, CONTRACT_LIMITS.responseBytes, CONTRACT_LIMITS.responseNodes) as MethodMap[M]["result"]
 }

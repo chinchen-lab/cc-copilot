@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { parseManifest, type ClientRuntimeDescriptor, type HostRuntimeDescriptor, type ConnectionDefinition } from "@cogpit/plugin-contracts"
+import { parseManifest, type ClientRuntimeDescriptor, type HostRuntimeDescriptor, type ConnectionDefinition, type PluginManifest } from "@cogpit/plugin-contracts"
 import { createBundle, replaceTargets, type Authority } from "./signing"
 
 export const authorize = async () => {}
@@ -8,15 +8,16 @@ export const host: HostRuntimeDescriptor = { appVersion: "2.6.6", apiVersions: [
 export const client: ClientRuntimeDescriptor = { appVersion: "2.6.6", apiVersions: ["1.0.0"], manifestVersions: [1], protocolVersions: [1], runtimes: ["browser-iife-v1"], capabilities: {}, browser: ["message-channel", "blob-script", "web-crypto"] }
 const hash = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex")
 export interface SignedPackage { bytes: Buffer; payload: Buffer; digest: string; targetPath: string; manifest: ReturnType<typeof parseManifest> }
-export function signedPackage(authority: Authority, options: { version?: string; metadataVersion?: number; stateVersion?: number; retained?: SignedPackage[]; script?: string; targetSuffix?: string; id?: string; publisher?: string; connection?: ConnectionDefinition; composer?: boolean; navigation?: boolean; storage?: { scope: "project" | "plugin"; quotaKiB: number } } = {}): SignedPackage {
+export function signedPackage(authority: Authority, options: { declarative?: boolean; version?: string; metadataVersion?: number; stateVersion?: number; retained?: SignedPackage[]; script?: string; contributes?: PluginManifest["contributes"]; skillSources?: Record<string, string>; targetSuffix?: string; id?: string; publisher?: string; connection?: ConnectionDefinition; composer?: boolean; navigation?: boolean; storage?: { scope: "project" | "plugin"; quotaKiB: number } } = {}): SignedPackage {
   const publisher = options.publisher ?? "dev-test"
-  const manifest = parseManifest({ manifestVersion: 1, id: options.id ?? `${publisher}.probe`, publisher, name: "Store probe", version: options.version ?? "1.0.0", runtime: "browser-iife-v1", entry: "plugin.js", engines: { pluginApi: "^1.0.0", client: ">=2.0.0", host: ">=2.0.0" }, requires: { client: {}, host: {} }, contributes: { panels: [{ id: "probe", title: "Probe", icon: "icon.png" }] }, permissions: { storage: options.storage ?? { scope: "project", quotaKiB: 16 }, composer: options.composer ? ["append"] : [], navigation: options.navigation ? ["external"] : [], connections: options.connection ? [{ id: options.connection.id, definition: "connection.json", operations: Object.entries(options.connection.operations).filter(([, operation]) => operation.audience === "panel").map(([id]) => id) }] : [] }, stateVersion: options.stateVersion ?? 1 })
+  const manifest = parseManifest({ manifestVersion: 1, id: options.id ?? `${publisher}.probe`, publisher, name: "Store probe", version: options.version ?? "1.0.0", runtime: "browser-iife-v1", ...options.declarative ? {} : { entry: "plugin.js" }, engines: { pluginApi: "^1.0.0", client: ">=2.0.0", host: ">=2.0.0" }, requires: { client: {}, host: {} }, contributes: options.contributes ?? { panels: [{ id: "probe", title: "Probe", icon: "icon.png" }] }, permissions: { storage: options.storage ?? { scope: "project", quotaKiB: 16 }, composer: options.composer ? ["append"] : [], navigation: options.navigation ? ["external"] : [], connections: options.connection ? [{ id: options.connection.id, definition: "connection.json", operations: Object.entries(options.connection.operations).filter(([, operation]) => operation.audience === "panel").map(([id]) => id) }] : [] }, stateVersion: options.stateVersion ?? 1 })
   const file = (path: string, mime: string, bytes: Buffer) => ({ path, mime, content: bytes.toString("base64") })
   const payload = Buffer.from(JSON.stringify({ archiveVersion: 1, files: [
     file("plugin.json", "application/json", Buffer.from(JSON.stringify(manifest))),
-    file("plugin.js", "text/javascript", Buffer.from(options.script ?? "document.body.textContent = 'Store probe'")),
-    file("icon.png", "image/png", Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==", "base64")),
+    ...options.declarative ? [] : [file("plugin.js", "text/javascript", Buffer.from(options.script ?? "document.body.textContent = 'Store probe'")),
+    file("icon.png", "image/png", Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==", "base64"))],
     ...options.connection ? [file("connection.json", "application/json", Buffer.from(JSON.stringify(options.connection)))] : [],
+    ...Object.entries(options.skillSources ?? {}).map(([path, source]) => file(path, "text/plain", Buffer.from(source))),
   ] }))
   const targetPath = `${manifest.publisher}/${manifest.id}/${manifest.version}/${options.targetSuffix ?? "payload"}.json`
   const unsigned = createBundle(authority, { payload, version: options.metadataVersion ?? 1 })

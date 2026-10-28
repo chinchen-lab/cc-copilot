@@ -626,6 +626,9 @@ describe("registerCreateAndSendRoute (Codex) — crash and image cleanup", () =>
 
     handler(req as never, res as never, next)
     await sendBody()
+    // Plugin skill resolution adds an asynchronous step before startup finishes.
+    // Wait for the HTTP response rather than a fixed number of microtasks.
+    await vi.waitFor(() => expect(res.end).toHaveBeenCalledOnce())
 
     expect(mockSpawn).not.toHaveBeenCalled()
     expect(mockWriteTempImageFiles).not.toHaveBeenCalled()

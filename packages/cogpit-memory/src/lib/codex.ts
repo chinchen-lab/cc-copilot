@@ -2,6 +2,7 @@
 import { computeStats, createEmptySessionStats, mergeTokenUsage } from "./sessionStats"
 import { appendAssistantText } from "./turnContent"
 import { awaitingAgentsStatus, type AgentLaunch } from "./backgroundAgents"
+import { linkAsyncAnswers } from "./asyncAnswers"
 import {
   findFailedNestedPatchCallIds,
   parseCodexToolPatches,
@@ -786,6 +787,9 @@ function walkCodexRecords(
 
   let current: Turn | null = null
   let currentTurnId: string | null = null
+  // A prompt steered into the running turn. Older CLIs echo it as the next
+  // `user_message` event, possibly decorated, so the echo is matched by position.
+  let queuedPromptEcho = false
   let currentModel: string | null = metadata.model || null
   let lastTurnTimestamp = ""
   let pendingCompaction: string | null = null
@@ -865,6 +869,7 @@ function walkCodexRecords(
     recordIndex = index
     const payload = isObject(record.payload) ? record.payload : undefined
     const timestamp = record.timestamp ?? ""
+    if (record.type !== "event_msg") queuedPromptEcho = false
 
     if (record.type === "compacted") {
       current = commitTurn(current)
@@ -887,11 +892,17 @@ function walkCodexRecords(
     }
 
     if (record.type === "event_msg" && payload?.type === "user_message" && typeof payload.message === "string") {
+      if (queuedPromptEcho) {
+        queuedPromptEcho = false
+        continue
+      }
       if (current && (current.assistantText.length > 0 || current.toolCalls.length > 0 || current.thinking.length > 0)) {
         current = commitTurn(current)
       }
+      const opensWindow = !sawTurnStart
       sawTurnStart = true
       current ??= createActiveTurn(currentTurnId, timestamp, currentModel)
+      if (opensWindow) current.opensOnPrompt = true
       const localImages = (Array.isArray(payload.local_images) ? payload.local_images : []).filter(
         (p): p is string => typeof p === "string" && p.length > 0,
       )
@@ -1033,8 +1044,17 @@ function walkCodexRecords(
       continue
     }
 
-    if (payload.type === "message" && payload.role === "user" && current.userMessage === null) {
+    if (payload.type === "message" && payload.role === "user") {
       const text = normalizePromptText(extractMessageText(payload, "input_text"))
+      // Sent while the turn was running: Codex steers it into the same turn. A
+      // window that opens mid-turn has no prompt yet but already has content.
+      if (current.userMessage !== null || current.contentBlocks.length > 0) {
+        if (text) {
+          current.contentBlocks.push({ kind: "queued_prompt", content: text, timestamp })
+          queuedPromptEcho = true
+        }
+        continue
+      }
       const images = extractResponseMessageImages(payload)
       const audio = extractResponseMessageAudio(payload)
       if (text || images.length > 0 || audio.length > 0) {
@@ -1328,6 +1348,7 @@ function walkCodexRecords(
   }
 
   commitTurn(current)
+  const linkedTurns = linkAsyncAnswers(turns)
 
   return {
     turnStartIndices,
@@ -1338,8 +1359,8 @@ function walkCodexRecords(
     slug: metadata.slug,
     name: "",
     model: metadata.model,
-    turns,
-    stats: options?.skipStats ? createEmptySessionStats(turns.length) : computeStats(turns),
+    turns: linkedTurns,
+    stats: options?.skipStats ? createEmptySessionStats(linkedTurns.length) : computeStats(linkedTurns),
     rawMessages: options?.skipStats
       ? []
       : records as Array<{ type: string; [key: string]: unknown }>,

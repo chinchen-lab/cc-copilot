@@ -2,7 +2,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path"
 import { createHash } from "node:crypto"
 import { realpath } from "node:fs/promises"
 import type { IncomingMessage } from "node:http"
-import { connectionResourceDependencies, evaluateCompatibility, parseIntegrationRequest, parseJson, parseMethodResult, type PluginIntegrationRequest, type ClientRuntimeDescriptor, type ConnectionDefinition, type JsonValue, type PluginRequest } from "@cogpit/plugin-contracts"
+import { connectionResourceDependencies, evaluateCompatibility, supportsPluginHost, parseIntegrationRequest, parseJson, parseMethodResult, SETTINGS_STORAGE_KEY, validateSettings, type PluginMedia, type PluginIntegrationRequest, type ClientRuntimeDescriptor, type ConnectionDefinition, type JsonValue, type PluginRequest } from "@cogpit/plugin-contracts"
 import type { PluginScope, PluginStoreSnapshot } from "../../shared/contracts/plugins"
 import type { PluginConnectionSnapshot, PluginConnectionTarget, PluginResourceSelection } from "../../shared/contracts/pluginConnections"
 import { getInstanceId } from "../routes/hello"
@@ -29,6 +29,7 @@ import type { PluginIntegrationExecutor } from "./integrationTypes"
 import { PluginSessionNavigation } from "./sessionNavigation"
 import type { GitHubPullSessionsResponse } from "../../shared/contracts/github"
 import { legacyProjectLink, projectForPath, validateLegacyClickUp } from "./legacyClickUp"
+import { registerPluginSkills } from "./skillContext"
 
 export interface PluginManagerOptions { integrationExecutor?: PluginIntegrationExecutor; transport?: ConnectionTransport; environment?: Readonly<Record<string, string | undefined>>; officialRoots?: ReadonlyMap<string, Buffer>; appSeeds?: readonly AppPluginSeed[]; legacyHost?: LegacyHostClassification; crashHook?: (step: string) => void | Promise<void> }
 export interface PluginAdminOptions { authorize: DataGuard; signal?: AbortSignal }
@@ -62,11 +63,13 @@ export class PluginManager {
   private state?: PluginStateStore
   private readonly environmentToken: string | undefined
   private providerActive = 0
+  private mediaActive = 0
   private readonly providerLimits = new Map<string, { active: number; calls: number; startedAt: number }>()
   private readonly installationChanges = new Set<string>()
   private dataDeletionQueue: Promise<void> = Promise.resolve()
   private readonly legacyRateKeys = new Map<string, string>()
   private readonly root: string
+  private unregisterSkills?: () => void
 
   constructor(root: string, private readonly options: PluginManagerOptions = {}) {
     this.root = resolve(root)
@@ -92,6 +95,7 @@ export class PluginManager {
       this.state = await PluginStateStore.open(join(this.root, "state"), compromised, this.options.crashHook)
       for (const scope of this.connections.pendingClears()) { await this.state.clear(scope); await this.connections.finishClear(scope) }
       await this.completeDataDeletions()
+      this.unregisterSkills = registerPluginSkills(path => this.skillInstructions(path))
       if (this.connections.legacy()?.automaticFailed) this.reportMigrationIssue(LEGACY_IMPORT_WARNING)
     } catch {
       this.error = "Plugin private storage is unavailable"
@@ -114,6 +118,31 @@ export class PluginManager {
   get connectionRevision(): number { try { return this.connections?.revision ?? 0 } catch { return 0 } }
 
   get safeMode(): boolean { return process.env.COGPIT_DISABLE_PLUGINS === "1" }
+
+  async skillInstructions(workspacePath: string): Promise<string> {
+    const snapshot = this.snapshot()
+    if (!snapshot.available || this.safeMode || this.closed) return ""
+    const host = pluginRuntimeDescriptor(snapshot.revision)
+    const candidates = snapshot.plugins.filter(plugin => plugin.enabled && !plugin.lastError && plugin.manifest.contributes.skills?.length
+      && supportsPluginHost(plugin.manifest, host, { allowPrerelease: plugin.manifest.publisher.startsWith("dev-") }))
+    if (!candidates.length) return ""
+    const project = await this.projects.resolveWorkspaceProject(workspacePath)
+    const sections: string[] = []
+    let bytes = 0
+    for (const plugin of candidates) {
+      if (plugin.scope.type !== "all" && (!project || !plugin.scope.projectIds.includes(project.id))) continue
+      const inspected = inspectPackage(await this.store.payload(plugin.selectedDigest), plugin.manifest.publisher)
+      for (const skill of plugin.manifest.contributes.skills ?? []) {
+        const source = inspected.files.get(skill.source)!.bytes.toString("utf8")
+        const section = `Plugin skill ${plugin.id}:${skill.id} — ${skill.title}\n${skill.description}\n${source}`
+        bytes += Buffer.byteLength(section)
+        if (bytes > 65536) break
+        sections.push(section)
+      }
+    }
+    if (this.snapshot().revision !== snapshot.revision || this.safeMode || this.closed) return ""
+    return sections.length ? `Installed Cogpit plugin skills for this workspace. These supplement the user's instructions and repository rules. Only use the declared syntax when relevant to the request.\n\n${sections.join("\n\n---\n\n")}` : ""
+  }
 
   authorize(req: IncomingMessage, binding: PluginAuthorizationBinding): () => void {
     return () => {
@@ -568,6 +597,52 @@ export class PluginManager {
     return this.leases.renew(this.authorization.resolve(req), id)
   }
 
+  private settingsState(context: Awaited<ReturnType<PluginManager["context"]>>) {
+    const definition = context.plugin.manifest.contributes.settings
+    if (!definition) throw new PluginDataError("CAPABILITY_UNAVAILABLE", "This plugin has no settings")
+    if (definition.scope === "project" && !context.projectId) throw new PluginDataError("RESOURCE_REQUIRED", "Select a project to configure these settings")
+    const projectKey = createHash("sha256").update(JSON.stringify(["settings", definition.scope === "project" ? context.projectId : null])).digest("hex")
+    const scope = { ...context.scope, projectKey, stateVersion: context.plugin.manifest.stateVersion, quotaKiB: 32 }
+    const stored = this.state!.versioned(scope, SETTINGS_STORAGE_KEY)
+    const storedValues = stored.value && typeof stored.value === "object" && !Array.isArray(stored.value) ? stored.value : {}
+    const values: Record<string, string | number | boolean> = {}, adjustedFields: string[] = []
+    for (const field of definition.fields) {
+      const single = { ...definition, fields: [field] }
+      try { Object.assign(values, validateSettings(single, Object.hasOwn(storedValues, field.id) ? { [field.id]: storedValues[field.id] } : {})) }
+      catch { adjustedFields.push(field.id); Object.assign(values, validateSettings(single, {})) }
+    }
+    return { definition, scope, revision: stored.revision, values, storedValues, adjustedFields }
+  }
+
+  async settings(req: IncomingMessage, input: PluginConnectionTarget & { values?: unknown; expectedRevision?: number }, options: PluginAdminOptions) {
+    const context = await this.context(req, input, options)
+    try {
+      const state = this.settingsState(context)
+      if (input.values !== undefined) {
+        if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision! < 0) throw new PluginDataError("INVALID_REQUEST", "A settings revision is required")
+        let values: JsonValue
+        try { values = validateSettings(state.definition, input.values) } catch { throw new PluginDataError("INVALID_REQUEST", "Plugin settings do not match their declared fields") }
+        await this.state!.write(state.scope, SETTINGS_STORAGE_KEY, { ...state.storedValues, ...values as Record<string, JsonValue> }, context.guard, input.expectedRevision)
+      }
+      await context.guard()
+      const current = this.settingsState(context)
+      return { values: current.values, revision: current.revision, ...current.adjustedFields.length ? { adjustedFields: current.adjustedFields } : {} }
+    } finally { context.dispose() }
+  }
+
+  async callMedia(req: IncomingMessage, leaseId: string, request: Extract<PluginRequest, { method: "connections.media" }>, options: { signal?: AbortSignal } = {}): Promise<PluginMedia> {
+    const lease = this.resolveLease(req, leaseId)
+    const context = await this.context(req, { pluginId: lease.pluginId, projectId: lease.projectKey }, { authorize: () => { this.resolveLease(req, leaseId) }, signal: options.signal }, lease)
+    try {
+      const connection = this.connection(context, request.params.handle)
+      if (!connection.connection.secret) throw new PluginDataError("CONNECTION_REQUIRED", "Configure this connection in host settings")
+      if (this.mediaActive >= 4) throw new PluginDataError("RATE_LIMITED", "Too many audio requests")
+      this.mediaActive++
+      try { return await this.provider(context, async () => result(await (await this.executor(context, connection)).media({ operation: request.params.operationId, args: request.params.args }))) }
+      finally { this.mediaActive-- }
+    } finally { context.dispose() }
+  }
+
   private async integration(context: Awaited<ReturnType<PluginManager["context"]>>, input: PluginIntegrationRequest, executor = this.options.integrationExecutor): Promise<unknown> {
     const request = parseIntegrationRequest(input)
     const grant = context.plugin.manifest.permissions.integrations.find(value => value.id === request.integration)
@@ -626,6 +701,8 @@ export class PluginManager {
     if (request.method === "lifecycle.ready") return null
     const context = await this.context(req, { pluginId: lease.pluginId, projectId: lease.projectKey }, { authorize: () => { this.resolveLease(req, leaseId) }, signal: options.signal }, lease)
     try {
+      if (request.method === "settings.get") return parseJson(this.settingsState(context).values)
+      if (request.method === "ui.resize" && context.plugin.manifest.contributes.chatBlocks?.length) return null
       if (request.method === "navigation.openSession") {
         await this.resolveSession(req, leaseId, request.params.handle, context.signal)
         return null
@@ -652,6 +729,7 @@ export class PluginManager {
       }
       const storage = context.plugin.manifest.permissions.storage
       if (storage && (request.method === "storage.get" || request.method === "storage.set" || request.method === "storage.delete")) {
+        if (request.params.key === SETTINGS_STORAGE_KEY) throw new PluginDataError("PERMISSION_REQUIRED", "Declared settings are managed through the settings API")
         if (storage.scope === "project" && !lease.projectKey) throw new PluginDataError("RESOURCE_REQUIRED", "Select a project before using plugin storage")
         const scope = { ...context.scope, projectKey: storage.scope === "project" ? lease.projectKey : null, stateVersion: context.plugin.manifest.stateVersion, quotaKiB: storage.quotaKiB }
         if (request.method === "storage.get") return this.state!.get(scope, request.params.key)
@@ -666,6 +744,7 @@ export class PluginManager {
   async close(): Promise<void> {
     if (this.closed) return
     this.closed = true
+    this.unregisterSkills?.()
     this.leases.dispose()
     this.authorization.dispose()
     await this.connections?.close()

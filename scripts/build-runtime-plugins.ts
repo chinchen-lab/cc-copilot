@@ -8,7 +8,7 @@ import { inspectPackage, validatePackagePath } from "../server/plugins/package"
 
 const root = resolve(import.meta.dir, "..")
 const app = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as { version: string }
-const bundled = ["clickup", "cloudflare", "github", "vercel-deployments"]
+const bundled = ["clickup", "cloudflare", "github", "vercel-deployments", "tts"]
 const requested = process.argv.slice(2)
 for (const name of requested) if (!bundled.includes(name)) throw new Error(`Unknown bundled plugin: ${name}`)
 const names = requested.length ? requested : bundled
@@ -33,11 +33,11 @@ for (const name of names) {
   } }
   await build({ configFile: false, root: source, publicDir: false, logLevel: "warn", define: { "process.env.NODE_ENV": JSON.stringify("production") }, plugins: [react(), tailwindcss(), boundary],
     build: { outDir: output, emptyOutDir: true, target: "es2022", minify: "esbuild", sourcemap: false, cssCodeSplit: false,
-      lib: { entry: join(source, "runtime.tsx"), name: "CogpitPlugin", formats: ["iife"], fileName: () => manifest.entry, cssFileName: "plugin" },
+      lib: { entry: join(source, "runtime.tsx"), name: "CogpitPlugin", formats: ["iife"], fileName: () => manifest.entry ?? "plugin.js", cssFileName: "plugin" },
       rollupOptions: { output: { inlineDynamicImports: true } },
     },
   })
-  const assets = new Set(["plugin.json", "LICENSE", "NOTICE", ...manifest.contributes.panels.map((panel) => panel.icon), ...manifest.permissions.connections.map((connection) => connection.definition)])
+  const assets = new Set(["plugin.json", "LICENSE", "NOTICE", ...manifest.contributes.panels.map((panel) => panel.icon), ...manifest.permissions.connections.map((connection) => connection.definition), ...(manifest.contributes.skills ?? []).map(skill => skill.source)])
   for (const path of assets) {
     validatePackagePath(path)
     await mkdir(dirname(join(output, path)), { recursive: true })

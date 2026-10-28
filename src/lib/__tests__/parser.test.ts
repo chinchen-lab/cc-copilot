@@ -1662,13 +1662,9 @@ describe("detectPendingInteraction", () => {
     expect(detectPendingInteraction(session)?.type).toBe("question")
   })
 
-  it("clears an async question once the reader replies in the same turn", () => {
+  it("clears an async question once the parser recorded a reply to it", () => {
     const session = withAsyncQuestion(makeSessionWithLastToolCall("Read", {}), [readCall])
-    session.turns[0].contentBlocks = [
-      { kind: "tool_calls", toolCalls: [session.turns[0].toolCalls[0]] },
-      { kind: "queued_prompt", content: "About 900 a month" },
-      { kind: "tool_calls", toolCalls: [readCall] },
-    ]
+    session.turns[0].toolCalls[0].asyncAnswer = "About 900 a month"
 
     expect(detectPendingInteraction(session)).toBeNull()
   })

@@ -1,9 +1,9 @@
-import type { JsonValue, PluginRequest } from "@cogpit/plugin-contracts"
+import type { PluginExecutionResult, PluginRequest } from "@cogpit/plugin-contracts"
 import type { RuntimeLease, RuntimePluginClient } from "./runtimeClient"
 
-export type RuntimePanelClient = Pick<RuntimePluginClient, "lease" | "payload" | "renewLease" | "revokeLease" | "call"> & Partial<Pick<RuntimePluginClient, "resolveSession" | "sessionHandle">>
+export type RuntimePanelClient = Pick<RuntimePluginClient, "lease" | "payload" | "renewLease" | "revokeLease" | "call"> & Partial<Pick<RuntimePluginClient, "resolveSession" | "sessionHandle" | "media">>
 export interface RuntimePanelActivation {
-  execute(request: PluginRequest, signal: AbortSignal): Promise<JsonValue>
+  execute(request: PluginRequest, signal: AbortSignal): Promise<PluginExecutionResult>
   setActive(active: boolean): void
   resetSession(): void
   fail(error: Error): void
@@ -23,6 +23,7 @@ export function createRuntimePanelActivation(options: {
   openSession?: (dirName: string, fileName: string) => void
   appendDraft?: (text: string) => void
   openExternal?: (url: string, signal: AbortSignal) => Promise<void>
+  resize?: (height: number) => void
 }): RuntimePanelActivation {
   const controller = new AbortController()
   let requests = new AbortController()
@@ -81,6 +82,11 @@ export function createRuntimePanelActivation(options: {
       combined.throwIfAborted()
       if (!lease || lease.expiresAt <= Date.now()) throw new Error("Plugin activation expired")
       if (!active && request.method !== "lifecycle.ready") throw new Error("Plugin panel is hidden")
+      if (request.method === "connections.media") {
+        if (!options.client.media) throw Object.assign(new Error("Audio responses are unavailable"), { code: "CAPABILITY_UNAVAILABLE" })
+        return options.client.media(lease.id, request, combined)
+      }
+      if (request.method === "ui.resize" && !options.resize) throw Object.assign(new Error("Resizing is unavailable"), { code: "CAPABILITY_UNAVAILABLE" })
       if (request.method === "composer.append" && !options.appendDraft) {
         throw Object.assign(new Error("The message composer is unavailable"), { code: "CAPABILITY_UNAVAILABLE" })
       }
@@ -92,6 +98,7 @@ export function createRuntimePanelActivation(options: {
       }
       const result = await options.client.call(lease.id, request, combined)
       combined.throwIfAborted()
+      if (request.method === "ui.resize") options.resize!(request.params.height)
       if (request.method === "composer.append") {
         if (performance.now() - lastDraftAppend < 1000) throw Object.assign(new Error("Wait before adding another draft"), { code: "RATE_LIMITED" })
         lastDraftAppend = performance.now()

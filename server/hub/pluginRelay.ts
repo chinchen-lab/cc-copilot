@@ -11,8 +11,9 @@ import {
   pluginSessionHeader, requirePluginAuthentication, samePluginAuthentication, staleActivation,
 } from "../plugins/authorization"
 import { parseJsonText } from "../plugins/json"
+import { MEDIA_LIMIT_BYTES } from "@cogpit/plugin-contracts"
 
-const MAX_RELAY_RESPONSE_BYTES = 4 * 1024 * 1024 + 16 * 1024
+const MAX_RELAY_RESPONSE_BYTES = MEDIA_LIMIT_BYTES + 16 * 1024
 const MAX_RELAY_SESSIONS = 512
 const REQUEST_TIMEOUT_MS = 30_000
 

@@ -61,7 +61,7 @@ async function target(auth: "password" | "none") {
           return
         }
         if (req.url === "/api/plugins/large") {
-          res.end(Buffer.alloc(4 * 1024 * 1024 + 16 * 1024 + 1))
+          res.end(Buffer.alloc(8 * 1024 * 1024 + 16 * 1024 + 1))
           return
         }
         res.statusCode = 404

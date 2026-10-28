@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useRef, useState } from "react"
 import { connectionResourceDependencies } from "@cogpit/plugin-contracts"
 import type { PluginHostStatus } from "../../shared/contracts/pluginManagement"
 import type { PluginConnectionSnapshot, PluginConnectionSummary, PluginConnectionTarget, PluginResourceSelection } from "../../shared/contracts/pluginConnections"
@@ -20,6 +20,8 @@ function ResourceField({ connection, resourceId, target, client, disabled, save 
 }) {
   const id = useId()
   const resource = connection.definition.resources[resourceId]
+  const dependencies = connectionResourceDependencies(connection.definition, resourceId)
+  const automatic = !!resource.options && dependencies.length === 0
   const selected = connection.selected[resourceId]
   const [input, setInput] = useState("")
   const [options, setOptions] = useState<PluginResourceSelection[] | null>(null)
@@ -27,34 +29,39 @@ function ResourceField({ connection, resourceId, target, client, disabled, save 
   const [error, setError] = useState<string | null>(null)
   const pending = useRef<AbortController | null>(null)
   useEffect(() => () => pending.current?.abort(), [])
-  const missingParent = connectionResourceDependencies(connection.definition, resourceId).find((parent) => !connection.selected[parent])
+  const missingParent = dependencies.find((parent) => !connection.selected[parent])
   const unavailable = disabled || !!missingParent || resource.scope === "project" && !target.projectId
-  async function loadOptions(): Promise<void> {
+  const loadOptions = useCallback(async (): Promise<void> => {
     pending.current?.abort()
     const controller = new AbortController()
     pending.current = controller
     setLoading(true); setError(null)
     try {
       const values = await client.connectionOptions(target, connection.id, resourceId, controller.signal)
-      if (!controller.signal.aborted) setOptions(values)
+      if (controller.signal.aborted) return
+      setOptions(values)
     } catch (failure) {
       if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : "Unable to load choices")
     } finally { if (!controller.signal.aborted) setLoading(false) }
-  }
+  }, [client, target, connection.id, resourceId])
+  const untouched = options === null && !loading && !error
+  useEffect(() => { if (automatic && untouched && !unavailable) void loadOptions() }, [automatic, untouched, unavailable, loadOptions])
   const choices = selected && !options?.some((option) => option.id === selected.id) ? [selected, ...options ?? []] : options ?? []
+  const select = <Select items={choices.map((choice) => ({ value: choice.id, label: choice.label }))} value={selected?.id ?? null} disabled={unavailable || loading || !options}
+    onValueChange={(value) => { if (value && value !== selected?.id) void save(connection.id, "select", { resourceId, value }) }}>
+    <SelectTrigger id={`${id}-resource`} aria-invalid={!!error}><SelectValue placeholder={loading ? "Loading choices…" : `Choose ${resource.label}`} /></SelectTrigger>
+    <SelectContent><SelectGroup>{choices.map((choice) => <SelectItem key={choice.id} value={choice.id}>{choice.label}</SelectItem>)}</SelectGroup></SelectContent>
+  </Select>
   return <Field data-disabled={unavailable} data-invalid={!!error}>
     <FieldLabel htmlFor={`${id}-resource`}>{resource.label}</FieldLabel>
     <FieldDescription>{resource.scope === "project" ? "Applies to the selected project." : "Applies to all projects using this connection."}</FieldDescription>
-    {selected && <p className="text-sm">Selected: {selected.label}</p>}
+    {selected && !automatic && <p className="text-sm">Selected: {selected.label}</p>}
     {missingParent && <p className="text-sm text-muted-foreground">Choose {connection.definition.resources[missingParent].label} first.</p>}
     {resource.scope === "project" && !target.projectId && <p className="text-sm text-muted-foreground">Choose a CC-Copilot project above.</p>}
     {resource.options && <div className="flex flex-wrap gap-2">
-      <Button type="button" variant="outline" size="sm" disabled={unavailable || loading} onClick={() => { void loadOptions() }}>{loading ? "Loading choices…" : options ? "Refresh choices" : "Browse choices"}</Button>
-      {options && <Select items={choices.map((choice) => ({ value: choice.id, label: choice.label }))} value={selected?.id ?? null} disabled={unavailable || loading}
-        onValueChange={(value) => { if (value && value !== selected?.id) void save(connection.id, "select", { resourceId, value }) }}>
-        <SelectTrigger id={`${id}-resource`} aria-invalid={!!error}><SelectValue placeholder={`Choose ${resource.label}`} /></SelectTrigger>
-        <SelectContent><SelectGroup>{choices.map((choice) => <SelectItem key={choice.id} value={choice.id}>{choice.label}</SelectItem>)}</SelectGroup></SelectContent>
-      </Select>}
+      {automatic ? select : <Button type="button" variant="outline" size="sm" disabled={unavailable || loading} onClick={() => { void loadOptions() }}>{loading ? "Loading choices…" : options ? "Refresh choices" : "Browse choices"}</Button>}
+      {!automatic && options && select}
+      {automatic && error && <Button type="button" variant="outline" size="sm" disabled={unavailable || loading} onClick={() => { void loadOptions() }}>Try again</Button>}
       {options?.length === 0 && <p className="text-sm text-muted-foreground">No choices were returned.</p>}
     </div>}
     {resource.input && <form className="flex flex-wrap gap-2" onSubmit={(event) => { event.preventDefault(); void save(connection.id, "select", { resourceId, value: input.trim() }) }}>

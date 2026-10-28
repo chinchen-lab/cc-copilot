@@ -1,6 +1,6 @@
 import {
   CONTRACT_LIMITS, ERROR_CODES, parseFrameMessage, parseJson, parseMethodResult, parsePluginContext,
-  type JsonValue, type PluginContext, type PluginError, type PluginRequest,
+  parsePluginMedia, type PluginExecutionResult, type PluginContext, type PluginError, type PluginRequest,
 } from "@cogpit/plugin-contracts"
 import { prepareRuntimePackage, type PreparedRuntimePackage } from "./runtimePayload"
 import { canHashInBrowser } from "@/lib/browserCrypto"
@@ -15,7 +15,7 @@ export interface RuntimeFrameOptions {
   digest: string
   context: PluginContext
   active?: boolean
-  execute: (request: PluginRequest, signal: AbortSignal) => Promise<JsonValue>
+  execute: (request: PluginRequest, signal: AbortSignal) => Promise<PluginExecutionResult>
   onReady?: () => void
   onError?: (error: Error) => void
   onDispose?: () => void
@@ -119,7 +119,10 @@ export function createRuntimeFrame(options: RuntimeFrameOptions): RuntimeFrameCo
     try {
       const value = parseMethodResult(request.method, await options.execute(request, controller.signal))
       if (disposed || controller.signal.aborted || pending.get(request.id) !== controller) return
-      post(parseFrameMessage({ protocol: 1, type: "result", id: request.id, value }))
+      if (request.method === "connections.media") {
+        const media = parsePluginMedia(value)
+        post({ protocol: 1, type: "media-result", id: request.id, value: media }, [media.bytes])
+      } else post(parseFrameMessage({ protocol: 1, type: "result", id: request.id, value }))
       if (disposed) return
       if (request.method === "lifecycle.ready") {
         clearTimeout(timer)

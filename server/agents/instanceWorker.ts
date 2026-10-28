@@ -5,6 +5,7 @@ import type { AgentKind } from "../../shared/session/agent-descriptors"
 import { isRecord } from "../../shared/objects"
 import * as streamBus from "../lib/streamBus"
 import { installBundledSkills } from "./skills"
+import { registerPluginSkills } from "../plugins/skillContext"
 
 const kind = process.env.COGPIT_WORKER_AGENT as AgentKind
 const dataRoot = process.env.COGPIT_WORKER_DATA_ROOT
@@ -18,6 +19,16 @@ const runtime = runtimeFor(kind)
 const answers = new Map<string, () => void>()
 const methods = new Set(["start", "send", "interrupt", "stop", "stopAll", "deleteSession", "respondToApproval", "respondToAllApprovals", "respondToPlan", "answerQuestion", "describeRuntime", "listModels", "liveUsageRecords", "fork", "shutdown", "snapshot", "commitAnswer"])
 function send(message: unknown) { if (process.connected) process.send?.(message) }
+let skillRequestId = 0
+const skillRequests = new Map<number, { resolve: (value: string) => void; timer: ReturnType<typeof setTimeout> }>()
+const unregisterSkills = registerPluginSkills(cwd => new Promise(resolve => {
+  if (skillRequests.size >= 64) { resolve(""); return }
+  const requestId = ++skillRequestId
+  const timer = setTimeout(() => { skillRequests.delete(requestId); resolve("") }, 5000)
+  timer.unref()
+  skillRequests.set(requestId, { resolve, timer })
+  send({ type: "plugin-skills", requestId, cwd })
+}))
 function snapshot() {
   const ids = runtime.listActive().map((s) => s.sessionId)
   return { active: runtime.listActive(), activity: Object.fromEntries(ids.map((id) => [id, runtime.activity(id)])), approvals: runtime.listPendingApprovals(), questions: runtime.listPendingQuestions(), plans: runtime.listPendingPlans?.() ?? [] }
@@ -36,6 +47,11 @@ function publishSnapshot() {
 const poll = setInterval(publishSnapshot, 300)
 poll.unref()
 process.on("message", (message: unknown) => {
+  if (isRecord(message) && message.type === "plugin-skills-result" && typeof message.requestId === "number") {
+    const request = skillRequests.get(message.requestId)
+    if (request) { clearTimeout(request.timer); skillRequests.delete(message.requestId); request.resolve(typeof message.instructions === "string" && Buffer.byteLength(message.instructions) <= 131072 ? message.instructions : "") }
+    return
+  }
   if (!isRecord(message) || typeof message.id !== "number" || typeof message.method !== "string" || !methods.has(message.method) || !Array.isArray(message.args)) return
   const { id, method, args } = message
   void (async () => {
@@ -70,5 +86,5 @@ process.on("message", (message: unknown) => {
     return result
   })().then((value) => send({ id, value }), (error: unknown) => send({ id, error: error instanceof Error ? error.message : "Instance operation failed", status: isRecord(error) ? error.status : undefined, code: isRecord(error) ? error.code : undefined }))
 })
-async function close() { clearInterval(poll); await runtime.shutdown(); process.disconnect?.() }
+async function close() { clearInterval(poll); unregisterSkills(); for (const request of skillRequests.values()) { clearTimeout(request.timer); request.resolve("") }; skillRequests.clear(); await runtime.shutdown(); process.disconnect?.() }
 process.on("disconnect", () => { void close().finally(() => process.exit(0)) })

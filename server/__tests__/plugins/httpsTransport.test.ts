@@ -126,6 +126,18 @@ describe("bounded HTTPS request construction", () => {
 })
 
 describe("hostile HTTPS responses", () => {
+  it("returns bounded declared audio as bytes and sends a JSON POST body", async () => {
+    const audio = Buffer.from([255, 251, 1, 2])
+    const test = fixture({ headers: { "content-type": "audio/mpeg" }, chunks: [audio] })
+    const response = await test.transport(input({ method: "POST", body: { input: "Hello\nworld", speed: 0.75 }, response: { type: "audio", mimeTypes: ["audio/mpeg"], maxBytes: 16 } }))
+    expect(response).toEqual({ mimeType: "audio/mpeg", bytes: Uint8Array.from(audio).buffer })
+    expect(test.request.mock.calls[0][0]).toMatchObject({ method: "POST", headers: { "Content-Type": "application/json", Accept: "audio/mpeg" } })
+    expect(test.outgoing.end).toHaveBeenCalledWith(Buffer.from(JSON.stringify({ input: "Hello\nworld", speed: 0.75 })))
+  })
+  it.each([{ type: "text/html", bytes: [1] }, { type: "audio/mpeg", bytes: [] }, { type: "audio/mpeg", bytes: [1, 2, 3] }])("rejects invalid, empty or oversized audio", async value => {
+    const test = fixture({ headers: { "content-type": value.type }, chunks: [Buffer.from(value.bytes)] })
+    await expect(test.transport(input({ response: { type: "audio", mimeTypes: ["audio/mpeg"], maxBytes: 2 } }))).rejects.toMatchObject({ code: "INVALID_RESPONSE" })
+  })
   it.each([301, 302, 303, 307, 308, 400, 401, 403, 500])("rejects upstream status %s without following redirects or exposing the body", async (status) => {
     const test = fixture({ status, headers: { location: "https://private.internal", "set-cookie": secret }, chunks: [Buffer.from(secret)] })
     await expect(test.transport(input())).rejects.toMatchObject({ code: "UPSTREAM_FAILED", message: "Plugin HTTPS request failed: UPSTREAM_FAILED" })

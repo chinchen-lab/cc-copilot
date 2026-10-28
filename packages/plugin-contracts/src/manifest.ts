@@ -3,9 +3,10 @@ import { valid, validRange } from "semver"
 import { CONTRACT_LIMITS } from "./json.js"
 import { canonicalPath, identifier, label, parseSchema } from "./schema.js"
 import { integrationPermissionSchema } from "./integrations.js"
+import { chatBlockContributionSchema, settingsContributionSchema, skillContributionSchema, sessionActionContributionSchema } from "./contributions.js"
 
 export const PROTOCOL_MAJOR = 1 as const
-export const PLUGIN_API_VERSION = "1.1.0"
+export const PLUGIN_API_VERSION = "1.2.0"
 export const RUNTIME = "browser-iife-v1" as const
 export const versionSchema = z.string().max(128).refine((value) => valid(value) === value, "Expected strict SemVer")
 const range = z.string().min(1).max(256).refine((value) => validRange(value) !== null, "Expected a SemVer range")
@@ -23,7 +24,7 @@ export const manifestSchema = z.strictObject({
   name: label,
   version: versionSchema,
   runtime: z.literal(RUNTIME),
-  entry: canonicalPath.refine((value) => value.endsWith(".js"), "Entry must be JavaScript"),
+  entry: canonicalPath.refine((value) => value.endsWith(".js"), "Entry must be JavaScript").optional(),
   style: canonicalPath.refine((value) => value.endsWith(".css"), "Style must be CSS").optional(),
   engines: z.strictObject({ pluginApi: range, client: range, host: range }),
   protocol: z.literal(PROTOCOL_MAJOR).default(PROTOCOL_MAJOR),
@@ -36,7 +37,12 @@ export const manifestSchema = z.strictObject({
     order: z.number().int().min(0).max(1000).optional(),
     defaultSize: size.optional(), minSize: size.optional(), maxSize: size.optional(),
     when: z.enum(["always", "project-selected"]).default("project-selected"),
-  })).min(1).max(8) }),
+  })).max(8).default([]),
+    settings: settingsContributionSchema.optional(),
+    skills: z.array(skillContributionSchema).max(16).optional(),
+    chatBlocks: z.array(chatBlockContributionSchema).max(8).optional(),
+    sessionActions: z.array(sessionActionContributionSchema).max(8).optional(),
+  }),
   permissions: z.strictObject({
     context: z.array(z.enum(["project.identity", "session.identity"])).max(2).refine(unique).default([]),
     composer: z.array(z.literal("append")).max(1).default([]),
@@ -47,9 +53,13 @@ export const manifestSchema = z.strictObject({
   }),
   stateVersion: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
 }).superRefine((value, context) => {
+  if (!value.contributes.panels.length && !value.contributes.skills?.length && !value.contributes.chatBlocks?.length && !value.contributes.settings) context.addIssue({ code: "custom", path: ["contributes"], message: "At least one contribution is required" })
+  if ((value.contributes.panels.length || value.contributes.chatBlocks?.length) && !value.entry) context.addIssue({ code: "custom", path: ["entry"], message: "Visual contributions require a JavaScript entry" })
+  if (value.style && !value.entry) context.addIssue({ code: "custom", path: ["style"], message: "Styles require a JavaScript entry" })
+  for (const action of value.contributes.sessionActions ?? []) if (!value.contributes.skills?.some(skill => skill.id === action.skill)) context.addIssue({ code: "custom", path: ["contributes", "sessionActions"], message: "Session actions must reference a declared skill" })
   if (!value.id.startsWith(`${value.publisher}.`)) context.addIssue({ code: "custom", path: ["id"], message: "Plugin ID must belong to its publisher" })
   if (["cogpit.worktrees", "cogpit.project-files", "cogpit.browser", "cogpit.file-changes", "cogpit.session-info"].includes(value.id)) context.addIssue({ code: "custom", path: ["id"], message: "Reserved built-in ID" })
-  for (const [key, entries] of [["panels", value.contributes.panels], ["connections", value.permissions.connections], ["integrations", value.permissions.integrations]] as const) {
+  for (const [key, entries] of [["panels", value.contributes.panels], ["skills", value.contributes.skills ?? []], ["chatBlocks", value.contributes.chatBlocks ?? []], ["sessionActions", value.contributes.sessionActions ?? []], ["connections", value.permissions.connections], ["integrations", value.permissions.integrations]] as const) {
     if (!unique(entries.map((entry) => entry.id))) context.addIssue({ code: "custom", path: [key], message: "Duplicate contribution ID" })
   }
   for (const side of ["client", "host"] as const) {

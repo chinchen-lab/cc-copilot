@@ -86,6 +86,16 @@ describe("plugin store process ownership and crash recovery", { timeout: process
     expect(recovered.snapshot()).toMatchObject({ available: true, revision: 0, plugins: [] })
   })
 
+  it.skipIf(process.platform === "win32")("leaves no ownership behind when its owner is terminated", async () => {
+    const { child } = await start("hold")
+    const exited = once(child, "exit")
+    child.kill("SIGTERM")
+    await exited
+    const names = await readdir(root)
+    expect(names).not.toContain("owner.json")
+    expect(names).not.toContain(".store.lock")
+  })
+
   it.each(["initialize-intent", "initialize-registry", "initialize-trust"].flatMap(label => ["file-synced", "renamed", "directory-synced"].map(step => `${label}:${step}`)))("recovers empty-store initialization after SIGKILL at %s", async step => {
     await expectCrash(await start("bootstrap", step), step)
     const old = new Date(Date.now() - 60000); await utimes(join(root, ".store.lock"), old, old)

@@ -66,32 +66,18 @@ function agentContinuedAfterToolCall(turn: Turn, toolCallId: string): boolean {
 }
 
 /**
- * Check whether the reader's own text follows the given tool call in the turn.
- * An async question is answered by a plain message, which lands mid-turn as a
- * queued prompt when the agent was still working.
- */
-function userRepliedAfterToolCall(turn: Turn, toolCallId: string): boolean {
-  const blocks = turn.contentBlocks
-  const blockIndex = blocks.findIndex(
-    (block) => block.kind === "tool_calls" && block.toolCalls.some((tc) => tc.id === toolCallId),
-  )
-  if (blockIndex === -1) return false
-  return blocks.slice(blockIndex + 1).some((block) => block.kind === "queued_prompt")
-}
-
-/**
  * The turn's most recent unanswered async question.
  *
  * These never block, so — unlike a blocking prompt — the question is not the
  * turn's last tool call and carries a successful result the moment it is asked.
- * What makes it still open is that the turn holds no reply to it: answering
- * starts the next turn, so an unanswered question stays in the last one.
+ * What makes it still open is that the parser recorded no reply to it. Only
+ * the last turn counts, so a question the agent moved on from stays closed.
  */
 function detectAsyncQuestion(turn: Turn): UserQuestionState | null {
   for (let index = turn.toolCalls.length - 1; index >= 0; index--) {
     const toolCall = turn.toolCalls[index]
     if (!toolCall.asyncQuestion || toolCall.isError) continue
-    if (userRepliedAfterToolCall(turn, toolCall.id)) return null
+    if (toolCall.asyncAnswer !== undefined) return null
 
     const questions = (toolCall.input as Record<string, unknown>).questions as
       | UserQuestionState["questions"]

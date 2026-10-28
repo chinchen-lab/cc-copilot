@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useHighlightedTokens } from "./ToolCallResult"
 import { cogpitBlockKind, CogpitBlockScope } from "./cogpit-blocks/kinds"
+import { parsePluginBlockLanguage } from "@cogpit/plugin-contracts"
+import { RuntimePluginBlock } from "@/plugins/RuntimePluginContributions"
 
 /** Blocks an agent declares to show structure; loaded with their parser only when a reply has one. */
 const CogpitBlock = lazy(() => import("./cogpit-blocks/CogpitBlock"))
@@ -110,6 +112,7 @@ export function MarkdownCodeBlock({ children, className, node: _node, ...rest }:
   }
 
   const plain = <HighlightedCodeBlock code={code} lang={lang} {...rest} />
+  if (blockScope && lang && parsePluginBlockLanguage(lang)) return <RuntimePluginBlock language={lang} source={code} instanceKey={`${blockScope.messageKey}:${_node?.position?.start.offset ?? 0}`} fallback={plain} />
   const blockKind = blockScope ? cogpitBlockKind(lang) : null
   if (blockKind) {
     return (

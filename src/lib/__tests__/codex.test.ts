@@ -266,6 +266,145 @@ describe("Codex request_user_input", () => {
 
     expect(toolCall.asyncQuestion).toBeUndefined()
   })
+
+  /** Codex 0.15x+ writes a prompt only as a response_item, including one steered into a running turn. */
+  function promptItem(text: string, timestamp = "2024-01-01T00:00:05.000Z"): string {
+    return JSON.stringify({
+      type: "response_item",
+      timestamp,
+      payload: { type: "message", role: "user", content: [{ type: "input_text", text }] },
+    })
+  }
+
+  const CREW_DELIVERY = "Crew chat · Lead · message 7\nYou were tagged in this message:\n\nJuly works for us"
+
+  it("keeps a message steered into the running turn and reads it as the answer", () => {
+    const [turn] = parseCodexSession([
+      questionSession("request_user_input_async"),
+      promptItem(CREW_DELIVERY, "2024-01-01T00:00:04.000Z"),
+      promptItem("June"),
+      assistantMessage("Booking for June", "2024-01-01T00:00:06.000Z"),
+    ].join("\n")).turns
+
+    expect(turn.contentBlocks.filter((block) => block.kind === "queued_prompt")).toEqual([
+      { kind: "queued_prompt", content: CREW_DELIVERY, timestamp: "2024-01-01T00:00:04.000Z" },
+      { kind: "queued_prompt", content: "June", timestamp: "2024-01-01T00:00:05.000Z" },
+    ])
+    expect(turn.toolCalls[0].asyncAnswer).toBe("June")
+  })
+
+  it("leaves the question open when only a crew message follows it", () => {
+    const [turn] = parseCodexSession([
+      questionSession("request_user_input_async"),
+      promptItem(CREW_DELIVERY),
+    ].join("\n")).turns
+
+    expect(turn.toolCalls[0].asyncAnswer).toBeUndefined()
+  })
+
+  it("reads the prompt that starts the next turn as the answer", () => {
+    const { turns } = parseCodexSession([
+      questionSession("request_user_input_async"),
+      turnContext({ turn_id: "turn-2" }),
+      promptItem("July"),
+    ].join("\n"))
+
+    expect(turns).toHaveLength(2)
+    expect(turns[0].toolCalls[0].asyncAnswer).toBe("July")
+  })
+
+  it("does not render an older CLI's echo of a steered message twice", () => {
+    const { turns } = parseCodexSession([
+      questionSession("request_user_input_async"),
+      promptItem("June\n<image>attached</image>"),
+      tokenCount(10, 2),
+      userMessage("June", "2024-01-01T00:00:05.000Z"),
+    ].join("\n"))
+
+    expect(turns).toHaveLength(1)
+    expect(turns[0].contentBlocks.filter((block) => block.kind === "queued_prompt")).toHaveLength(1)
+  })
+
+  it("reads a reply as steered when the window opens mid-turn", () => {
+    const [turn] = parseCodexSession([
+      sessionMeta(),
+      functionCall("call-q", "request_user_input_async", JSON.stringify({ questions: [{ title: QUESTION }] })),
+      promptItem("June"),
+    ].join("\n")).turns
+
+    expect(turn.isFragment).toBe(true)
+    expect(turn.userMessage).toBeNull()
+    expect(turn.toolCalls[0].asyncAnswer).toBe("June")
+  })
+
+  it("shows a steered reply once when a page cut separates it from an older CLI's echo", () => {
+    const older = parseCanonicalCodexSession([
+      questionSession("request_user_input_async"),
+      promptItem("<image name=[Image #1]>\n</image>\nJune"),
+    ].join("\n")).turns
+    const newer = parseCanonicalCodexSession([
+      sessionMeta(),
+      userMessage("June", "2024-01-01T00:00:06.000Z", ["/tmp/june.png"]),
+      assistantMessage("Booking for June", "2024-01-01T00:00:07.000Z"),
+    ].join("\n")).turns
+
+    const joined = prependTurns(newer, older, "codex")
+
+    expect(joined.flatMap((turn) => turn.contentBlocks).filter((block) => block.kind === "queued_prompt")).toHaveLength(0)
+    const echoed = "June\n![image](</tmp/june.png>)"
+    expect(joined.map((turn) => turn.userMessage)).toEqual(["Find me a place to stay", echoed])
+    expect(joined[0].toolCalls[0].asyncAnswer).toBe(echoed)
+  })
+
+  it("keeps a steered reply when the next page opens on a new turn with the same prompt", () => {
+    const older = parseCanonicalCodexSession([
+      questionSession("request_user_input_async"),
+      promptItem("Continue"),
+    ].join("\n")).turns
+    const newer = parseCanonicalCodexSession([
+      sessionMeta(),
+      turnContext({ turn_id: "turn-2" }),
+      userMessage("Continue", "2024-01-01T00:00:06.000Z"),
+    ].join("\n")).turns
+
+    const joined = prependTurns(newer, older, "codex")
+
+    expect(joined[0].contentBlocks.at(-1)).toMatchObject({ kind: "queued_prompt", content: "Continue" })
+    expect(joined.map((turn) => turn.userMessage)).toEqual(["Find me a place to stay", "Continue"])
+  })
+
+  it("keeps a steered reply when the next page opens with a different prompt", () => {
+    const older = parseCanonicalCodexSession([
+      questionSession("request_user_input_async"),
+      promptItem("Which month?\nJune"),
+    ].join("\n")).turns
+    const newer = parseCanonicalCodexSession([
+      sessionMeta(),
+      turnContext({ turn_id: "turn-2" }),
+      promptItem("Which month?\nJuly"),
+    ].join("\n")).turns
+
+    const joined = prependTurns(newer, older, "codex")
+
+    expect(joined[0].contentBlocks.at(-1)).toMatchObject({ kind: "queued_prompt", content: "Which month?\nJune" })
+    expect(joined[0].toolCalls[0].asyncAnswer).toBe("Which month?\nJune")
+  })
+
+  it("links a reply to a question asked on an older page", () => {
+    const header = [sessionMeta(), turnContext()].join("\n")
+    const older = parseCanonicalCodexSession(questionSession("request_user_input_async")).turns
+    const newer = parseCanonicalCodexSession([
+      header,
+      turnContext({ turn_id: "turn-2" }),
+      promptItem("July"),
+    ].join("\n")).turns
+
+    const [asked] = prependTurns(newer, older, "codex")
+
+    expect(asked.toolCalls[0].asyncAnswer).toBe("July")
+    expect(asked.contentBlocks.flatMap((block) => block.kind === "tool_calls" ? block.toolCalls : []))
+      .toContain(asked.toolCalls[0])
+  })
 })
 
 // ── isCodexSessionText ─────────────────────────────────────────────────────

@@ -1,0 +1,3 @@
+Text to speech is a Cogpit runtime plugin. Bundled dependencies include React,
+React DOM, the Cogpit plugin SDK and UI packages, and their MIT-licensed code.
+The speech model and service run separately and are not distributed in this package.

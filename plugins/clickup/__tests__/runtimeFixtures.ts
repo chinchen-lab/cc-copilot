@@ -13,6 +13,7 @@ export function fakeClient(): PluginClient {
     ready: vi.fn().mockResolvedValue(null),
     integrations: { request: vi.fn() },
     connections: {
+      media: vi.fn(),
       status: vi.fn().mockResolvedValue(connectionStatus),
       request: vi.fn(async (_handle, operation): Promise<JsonValue> => {
         if (operation === "viewer") return { user: viewer }
@@ -21,6 +22,8 @@ export function fakeClient(): PluginClient {
       }),
     },
     composer: { append: vi.fn().mockResolvedValue(null) },
+    settings: { get: vi.fn().mockResolvedValue({}) },
+    ui: { resize: vi.fn().mockResolvedValue(null) },
     navigation: { openExternal: vi.fn().mockResolvedValue(null), openSession: vi.fn().mockResolvedValue(null) },
     storage: { get: vi.fn().mockResolvedValue(null), set: vi.fn().mockResolvedValue(null), delete: vi.fn().mockResolvedValue(null) },
     onContextChange: vi.fn(() => () => undefined), onThemeChange: vi.fn(() => () => undefined), onVisibilityChange: vi.fn(() => () => undefined), dispose: vi.fn(),

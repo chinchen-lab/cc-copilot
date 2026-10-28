@@ -232,6 +232,7 @@ export const claudeRuntime: AgentRuntime = {
 
   async send(sessionId, req: SendRequest): Promise<SendOutcome> {
     const live = sdkSessions.get(sessionId)
+    if (live?.pluginSkillLoading) return { delivery: "busy" }
     if (req.onlyWhileRunning && (!isSDKQueryLive(live) || !live.running)) return { delivery: "busy" }
     if (isSDKQueryLive(live)) {
       // The query is alive: put the message on its input stream and let the
