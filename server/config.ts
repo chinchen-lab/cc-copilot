@@ -88,6 +88,10 @@ export interface AppConfig {
   editorApp?: string
   /** Route "open in editor" affordances to CC-Copilot's own file workspace. */
   useBuiltInEditor?: boolean
+  /** Allow notification alerts; omitted means enabled. History is always kept. */
+  notificationsEnabled?: boolean
+  /** Allow desktop alerts independently of push; omitted means enabled. */
+  desktopNotificationsEnabled?: boolean
   /** Which binary the configured-home agent is spawned from; absent means auto. */
   agentExecutable?: ExecutableChoice
   /** Absolute folder the folder browser starts in; see getProjectsRoot. File-only, like `edition`. */
@@ -313,6 +317,8 @@ export async function loadConfig(): Promise<AppConfig | null> {
         terminalApp: parsed.terminalApp || undefined,
         editorApp: parsed.editorApp || undefined,
         useBuiltInEditor: !!parsed.useBuiltInEditor,
+        notificationsEnabled: parsed.notificationsEnabled !== false,
+        desktopNotificationsEnabled: parsed.desktopNotificationsEnabled !== false,
         agentExecutable: parseExecutableChoice(parsed.agentExecutable),
         projectsRoot: absolutePathOrUndefined(parsed.projectsRoot, "projectsRoot in the config file"),
       }

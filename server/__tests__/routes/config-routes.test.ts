@@ -597,6 +597,8 @@ describe("config routes", () => {
       expect(response.terminalApp).toBe("Ghostty")
       expect(response.editorApp).toBe("Visual Studio Code")
       expect(response.useBuiltInEditor).toBe(false)
+      expect(response.notificationsEnabled).toBe(true)
+      expect(response.desktopNotificationsEnabled).toBe(true)
     })
 
     it("reports the folder the folder browser starts in", async () => {
@@ -607,6 +609,14 @@ describe("config routes", () => {
       await handler(req, res, next)
 
       expect(JSON.parse(res._getData()).projectsRoot).toBe("/srv/projects")
+    })
+
+    it("reports disabled notification preferences", async () => {
+      const handler = getRouteHandler(handlers, "/api/config")
+      const { req, res, next } = createLanReqRes("GET", "/")
+      mockedGetConfig.mockReturnValueOnce({ claudeDir: "/home/.claude", notificationsEnabled: false, desktopNotificationsEnabled: false })
+      await handler(req, res, next)
+      expect(JSON.parse(res._getData())).toMatchObject({ notificationsEnabled: false, desktopNotificationsEnabled: false })
     })
 
     it("reports the built-in editor preference", async () => {
@@ -696,6 +706,29 @@ describe("config routes", () => {
   // ── POST /api/config ──────────────────────────────────────────────────
 
   describe("POST /api/config", () => {
+    it.each(["notificationsEnabled", "desktopNotificationsEnabled"])("rejects non-boolean %s without saving", async (key) => {
+      const handler = getRouteHandler(handlers, "/api/config")
+      const { req, res, next, sendBody } = createLanReqRes("POST", "/", JSON.stringify({ claudeDir: "/home/.claude", [key]: "false" }))
+      handler(req, res, next)
+      await sendBody()
+      await vi.waitFor(() => expect(res.end).toHaveBeenCalled())
+      expect(res._getStatus()).toBe(400)
+      expect(mockedSaveConfig).not.toHaveBeenCalled()
+    })
+
+    it.each([false, true])("saves notification preferences when provided and preserves omissions (explicit=%s)", async (explicit) => {
+      const handler = getRouteHandler(handlers, "/api/config")
+      mockedGetConfig.mockReturnValue({ claudeDir: "/home/.claude", notificationsEnabled: false, desktopNotificationsEnabled: false })
+      mockedValidateClaudeDir.mockResolvedValue({ valid: true, resolved: "/home/.claude" })
+      const preferences = explicit ? { notificationsEnabled: true, desktopNotificationsEnabled: false } : {}
+      const { req, res, next, sendBody } = createLanReqRes("POST", "/", JSON.stringify({ claudeDir: "/home/.claude", ...preferences }))
+      handler(req, res, next)
+      await sendBody()
+      await vi.waitFor(() => expect(res.end).toHaveBeenCalled())
+      expect(res._getStatus()).toBe(200)
+      expect(mockedSaveConfig).toHaveBeenCalledWith(expect.objectContaining({ notificationsEnabled: explicit, desktopNotificationsEnabled: false }))
+    })
+
     it("returns 400 when claudeDir is missing", async () => {
       const handler = getRouteHandler(handlers, "/api/config")
       const body = JSON.stringify({ other: "value" })

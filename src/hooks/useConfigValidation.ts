@@ -11,6 +11,8 @@ export interface ConfigSettingsPayload {
   terminalApp?: string
   editorApp?: string
   useBuiltInEditor?: boolean
+  notificationsEnabled?: boolean
+  desktopNotificationsEnabled?: boolean
   agentExecutable?: ExecutableChoice
 }
 

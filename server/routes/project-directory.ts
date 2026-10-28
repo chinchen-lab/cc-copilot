@@ -39,7 +39,7 @@ function ignoredPaths(root: string, paths: string[]): Promise<Set<string> | null
 const pending = new Map<string, Promise<ProjectTreeEntry[]>>()
 
 /** Read only this directory. Never inspect children to compact folder chains. */
-async function readDirectory(root: string, directory: string): Promise<ProjectTreeEntry[]> {
+async function readDirectory(root: string, directory: string, includeIgnored: boolean): Promise<ProjectTreeEntry[]> {
   const candidate = resolve(root, directory)
   if (!isWithinDir(root, candidate)) throw new ProjectDirectoryError(400, "dir must stay inside the project")
   let absolutePath: string
@@ -55,7 +55,7 @@ async function readDirectory(root: string, directory: string): Promise<ProjectTr
   })
   const children = entries.filter((entry) => entry.name !== ".git" && (entry.isFile() || entry.isDirectory()))
   const paths = children.map((entry) => `${directory ? `${directory}/` : ""}${entry.name}${entry.isDirectory() ? "/" : ""}`)
-  const ignored = await ignoredPaths(root, paths)
+  const ignored = includeIgnored ? new Set<string>() : await ignoredPaths(root, paths)
   return children.flatMap((entry, index): ProjectTreeEntry[] => {
     if (ignored?.has(paths[index])) return []
     if (ignored === null && entry.isDirectory() && IGNORED_PROJECT_DIRECTORIES.has(entry.name)) return []
@@ -64,11 +64,11 @@ async function readDirectory(root: string, directory: string): Promise<ProjectTr
 }
 
 /** Deduplicate concurrent reads, without retaining stale directory snapshots. */
-export function listProjectDirectory(root: string, directory: string): Promise<ProjectTreeEntry[]> {
-  const key = JSON.stringify([root, directory])
+export function listProjectDirectory(root: string, directory: string, { includeIgnored = false }: { includeIgnored?: boolean } = {}): Promise<ProjectTreeEntry[]> {
+  const key = JSON.stringify([root, directory, includeIgnored])
   const existing = pending.get(key)
   if (existing) return existing
-  const request = readDirectory(root, directory).finally(() => pending.delete(key))
+  const request = readDirectory(root, directory, includeIgnored).finally(() => pending.delete(key))
   pending.set(key, request)
   return request
 }

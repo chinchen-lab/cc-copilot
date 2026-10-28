@@ -139,6 +139,16 @@ describe("loadConfig", () => {
     delete process.env.COPILOT_HOME
   })
 
+  it.each([
+    [{}, { notificationsEnabled: true, desktopNotificationsEnabled: true }],
+    [{ notificationsEnabled: false, desktopNotificationsEnabled: false }, { notificationsEnabled: false, desktopNotificationsEnabled: false }],
+    [{ notificationsEnabled: true, desktopNotificationsEnabled: false }, { notificationsEnabled: true, desktopNotificationsEnabled: false }],
+  ])("loads notification preferences with enabled defaults: %j", async (preferences, expected) => {
+    const { loadConfig } = await import("../config")
+    mockedReadFile.mockResolvedValueOnce(JSON.stringify({ claudeDir: "/home/.claude", ...preferences }))
+    expect(await loadConfig()).toMatchObject(expected)
+  })
+
   it("loads valid config with already-hashed password (no migration)", async () => {
     const { loadConfig } = await import("../config")
     mockedIsPasswordHashed.mockReturnValueOnce(true)

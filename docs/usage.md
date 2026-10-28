@@ -100,6 +100,8 @@ On desktop, terminals and discovered project scripts share the bottom process pa
 
 The project file editor reads and writes files within the project, checks modification times to avoid overwriting concurrent edits, and previews supported content. Use `@` in the composer to mention a file.
 
+In **Project files → All files**, turn on **Show ignored files** to browse and search generated files excluded by Git ignore rules. The browser remembers this choice per host and account. Folders still load only when expanded; Git metadata and symbolic links stay hidden. **Changes** continues to show Git's changed files.
+
 Enable **Configuration → Open files in Cogpit** to route file links, file-change cards, and open-in-editor actions to the built-in editor. On remote devices, it reads the file through the hub proxy.
 
 ## Usage and process monitoring
@@ -113,6 +115,8 @@ The process leak monitor flags suspected orphaned agents, browsers, and scripts,
 ## Notifications
 
 Cogpit raises notifications when an agent finishes or needs an answer, including sessions started in a terminal. The notification inbox persists in `~/.cogpit/notifications.json`. Read it with `GET /api/notifications`.
+
+In **Settings → General**, **Enable notifications** controls desktop alerts and push notifications from the selected host. **Desktop notifications** can disable desktop alerts while keeping push enabled. Both default to on; changes apply when saved without restarting. Notification history is kept even when alerts are disabled. These are host settings shared by its clients and require permission to change server configuration.
 
 Desktop notifications use the Cogpit icon and open the relevant session when clicked. They are suppressed when the window is focused and already showing that session. A headless server falls back to `osascript` on macOS. Other headless systems use push notifications.
 

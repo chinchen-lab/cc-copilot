@@ -30,6 +30,7 @@ interface ProjectFileTreeProps {
   fileStatus: (path: string) => FileStatusMark | null
   /** Bumped by the parent to re-read every open directory, bypassing the server cache. */
   reloadToken: number
+  includeIgnored?: boolean
 }
 
 type DirectoryState =
@@ -58,10 +59,10 @@ function parseEntries(data: unknown): ProjectTreeEntry[] {
   return Array.isArray(entries) ? entries.filter(isTreeEntry) : []
 }
 
-async function fetchDirectory(cwd: string, directory: string, refresh: boolean, signal: AbortSignal): Promise<DirectoryState> {
+async function fetchDirectory(cwd: string, directory: string, refresh: boolean, includeIgnored: boolean, signal: AbortSignal): Promise<DirectoryState> {
   try {
     const response = await authFetch(
-      `/api/project-files/tree?cwd=${encodeURIComponent(cwd)}&dir=${encodeURIComponent(directory)}${refresh ? "&refresh=1" : ""}`,
+      `/api/project-files/tree?cwd=${encodeURIComponent(cwd)}&dir=${encodeURIComponent(directory)}${refresh ? "&refresh=1" : ""}${includeIgnored ? "&includeIgnored=1" : ""}`,
       { signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) },
     )
     if (!response.ok) {
@@ -86,7 +87,7 @@ function ancestorsOf(path: string): string[] {
   return segments.slice(0, -1).map((_, index) => segments.slice(0, index + 1).join("/"))
 }
 
-export function ProjectFileTree({ cwd, selectedPath, onSelect, fileStatus, reloadToken }: ProjectFileTreeProps) {
+export function ProjectFileTree({ cwd, selectedPath, onSelect, fileStatus, reloadToken, includeIgnored = false }: ProjectFileTreeProps) {
   const { t } = useTranslation()
   const [directories, setDirectories] = useState<Map<string, DirectoryState>>(() => new Map())
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
@@ -101,11 +102,11 @@ export function ProjectFileTree({ cwd, selectedPath, onSelect, fileStatus, reloa
     const generation = generationRef.current
     requests.set(directory, controller)
     setDirectories((current) => new Map(current).set(directory, { status: "loading" }))
-    const result = await fetchDirectory(cwd, directory, refresh, controller.signal)
+    const result = await fetchDirectory(cwd, directory, refresh, includeIgnored, controller.signal)
     if (requests.get(directory) === controller) requests.delete(directory)
     if (controller.signal.aborted || generation !== generationRef.current) return
     setDirectories((current) => new Map(current).set(directory, result))
-  }, [cwd])
+  }, [cwd, includeIgnored])
 
   const loadedCwdRef = useRef<string | null>(null)
   useEffect(() => {

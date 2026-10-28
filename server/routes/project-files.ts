@@ -37,14 +37,17 @@ async function listGitProjectFiles(root: string): Promise<string[] | null> {
 
 export async function listProjectFiles(
   root: string,
-  { skipCache = false }: { skipCache?: boolean } = {},
+  { skipCache = false, includeIgnored = false }: { skipCache?: boolean; includeIgnored?: boolean } = {},
 ): Promise<string[]> {
-  const cached = fileCache.get(root)
+  const cacheKey = JSON.stringify([root, includeIgnored])
+  const cached = fileCache.get(cacheKey)
   if (!skipCache && cached && cached.expiresAt > Date.now()) return cached.files
 
-  const gitFiles = await listGitProjectFiles(root)
+  // Inclusive search walks the filesystem with a file cap instead of asking
+  // Git to enumerate every ignored dependency/build file before we can limit it.
+  const gitFiles = includeIgnored ? null : await listGitProjectFiles(root)
   if (gitFiles) {
-    fileCache.set(root, { expiresAt: Date.now() + CACHE_TTL_MS, files: gitFiles })
+    fileCache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, files: gitFiles })
     return gitFiles
   }
 
@@ -59,10 +62,10 @@ export async function listProjectFiles(
       continue
     }
     for (const entry of entries) {
-      if (entry.isSymbolicLink()) continue
+      if (entry.name === ".git" || entry.isSymbolicLink()) continue
       const absolutePath = resolve(directory, entry.name)
       if (entry.isDirectory()) {
-        if (!IGNORED_PROJECT_DIRECTORIES.has(entry.name)) pending.push(absolutePath)
+        if (includeIgnored || !IGNORED_PROJECT_DIRECTORIES.has(entry.name)) pending.push(absolutePath)
         continue
       }
       if (!entry.isFile()) continue
@@ -71,7 +74,7 @@ export async function listProjectFiles(
     }
   }
   files.sort((a, b) => a.localeCompare(b))
-  fileCache.set(root, { expiresAt: Date.now() + CACHE_TTL_MS, files })
+  fileCache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, files })
   return files
 }
 
@@ -100,7 +103,7 @@ export function registerProjectFileRoutes(use: UseFn) {
     const resolved = await resolveProjectRoot(url.searchParams.get("cwd") ?? "")
     if ("error" in resolved) return sendJson(res, resolved.status, { error: resolved.error })
     try {
-      const entries = await listProjectDirectory(resolved.root, directory)
+      const entries = await listProjectDirectory(resolved.root, directory, { includeIgnored: url.searchParams.get("includeIgnored") === "1" })
       return sendJson(res, 200, { entries, scanLimited: false })
     } catch (error) {
       return sendJson(res, error instanceof ProjectDirectoryError ? error.status : 500, {
@@ -118,7 +121,7 @@ export function registerProjectFileRoutes(use: UseFn) {
 
     const resolved = await resolveProjectRoot(url.searchParams.get("cwd") ?? "")
     if ("error" in resolved) return sendJson(res, resolved.status, { error: resolved.error })
-    const files = await listProjectFiles(resolved.root, { skipCache })
+    const files = await listProjectFiles(resolved.root, { skipCache, includeIgnored: url.searchParams.get("includeIgnored") === "1" })
     const ranked = rankProjectFiles(files, query, limit)
     return sendJson(res, 200, {
       files: ranked.files,

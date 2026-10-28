@@ -1,5 +1,5 @@
 import { useTranslation } from "@/hooks/useTranslation"
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { AlertTriangle, ArrowLeft, FileCode2, FolderTree, GitBranch, MessageSquarePlus, RefreshCw, Save, Search, X } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import { Badge } from "@/components/ui/badge"
@@ -43,6 +43,7 @@ import { LocalImage } from "@/components/timeline/LocalImage"
 import { markdownComponents, markdownPlugins } from "@/components/timeline/markdown-components"
 import { ProjectFileTree, type FileStatusMark } from "@/components/ProjectFileTree"
 import { Spinner } from "@/components/ui/Spinner"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { authFetch } from "@/lib/auth"
@@ -52,6 +53,8 @@ import { matchesKeybinding } from "@/lib/keybindings"
 import { cn } from "@/lib/utils"
 import type { ProjectPromptContext } from "@/plugin-api"
 import { parseProjectFilesResponse } from "@/hooks/useProjectFileSuggestions"
+import { useLocalStorage } from "@/hooks/useLocalStorage"
+import { deviceScopedKey } from "@/lib/device"
 import type { GitStatusFile } from "../../shared/contracts/projectTools"
 import { diffLineCount } from "../../shared/diff-utils"
 import { needsHtmlMarkdownPreview, isMarpMarkdown, resolveMarkdownImage } from "@/lib/projectMarkdown"
@@ -169,6 +172,9 @@ export function ProjectFilesPanel({
   openRequest,
 }: ProjectFilesPanelProps) {
   const { t } = useTranslation()
+  const ignoredToggleId = useId()
+  const [storedIncludeIgnored, setIncludeIgnored] = useLocalStorage<boolean>(deviceScopedKey("project-files-show-ignored"), false)
+  const includeIgnored = storedIncludeIgnored === true
   const panelRef = useRef<HTMLElement>(null)
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const pendingFocusRef = useRef<{ text: string; line?: number } | null>(null)
@@ -246,7 +252,7 @@ export function ProjectFilesPanel({
       skipListCacheRef.current = false
       try {
         const response = await authFetch(
-          `/api/project-files?cwd=${encodeURIComponent(cwd)}&q=${encodeURIComponent(query)}&limit=100${skipCache ? "&refresh=1" : ""}`,
+          `/api/project-files?cwd=${encodeURIComponent(cwd)}&q=${encodeURIComponent(query)}&limit=100${skipCache ? "&refresh=1" : ""}${includeIgnored ? "&includeIgnored=1" : ""}`,
           { signal: controller.signal },
         )
         if (!response.ok) throw new Error(await responseError(response, "Unable to list project files"))
@@ -271,7 +277,7 @@ export function ProjectFilesPanel({
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [cwd, query, reloadToken, showTree])
+  }, [cwd, query, reloadToken, showTree, includeIgnored])
 
   useEffect(() => {
     setSelectedPath(null)
@@ -637,6 +643,10 @@ export function ProjectFilesPanel({
                 <RefreshCw data-icon="inline-start" className={refreshing ? "animate-spin" : undefined} />
               </Button>
             </div>
+            {fileScope === "all" && <label htmlFor={ignoredToggleId} className="flex cursor-pointer items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
+              {t("Show ignored files")}
+              <Switch id={ignoredToggleId} size="sm" checked={includeIgnored} onCheckedChange={setIncludeIgnored} />
+            </label>}
             {gitStatus?.isRepository && (
               <ToggleGroup
                 aria-label={t("File scope")}
@@ -663,6 +673,7 @@ export function ProjectFilesPanel({
               onSelect={selectFile}
               fileStatus={fileStatusMark}
               reloadToken={reloadToken}
+              includeIgnored={includeIgnored}
             />
           ) : (
             <ScrollArea className="min-h-0 flex-1">

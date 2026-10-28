@@ -90,6 +90,21 @@ describe("listProjectFiles", () => {
     expect(await listProjectFiles(root)).toEqual([".gitignore", "visible.ts"])
   })
 
+  it("includes ignored generated files on request and keeps the two cache modes separate", async () => {
+    const root = await mkdtemp(join(tmpdir(), "cogpit-project-list-ignored-"))
+    temporaryDirectories.push(root)
+    await execFile("git", ["init", "-q"], { cwd: root })
+    await mkdir(join(root, "generated"))
+    await writeFile(join(root, ".gitignore"), "generated/\n*.log\n")
+    await writeFile(join(root, "generated/result.md"), "")
+    await writeFile(join(root, "report.log"), "")
+    await writeFile(join(root, "visible.ts"), "")
+    expect(await listProjectFiles(root)).toEqual([".gitignore", "visible.ts"])
+    expect(await listProjectFiles(root, { includeIgnored: true })).toEqual([".gitignore", "generated/result.md", "report.log", "visible.ts"])
+    expect(await listProjectFiles(root)).toEqual([".gitignore", "visible.ts"])
+    expect(await listProjectFiles(root, { includeIgnored: true })).toHaveLength(4)
+  })
+
   it("falls back to the bounded filesystem walker outside git repositories", async () => {
     const root = await mkdtemp(join(tmpdir(), "cogpit-project-list-files-"))
     temporaryDirectories.push(root)
@@ -97,8 +112,11 @@ describe("listProjectFiles", () => {
     await mkdir(join(root, "node_modules"))
     await writeFile(join(root, "src", "app.ts"), "export {}\n", "utf-8")
     await writeFile(join(root, "node_modules", "ignored.js"), "", "utf-8")
+    await mkdir(join(root, ".git"))
+    await writeFile(join(root, ".git", "metadata"), "")
 
     expect(await listProjectFiles(root)).toEqual(["src/app.ts"])
+    expect(await listProjectFiles(root, { includeIgnored: true })).toEqual(["node_modules/ignored.js", "src/app.ts"])
   })
 
   it("re-reads the directory when the caller asks to skip the cache", async () => {
@@ -172,6 +190,19 @@ describe("project files route", () => {
       { name: "lib", type: "directory" },
       { name: "main.ts", type: "file" },
     ])
+  })
+
+  it("applies the ignored-file option to both directory browsing and search", async () => {
+    const root = await createProject(0)
+    await execFile("git", ["init", "-q"], { cwd: root })
+    await writeFile(join(root, ".gitignore"), "*.log\n")
+    await writeFile(join(root, "generated.log"), "")
+    const cwd = encodeURIComponent(root)
+    expect((await treeViaRoute(`cwd=${cwd}`)).data.entries).toEqual([{ name: ".gitignore", type: "file" }])
+    expect((await treeViaRoute(`cwd=${cwd}&includeIgnored=1`)).data.entries).toContainEqual({ name: "generated.log", type: "file" })
+    expect((await listViaRoute(`cwd=${cwd}&q=generated`)).data.files).toEqual([])
+    expect((await listViaRoute(`cwd=${cwd}&q=generated&includeIgnored=1`)).data.files).toEqual(["generated.log"])
+    expect((await listViaRoute(`cwd=${cwd}&q=generated`)).data.files).toEqual([])
   })
 
   it("rejects tree directories that escape the project", async () => {

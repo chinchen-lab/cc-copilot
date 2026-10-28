@@ -1,5 +1,10 @@
 /** Traditional Chinese interface messages; English source text is the fallback. */
 export const zhTW: Readonly<Record<string, string>> = {
+  "Show ignored files": "顯示忽略檔案",
+  "Enable notifications": "啟用通知",
+  "Desktop notifications": "桌面通知",
+  "Allow desktop alerts and push notifications from this host. Notification history is kept.": "允許這台主機傳送桌面提醒與推播，關閉後仍會保留通知歷史。",
+  "Show alerts in this host's desktop notification center. Push notifications are controlled separately.": "在這台主機的桌面通知中心顯示提醒，此選項不影響推播。",
   "Manage plugins": "管理外掛",
   "Manage installed plugins, their settings, and service connections.": "管理已安裝的外掛、設定與服務連線。",
   "Usage": "用量",

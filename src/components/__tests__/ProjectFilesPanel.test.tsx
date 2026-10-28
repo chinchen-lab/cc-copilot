@@ -73,6 +73,54 @@ describe("ProjectFilesPanel", () => {
     })
   })
 
+  it("shows ignored files in the tree and search only when enabled and remembers the choice", async () => {
+    const user = userEvent.setup()
+    const fetch = mocks.authFetch.getMockImplementation()!
+    mocks.authFetch.mockImplementation((url: string, init?: RequestInit) => {
+      const files = [...PROJECT_FILES, ...(url.includes("includeIgnored=1") ? ["generated.log"] : [])]
+      if (url.startsWith("/api/project-files/tree")) return Promise.resolve(treeResponse(files, url))
+      if (url.startsWith("/api/project-files?")) {
+        const query = new URL(url, "http://localhost").searchParams.get("q") ?? ""
+        const matches = files.filter(file => file.includes(query))
+        return Promise.resolve(jsonResponse({ files: matches, totalMatches: matches.length, scanLimited: false }))
+      }
+      return fetch(url, init)
+    })
+    const view = render(<ProjectFilesPanel cwd="/workspace/cogpit" onClose={vi.fn()} />)
+    await screen.findByRole("button", { name: /README\.md/ })
+    const toggle = screen.getByRole("switch", { name: "Show ignored files" })
+    expect(toggle).not.toBeChecked()
+    expect(screen.queryByRole("button", { name: "generated.log" })).not.toBeInTheDocument()
+    await user.click(toggle)
+    expect(await screen.findByRole("button", { name: "generated.log" })).toBeInTheDocument()
+    await user.type(screen.getByRole("textbox", { name: "Search project files" }), "generated")
+    await waitFor(() => expect(mocks.authFetch.mock.calls.some(([url]) => String(url).includes("q=generated&") && String(url).includes("includeIgnored=1"))).toBe(true))
+    await screen.findByRole("button", { name: "generated.log" })
+    await user.click(toggle)
+    await waitFor(() => expect(screen.queryByRole("button", { name: "generated.log" })).not.toBeInTheDocument())
+    await user.click(toggle)
+    await screen.findByRole("button", { name: "generated.log" })
+    view.unmount()
+    render(<ProjectFilesPanel cwd="/workspace/cogpit" onClose={vi.fn()} />)
+    expect(screen.getByRole("switch", { name: "Show ignored files" })).toBeChecked()
+    expect(await screen.findByRole("button", { name: "generated.log" })).toBeInTheDocument()
+  })
+
+  it("keeps unsaved editor contents while toggling ignored files", async () => {
+    const user = userEvent.setup()
+    render(<ProjectFilesPanel cwd="/workspace/cogpit" onClose={vi.fn()} />)
+    await user.click(await screen.findByRole("button", { name: "src" }))
+    await user.click(await screen.findByRole("button", { name: /App\.tsx/ }))
+    const editor = await screen.findByRole("textbox", { name: "Editing src/App.tsx" })
+    fireEvent.change(editor, { target: { value: "unsaved draft" } })
+    const toggle = screen.getByRole("switch", { name: "Show ignored files" })
+    await user.click(toggle)
+    await user.click(toggle)
+    expect(editor).toHaveValue("unsaved draft")
+    expect(screen.getByText("Unsaved")).toBeInTheDocument()
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
+  })
+
   it("searches, opens, edits, and saves project files", async () => {
     const user = userEvent.setup()
     render(<ProjectFilesPanel cwd="/workspace/cogpit" onClose={vi.fn()} />)

@@ -13,8 +13,11 @@ vi.mock("../../lib/pushNotify", () => ({
 vi.mock("../../lib/notificationHistory", () => ({
   recordNotification: vi.fn(() => ({ id: "history-1" })),
 }))
+vi.mock("../../config", () => ({ getConfig: vi.fn() }))
 
 import { deliverNotification } from "../../lib/notificationDelivery"
+import { getConfig } from "../../config"
+import { recordNotification } from "../../lib/notificationHistory"
 import { setDesktopAttention } from "../../lib/desktopAttention"
 import { computeDesktopAttention } from "../../../shared/notifications"
 
@@ -23,6 +26,8 @@ const NOTIFICATION = { title: "Claude Code — proj", body: "Done", nav: { sessi
 const PRESENT = { hasWindow: true, locked: false, idleSeconds: 0 }
 
 beforeEach(() => {
+  vi.mocked(getConfig).mockReturnValue(null)
+  vi.mocked(recordNotification).mockClear()
   mockShowNotification.mockReset()
   mockSendPush.mockReset().mockResolvedValue(true)
   setDesktopAttention(false)
@@ -34,6 +39,39 @@ afterEach(() => {
 })
 
 describe("deliverNotification", () => {
+  it("keeps history but suppresses desktop and push when all alerts are disabled", () => {
+    vi.mocked(getConfig).mockReturnValue({ claudeDir: "/home/me/.agent", notificationsEnabled: false })
+    deliverNotification(NOTIFICATION, "permission")
+    expect(recordNotification).toHaveBeenCalledWith(NOTIFICATION, "permission")
+    expect(mockShowNotification).not.toHaveBeenCalled()
+    expect(mockSendPush).not.toHaveBeenCalled()
+  })
+
+  it("keeps history and unattended push when only desktop notifications are disabled", () => {
+    vi.mocked(getConfig).mockReturnValue({ claudeDir: "/home/me/.agent", desktopNotificationsEnabled: false })
+    deliverNotification(NOTIFICATION)
+    expect(recordNotification).toHaveBeenCalledOnce()
+    expect(mockShowNotification).not.toHaveBeenCalled()
+    expect(mockSendPush).toHaveBeenCalledWith(NOTIFICATION)
+  })
+
+  it("still suppresses push while attended when desktop alerts are disabled", () => {
+    vi.mocked(getConfig).mockReturnValue({ claudeDir: "/home/me/.agent", desktopNotificationsEnabled: false })
+    setDesktopAttention(true)
+    deliverNotification(NOTIFICATION)
+    expect(mockShowNotification).not.toHaveBeenCalled()
+    expect(mockSendPush).not.toHaveBeenCalled()
+  })
+
+  it("applies changed preferences to the next notification without a restart", () => {
+    vi.mocked(getConfig).mockReturnValue({ claudeDir: "/home/me/.agent", notificationsEnabled: false })
+    deliverNotification(NOTIFICATION)
+    vi.mocked(getConfig).mockReturnValue({ claudeDir: "/home/me/.agent", notificationsEnabled: true, desktopNotificationsEnabled: true })
+    deliverNotification(NOTIFICATION)
+    expect(mockShowNotification).toHaveBeenCalledOnce()
+    expect(mockSendPush).toHaveBeenCalledOnce()
+  })
+
   it("pushes to the phone when nobody is at the desktop", () => {
     deliverNotification(NOTIFICATION)
     expect(mockShowNotification).toHaveBeenCalledOnce()

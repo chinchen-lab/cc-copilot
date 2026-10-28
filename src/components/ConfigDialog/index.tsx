@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import {
@@ -124,6 +125,11 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
   // Route "open in editor" to Cogpit's own file workspace instead
   const [useBuiltInEditor, setUseBuiltInEditor] = useState(false)
   const [initialUseBuiltInEditor, setInitialUseBuiltInEditor] = useState(false)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
+  const [initialNotificationsEnabled, setInitialNotificationsEnabled] = useState(true)
+  const [desktopNotificationsEnabled, setDesktopNotificationsEnabled] = useState(true)
+  const [initialDesktopNotificationsEnabled, setInitialDesktopNotificationsEnabled] = useState(true)
+  const [notificationSettingsLoaded, setNotificationSettingsLoaded] = useState(false)
 
   const [agentExecutable, setAgentExecutable] = useState<ExecutableChoice>(DEFAULT_EXECUTABLE_CHOICE)
   const [executableReportVersion, setExecutableReportVersion] = useState(0)
@@ -142,9 +148,13 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
       setTab("general")
       setPath(currentPath)
       reset()
+      setNotificationSettingsLoaded(false)
       // Fetch current network settings
       authFetch("/api/config")
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) throw new Error("Unable to load settings")
+          return res.json()
+        })
         .then((data) => {
           const access = data?.networkAccess || false
           setNetworkAccess(access)
@@ -160,6 +170,13 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
           const builtIn = data?.useBuiltInEditor === true
           setUseBuiltInEditor(builtIn)
           setInitialUseBuiltInEditor(builtIn)
+          const notifications = data?.notificationsEnabled !== false
+          setNotificationsEnabled(notifications)
+          setInitialNotificationsEnabled(notifications)
+          const desktopNotifications = data?.desktopNotificationsEnabled !== false
+          setDesktopNotificationsEnabled(desktopNotifications)
+          setInitialDesktopNotificationsEnabled(desktopNotifications)
+          setNotificationSettingsLoaded(true)
           const executable = parseExecutableChoice(data?.agentExecutable) ?? DEFAULT_EXECUTABLE_CHOICE
           setAgentExecutable(executable)
           setInitialAgentExecutable(executable)
@@ -197,6 +214,8 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
       terminalApp: terminalApp.trim() || undefined,
       editorApp: editorApp.trim() || undefined,
       useBuiltInEditor,
+      notificationsEnabled: notificationSettingsLoaded ? notificationsEnabled : undefined,
+      desktopNotificationsEnabled: notificationSettingsLoaded ? desktopNotificationsEnabled : undefined,
       agentExecutable,
     })
     if (result.success && result.claudeDir) {
@@ -204,7 +223,7 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
       onSaved(result.claudeDir)
     }
     setSaving(false)
-  }, [path, networkAccess, networkPassword, terminalApp, editorApp, useBuiltInEditor, agentExecutable, save, onSaved, remoteDevice, initialNetworkAccess])
+  }, [path, networkAccess, networkPassword, terminalApp, editorApp, useBuiltInEditor, notificationsEnabled, desktopNotificationsEnabled, notificationSettingsLoaded, agentExecutable, save, onSaved, remoteDevice, initialNetworkAccess])
 
   function computeCanSave(): boolean {
     // Block save while path is being validated or is invalid
@@ -217,7 +236,9 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
     const editorChanged = editorApp !== initialEditorApp
       || useBuiltInEditor !== initialUseBuiltInEditor
     const executableChanged = !sameChoice(agentExecutable, initialAgentExecutable)
-    if (!pathChanged && !networkChanged && !terminalChanged && !editorChanged && !executableChanged) return false
+    const notificationsChanged = notificationSettingsLoaded && (notificationsEnabled !== initialNotificationsEnabled
+      || desktopNotificationsEnabled !== initialDesktopNotificationsEnabled)
+    if (!pathChanged && !networkChanged && !terminalChanged && !editorChanged && !executableChanged && !notificationsChanged) return false
     if (agentExecutable.source === "custom" && !agentExecutable.path?.trim()) return false
 
     // Validate password requirements when network is enabled
@@ -263,6 +284,20 @@ export function ConfigDialog({ open, currentPath, onClose, onSaved }: ConfigDial
                 </Field>}
                 <LanguageSettings />
                 <FontScaleSettings />
+                <Field orientation="horizontal">
+                  <FieldContent>
+                    <FieldLabel htmlFor="notifications-enabled">{t("Enable notifications")}</FieldLabel>
+                    <FieldDescription>{t("Allow desktop alerts and push notifications from this host. Notification history is kept.")}</FieldDescription>
+                  </FieldContent>
+                  <Switch id="notifications-enabled" checked={notificationsEnabled} onCheckedChange={setNotificationsEnabled} disabled={!canWriteConfig || !notificationSettingsLoaded || saving} />
+                </Field>
+                <Field orientation="horizontal">
+                  <FieldContent>
+                    <FieldLabel htmlFor="desktop-notifications-enabled">{t("Desktop notifications")}</FieldLabel>
+                    <FieldDescription>{t("Show alerts in this host's desktop notification center. Push notifications are controlled separately.")}</FieldDescription>
+                  </FieldContent>
+                  <Switch id="desktop-notifications-enabled" checked={desktopNotificationsEnabled} onCheckedChange={setDesktopNotificationsEnabled} disabled={!canWriteConfig || !notificationSettingsLoaded || !notificationsEnabled || saving} />
+                </Field>
                 <Field>
                   <FieldLabel htmlFor="terminal-application">
                     <TerminalSquare data-icon="inline-start" className="size-4 text-muted-foreground" />

@@ -19,8 +19,17 @@ describe("storedSettings", () => {
       terminalApp: undefined,
       editorApp: "Zed",
       useBuiltInEditor: false,
+      notificationsEnabled: true,
+      desktopNotificationsEnabled: true,
       agentExecutable: undefined,
     })
+  })
+
+  it("preserves notification preferences omitted by older clients", () => {
+    expect(storedSettings({}, { ...SAVED, notificationsEnabled: false, desktopNotificationsEnabled: false }))
+      .toMatchObject({ notificationsEnabled: false, desktopNotificationsEnabled: false })
+    expect(storedSettings({ notificationsEnabled: true, desktopNotificationsEnabled: false }))
+      .toMatchObject({ notificationsEnabled: true, desktopNotificationsEnabled: false })
   })
 })
 

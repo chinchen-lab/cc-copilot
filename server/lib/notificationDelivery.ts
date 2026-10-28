@@ -3,13 +3,13 @@ import { showNotification } from "./desktopNotify"
 import { isDesktopAttended } from "./desktopAttention"
 import { sendPushNotification } from "./pushNotify"
 import { recordNotification } from "./notificationHistory"
+import { getConfig } from "../config"
 
 /**
  * Fan a notification out to every sink, recording it in history first.
  *
- * The desktop sink always fires — when the window is focused on that very
- * session the Electron main process drops it, and otherwise it is worth having
- * in Notification Center. Push only fires when the user is *not* at the desktop,
+ * The Electron main process suppresses enabled desktop alerts when its window
+ * is focused on that same session. Push only fires when the user is *not* at the desktop,
  * so sitting in front of Cogpit never buzzes the phone. A headless server always
  * counts as unattended, which is what makes push the only working channel there.
  *
@@ -20,11 +20,15 @@ export function deliverNotification(
   kind: NotificationKind = "system",
 ): void {
   const entry = recordNotification(notification, kind)
+  const config = getConfig()
+  if (config?.notificationsEnabled === false) return
 
-  try {
-    showNotification(notification.title, notification.body, notification.nav, entry.id)
-  } catch (err) {
-    console.error("[notify] Desktop notification failed:", err)
+  if (config?.desktopNotificationsEnabled !== false) {
+    try {
+      showNotification(notification.title, notification.body, notification.nav, entry.id)
+    } catch (err) {
+      console.error("[notify] Desktop notification failed:", err)
+    }
   }
 
   if (isDesktopAttended()) return

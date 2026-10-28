@@ -70,6 +70,28 @@ describe("listProjectDirectory", () => {
     ])
   })
 
+  it("includes ignored files and folders on request without mixing concurrent modes or reading children", async () => {
+    const root = await project()
+    await execFile("git", ["init", "-q"], { cwd: root })
+    await mkdir(join(root, "generated"))
+    await writeFile(join(root, ".gitignore"), "generated/\n*.log\n")
+    await writeFile(join(root, "report.log"), "")
+    await writeFile(join(root, "generated/result.md"), "")
+    const [filtered, inclusive] = await Promise.all([
+      listProjectDirectory(root, ""),
+      listProjectDirectory(root, "", { includeIgnored: true }),
+    ])
+    expect(filtered).toEqual([{ name: ".gitignore", type: "file" }])
+    expect(inclusive).toEqual([
+      { name: "generated", type: "directory" },
+      { name: ".gitignore", type: "file" },
+      { name: "report.log", type: "file" },
+    ])
+    expect(vi.mocked(readdir).mock.calls.map(call => call[0])).toEqual([root, root])
+    expect(await listProjectDirectory(root, "generated", { includeIgnored: true }))
+      .toEqual([{ name: "result.md", type: "file" }])
+  })
+
   it("uses filesystem ignore defaults outside git and omits symlinks", async () => {
     const root = await project()
     await mkdir(join(root, "node_modules"))
@@ -77,6 +99,9 @@ describe("listProjectDirectory", () => {
     await writeFile(join(root, "src/main.ts"), "")
     await symlink(join(root, "src"), join(root, "alias"), "dir")
     expect(await listProjectDirectory(root, "")).toEqual([{ name: "src", type: "directory" }])
+    expect(await listProjectDirectory(root, "", { includeIgnored: true })).toEqual([
+      { name: "node_modules", type: "directory" }, { name: "src", type: "directory" },
+    ])
   })
 
   it("does not apply the whole-project search limit to a directory", async () => {

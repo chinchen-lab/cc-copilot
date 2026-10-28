@@ -22,6 +22,8 @@ const SAVED_CONFIG = {
   terminalApp: "",
   editorApp: "cursor",
   useBuiltInEditor: false,
+  notificationsEnabled: undefined as boolean | undefined,
+  desktopNotificationsEnabled: undefined as boolean | undefined,
 }
 
 const ACCOUNTS_REPORT = {
@@ -121,6 +123,71 @@ describe("ConfigDialog editor routing", () => {
     expect(screen.getByRole("checkbox", { name: /Open files in CC-Copilot/ })).toBeChecked()
     // Nothing changed yet, so there is nothing to save.
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled()
+  })
+})
+
+describe("ConfigDialog notification preferences", () => {
+  beforeEach(() => { mocks.authFetch.mockReset() })
+
+  it("defaults old configurations to enabled and saves a desktop-only opt out", async () => {
+    const user = userEvent.setup()
+    mockConfig()
+    const { onSaved } = renderDialog()
+    const desktop = screen.getByRole("switch", { name: "Desktop notifications" })
+    await waitFor(() => expect(desktop).not.toHaveAttribute("aria-disabled", "true"))
+    expect(desktop).toBeChecked()
+    expect(screen.getByRole("switch", { name: "Enable notifications" })).toBeChecked()
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled()
+    await user.click(desktop)
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const save = mocks.authFetch.mock.calls.find(([, init]) => init?.method === "POST")
+    expect(JSON.parse(save?.[1]?.body as string)).toMatchObject({ notificationsEnabled: true, desktopNotificationsEnabled: false })
+  })
+
+  it("restores disabled alerts and preserves the desktop choice across the master switch", async () => {
+    const user = userEvent.setup()
+    mockConfig({ notificationsEnabled: false, desktopNotificationsEnabled: true })
+    const { onSaved } = renderDialog()
+    const master = screen.getByRole("switch", { name: "Enable notifications" })
+    const desktop = screen.getByRole("switch", { name: "Desktop notifications" })
+    await waitFor(() => expect(master).not.toHaveAttribute("aria-disabled", "true"))
+    expect(master).not.toBeChecked()
+    expect(desktop).toHaveAttribute("aria-disabled", "true")
+    expect(desktop).toBeChecked()
+    await user.click(master)
+    await user.click(desktop)
+    await user.click(master)
+    expect(desktop).toHaveAttribute("aria-disabled", "true")
+    expect(desktop).not.toBeChecked()
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const save = mocks.authFetch.mock.calls.find(([, init]) => init?.method === "POST")
+    expect(JSON.parse(save?.[1]?.body as string)).toMatchObject({ notificationsEnabled: false, desktopNotificationsEnabled: false })
+  })
+
+  it("translates the controls into Traditional Chinese", async () => {
+    mockConfig({ desktopNotificationsEnabled: false })
+    act(() => setLanguage("zh-TW"))
+    renderDialog()
+    await waitFor(() => expect(screen.getByRole("switch", { name: "啟用通知" })).not.toHaveAttribute("aria-disabled", "true"))
+    expect(screen.getByRole("switch", { name: "桌面通知" })).not.toBeChecked()
+    expect(screen.getByText(/關閉後仍會保留通知歷史/)).toBeInTheDocument()
+  })
+
+  it("does not overwrite notification preferences when loading the config fails", async () => {
+    const user = userEvent.setup()
+    mockConfig()
+    mocks.authFetch.mockResolvedValueOnce({ ok: false, json: async () => ({ error: "Unavailable" }) })
+    const { onSaved } = renderDialog()
+    await user.type(screen.getByLabelText("Editor application"), "my-editor")
+    expect(screen.getByRole("switch", { name: "Enable notifications" })).toHaveAttribute("aria-disabled", "true")
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const save = mocks.authFetch.mock.calls.find(([, init]) => init?.method === "POST")
+    const body = JSON.parse(save?.[1]?.body as string)
+    expect(body).not.toHaveProperty("notificationsEnabled")
+    expect(body).not.toHaveProperty("desktopNotificationsEnabled")
   })
 })
 
@@ -345,6 +412,8 @@ describe("ConfigDialog categories", () => {
     expect(screen.queryByRole("tab", { name: "Network & sharing" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Manage plugins" })).not.toBeInTheDocument()
+    expect(screen.getByRole("switch", { name: "Enable notifications" })).toHaveAttribute("aria-disabled", "true")
+    expect(screen.getByRole("switch", { name: "Desktop notifications" })).toHaveAttribute("aria-disabled", "true")
     fireEvent.change(screen.getByRole("combobox", { name: "Language" }), { target: { value: "zh-TW" } })
     expect(screen.getByRole("combobox", { name: "語言" })).toHaveValue("zh-TW")
     expect(screen.getByRole("slider", { name: "文字大小" })).toBeEnabled()

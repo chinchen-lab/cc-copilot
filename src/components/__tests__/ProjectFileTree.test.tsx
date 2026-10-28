@@ -28,6 +28,22 @@ describe("ProjectFileTree lazy loading", () => {
     expect(mocks.authFetch).toHaveBeenCalledTimes(2)
   })
 
+  it("reloads expanded directories when ignored files are toggled and leaves other branches lazy", async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => response(directoryOf(url) === "" ? [folder("src"), folder("other")]
+      : [file("main.ts"), ...(url.includes("includeIgnored=1") ? [file("generated.log")] : [])]))
+    const view = render(<ProjectFileTree {...props} />)
+    fireEvent.click(await screen.findByRole("button", { name: "src" }))
+    await screen.findByRole("button", { name: "main.ts" })
+    expect(screen.queryByRole("button", { name: "generated.log" })).not.toBeInTheDocument()
+    view.rerender(<ProjectFileTree {...props} includeIgnored />)
+    expect(await screen.findByRole("button", { name: "generated.log" })).toBeInTheDocument()
+    expect(mocks.authFetch.mock.calls.map(([url]) => directoryOf(url))).toEqual(["", "src", "", "src"])
+    expect(mocks.authFetch.mock.calls.slice(-2).every(([url]) => String(url).includes("includeIgnored=1"))).toBe(true)
+    view.rerender(<ProjectFileTree {...props} />)
+    await waitFor(() => expect(screen.queryByRole("button", { name: "generated.log" })).not.toBeInTheDocument())
+    await screen.findByRole("button", { name: "main.ts" })
+  })
+
   it("refreshes expanded directories and leaves unopened branches unloaded", async () => {
     let refreshed = false
     mocks.authFetch.mockImplementation(async (url: string) => response(directoryOf(url) === "" ? [folder("src"), folder("other")] : [file(refreshed ? "new.ts" : "old.ts")]))
@@ -41,7 +57,7 @@ describe("ProjectFileTree lazy loading", () => {
     expect(mocks.authFetch.mock.calls.map(([url]) => directoryOf(url))).toEqual(["", "src", "", "src"])
   })
 
-  it("aborts obsolete requests and ignores late responses after a refresh", async () => {
+  it.each(["refresh", "ignored-file toggle"])("aborts obsolete requests and ignores late responses after a %s", async (change) => {
     let resolveOld!: (value: ReturnType<typeof response>) => void
     let oldSignal!: AbortSignal
     let childCalls = 0
@@ -54,7 +70,7 @@ describe("ProjectFileTree lazy loading", () => {
     const view = render(<ProjectFileTree {...props} />)
     fireEvent.click(await screen.findByRole("button", { name: "src" }))
     await waitFor(() => expect(childCalls).toBe(1))
-    view.rerender(<ProjectFileTree {...props} reloadToken={1} />)
+    view.rerender(<ProjectFileTree {...props} reloadToken={change === "refresh" ? 1 : 0} includeIgnored={change !== "refresh"} />)
     expect(await screen.findByRole("button", { name: "new.ts" })).toBeInTheDocument()
     expect(oldSignal.aborted).toBe(true)
     resolveOld(response([file("stale.ts")]))

@@ -91,6 +91,12 @@ async function saveClientSettings(
   }
 
   const currentConfig = getConfig()
+  for (const key of ["notificationsEnabled", "desktopNotificationsEnabled"] as const) {
+    if (parsed[key] !== undefined && typeof parsed[key] !== "boolean") {
+      sendJson(res, 400, { error: `${key} must be a boolean` })
+      return
+    }
+  }
   const validation = await validateClaudeDir(claudeDir)
   // A bootstrapped install deliberately does not require
   // ~/.claude/projects. Allow saving unrelated settings while that
@@ -143,7 +149,7 @@ async function saveClientSettings(
     edition: currentConfig?.edition ?? configuredEdition(getConfiguredEditionValue()),
     projectsRoot: currentConfig?.projectsRoot,
     networkPassword: finalPassword,
-    ...storedSettings(parsed),
+    ...storedSettings(parsed, currentConfig),
   }
   await saveConfig(nextConfig)
   refreshDirs()
@@ -332,6 +338,8 @@ export function registerConfigRoutes(use: UseFn) {
         terminalApp: config.terminalApp || null,
         editorApp: config.editorApp || null,
         useBuiltInEditor: config.useBuiltInEditor || false,
+        notificationsEnabled: config.notificationsEnabled !== false,
+        desktopNotificationsEnabled: config.desktopNotificationsEnabled !== false,
         agentExecutable: config.agentExecutable ?? DEFAULT_EXECUTABLE_CHOICE,
         projectsRoot: getProjectsRoot(),
       } : null)

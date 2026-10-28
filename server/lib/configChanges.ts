@@ -8,18 +8,22 @@ export interface ClientSettings {
   terminalApp?: string
   editorApp?: string
   useBuiltInEditor?: unknown
+  notificationsEnabled?: unknown
+  desktopNotificationsEnabled?: unknown
   agentExecutable?: unknown
 }
 
-type StoredSettings = Pick<AppConfig, "networkAccess" | "terminalApp" | "editorApp" | "useBuiltInEditor" | "agentExecutable">
+type StoredSettings = Pick<AppConfig, "networkAccess" | "terminalApp" | "editorApp" | "useBuiltInEditor" | "agentExecutable" | "notificationsEnabled" | "desktopNotificationsEnabled">
 
 /** A client's settings as the config stores them: flags as booleans, blanks and the automatic executable left out. */
-export function storedSettings(settings: ClientSettings): StoredSettings {
+export function storedSettings(settings: ClientSettings, current?: AppConfig | null): StoredSettings {
   return {
     networkAccess: !!settings.networkAccess,
     terminalApp: settings.terminalApp || undefined,
     editorApp: settings.editorApp || undefined,
     useBuiltInEditor: !!settings.useBuiltInEditor,
+    notificationsEnabled: (settings.notificationsEnabled ?? current?.notificationsEnabled) !== false,
+    desktopNotificationsEnabled: (settings.desktopNotificationsEnabled ?? current?.desktopNotificationsEnabled) !== false,
     agentExecutable: parseExecutableChoice(settings.agentExecutable),
   }
 }
