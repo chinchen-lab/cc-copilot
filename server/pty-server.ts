@@ -281,15 +281,16 @@ export class PtySessionManager {
       return
     }
     session.clients.add(ws)
-    if (session.scrollback.length > 0) {
-      ws.send(
-        JSON.stringify({
-          type: "output",
-          id: msg.id,
-          data: session.scrollback,
-        })
-      )
-    }
+    // Mark historical output so the renderer does not send old terminal-query
+    // replies back into a running app. Empty replay also completes the attach.
+    ws.send(
+      JSON.stringify({
+        type: "output",
+        id: msg.id,
+        data: session.scrollback,
+        replay: true,
+      })
+    )
     if (session.status === "exited") {
       ws.send(
         JSON.stringify({

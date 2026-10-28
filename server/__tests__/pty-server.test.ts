@@ -72,6 +72,24 @@ describe("PtySessionManager", () => {
 
   afterEach(() => vi.useRealTimers())
 
+  it.each(["", "\x1b[?1049hVim screen\x1b[6n"])("marks attached scrollback as replay (%j) and resumes live output", (scrollback) => {
+    const { pty, manager, socket } = spawnSession("vim")
+    const receive = pty.onData.mock.calls[0][0] as (data: string) => void
+    receive(scrollback)
+    socket.close()
+    const reconnected = new FakeSocket()
+    manager.handleConnection(reconnected as never)
+    reconnected.emit("message", Buffer.from(JSON.stringify({ type: "attach", id: "vim" })))
+    receive("live output")
+    expect(messages(reconnected)).toEqual([
+      { type: "output", id: "vim", data: scrollback, replay: true },
+      { type: "output", id: "vim", data: "live output" },
+    ])
+    reconnected.emit("message", Buffer.from(JSON.stringify({ type: "input", id: "vim", data: "i" })))
+    expect(pty.write).toHaveBeenCalledWith("i")
+    manager.cleanup()
+  })
+
   it("closes an established socket when its authorization later expires", () => {
     vi.useFakeTimers()
     let authorized = true

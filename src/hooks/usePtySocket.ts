@@ -84,6 +84,13 @@ export function usePtySocket(enabled = true) {
         reconnectDelayRef.current = INITIAL_RECONNECT_DELAY
         setStatus("connected")
         ws.send(JSON.stringify({ type: "list" }))
+        // Output subscriptions belong to the old socket. Reattach mounted
+        // terminals on every connection, including mounts before the first
+        // open. Attach replays scrollback, so clear the renderer first.
+        for (const [id, handler] of subscribersRef.current) {
+          handler("reset", null)
+          ws.send(JSON.stringify({ type: "attach", id }))
+        }
       }
 
       ws.onmessage = (event: MessageEvent) => {

@@ -25,6 +25,7 @@ export function TerminalOutput({ processId, autoFocus = false, onRequestNew, onR
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
   const rafRef = useRef<number | null>(null)
+  const replayVersionRef = useRef(0)
   const shortcutCallbacksRef = useRef({ onRequestNew, onRequestClose })
   const [selectedText, setSelectedText] = useState("")
 
@@ -53,9 +54,21 @@ export function TerminalOutput({ processId, autoFocus = false, onRequestNew, onR
       const term = termRef.current
       if (!term) return
 
-      if (type === "output") {
-        const msg = data as { data?: string }
-        if (msg.data) {
+      if (type === "reset") {
+        replayVersionRef.current += 1
+        term.reset()
+        setSelectedText("")
+      } else if (type === "output") {
+        const msg = data as { data?: string; replay?: boolean }
+        if (msg.replay && typeof msg.data === "string") {
+          const version = ++replayVersionRef.current
+          // Replaying old device queries must not inject their answers into
+          // Vim as new input. Re-enable input once xterm finishes parsing.
+          term.options.disableStdin = true
+          term.write(msg.data, () => {
+            if (termRef.current === term && replayVersionRef.current === version) term.options.disableStdin = false
+          })
+        } else if (msg.data) {
           term.write(msg.data)
         }
       } else if (type === "exit") {
@@ -94,6 +107,13 @@ export function TerminalOutput({ processId, autoFocus = false, onRequestNew, onR
     })
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style"] })
     terminal.attachCustomKeyEventHandler((event) => {
+      // Full-screen terminal apps own their keys, including Vim's Ctrl+W/N
+      // and Ctrl+B/F. Keep these out of terminal and window-level shortcuts.
+      // Command-key shortcuts remain available on macOS.
+      if (terminal.buffer.active.type === "alternate" && !event.metaKey) {
+        event.stopPropagation()
+        return true
+      }
       if (matchesKeybinding("newIntegratedTerminal", event)) {
         if (event.type === "keydown") shortcutCallbacksRef.current.onRequestNew?.()
         return false

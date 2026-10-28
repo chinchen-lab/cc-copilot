@@ -19,7 +19,7 @@ class MockWebSocket {
     this.url = url
     MockWebSocket.instances.push(this)
   }
-  send() {}
+  send = vi.fn()
   close() {
     this.readyState = MockWebSocket.CLOSED
   }
@@ -47,6 +47,7 @@ describe("usePtySocket buildWsUrl", () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
   })
 
@@ -108,5 +109,48 @@ describe("usePtySocket buildWsUrl", () => {
 
     unmount()
     expect(ws.readyState).toBe(MockWebSocket.CLOSED)
+  })
+
+  it("attaches terminals mounted before the connection opens and resets before replaying output", () => {
+    const { result } = renderHook(() => usePtySocket())
+    const handler = vi.fn()
+    result.current.subscribe("vim", handler)
+    const ws = MockWebSocket.instances[0]
+    ws.readyState = MockWebSocket.OPEN
+    act(() => ws.onopen?.())
+    expect(ws.send.mock.calls.map(([message]) => JSON.parse(message as string))).toEqual([
+      { type: "list" }, { type: "attach", id: "vim" },
+    ])
+    expect(handler).toHaveBeenCalledExactlyOnceWith("reset", null)
+    expect(handler.mock.invocationCallOrder[0]).toBeLessThan(ws.send.mock.invocationCallOrder[1])
+  })
+
+  it("reattaches subscribed terminals after reconnecting and resumes their output without replaying removed terminals", () => {
+    vi.useFakeTimers()
+    const { result } = renderHook(() => usePtySocket())
+    const oldSocket = MockWebSocket.instances[0]
+    oldSocket.readyState = MockWebSocket.OPEN
+    act(() => oldSocket.onopen?.())
+    const handler = vi.fn()
+    const removed = vi.fn()
+    result.current.subscribe("vim", handler)
+    result.current.subscribe("closed-terminal", removed)
+    result.current.unsubscribe("closed-terminal")
+    oldSocket.readyState = MockWebSocket.CLOSED
+    act(() => oldSocket.onclose?.())
+    expect(result.current.status).toBe("disconnected")
+    act(() => vi.advanceTimersByTime(500))
+    const newSocket = MockWebSocket.instances[1]
+    newSocket.readyState = MockWebSocket.OPEN
+    act(() => newSocket.onopen?.())
+    expect(result.current.status).toBe("connected")
+    expect(newSocket.send.mock.calls.map(([message]) => JSON.parse(message as string))).toEqual([
+      { type: "list" }, { type: "attach", id: "vim" },
+    ])
+    act(() => newSocket.onmessage?.({ data: JSON.stringify({ type: "output", id: "vim", data: "\x1b[?1049hVim screen" }) } as MessageEvent))
+    expect(handler.mock.calls).toEqual([
+      ["reset", null], ["output", { type: "output", id: "vim", data: "\x1b[?1049hVim screen" }],
+    ])
+    expect(removed).not.toHaveBeenCalled()
   })
 })
