@@ -320,6 +320,7 @@ export const zhTW: Readonly<Record<string, string>> = {
   "Session actions": "對話操作",
   "New session": "新增對話",
   "Continue with another provider…": "使用其他供應商繼續…",
+  "Model and effort apply to the next request in the new session.": "模型與推理程度將套用至新對話的下一個請求。",
   "Search conversation": "搜尋對話內容",
   "File changes": "檔案變更",
   "Workflows": "工作流程",

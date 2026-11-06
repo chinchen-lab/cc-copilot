@@ -2,7 +2,9 @@ import { useTranslation } from "@/hooks/useTranslation"
 import { randomUUID } from "@/lib/uuid"
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import type { ProviderInstance } from "../../shared/contracts/orchestration"
-import { AGENT_KINDS, descriptorFor, type AgentKind } from "@/lib/agents"
+import { AGENT_KINDS, DEFAULT_AGENT_KIND, descriptorFor, type AgentKind } from "@/lib/agents"
+import { useModelOptions } from "@/hooks/useModelOptions"
+import { getEffortOptions } from "@/lib/utils"
 import { authFetch } from "@/lib/auth"
 import { conversationStateFor } from "@/lib/conversationState"
 import { Button } from "@/components/ui/button"
@@ -18,6 +20,14 @@ export function ConversationActions({ sessionId, onOpen, open, onOpenChange }: {
   const state = useSyncExternalStore(owner.subscribe, owner.snapshot)
   const [instances, setInstances] = useState<ProviderInstance[]>([])
   const [target, setTarget] = useState(AGENT_KINDS.at(-1)! as string)
+  const [model, setModel] = useState("")
+  const [effort, setEffort] = useState("")
+  const targetInstance = instances.find((instance) => instance.id === target)
+  const targetAgent = targetInstance?.agent ?? (AGENT_KINDS.includes(target as AgentKind) ? target as AgentKind : DEFAULT_AGENT_KIND)
+  const modelOptions = useModelOptions(targetAgent, targetInstance?.id ?? "default")
+  const selectedModel = modelOptions.some((option) => option.value === model) ? model : ""
+  const effortOptions = getEffortOptions(targetAgent, modelOptions, selectedModel)
+  const selectedEffort = effortOptions.some((option) => option.value === effort) ? effort : ""
   const [message, setMessage] = useState("")
   const [busy, setBusy] = useState(false)
   const [recoveredSessionId, setRecoveredSessionId] = useState("")
@@ -43,7 +53,9 @@ export function ConversationActions({ sessionId, onOpen, open, onOpenChange }: {
     const epoch = ownerEpoch.current
     const instance = instances.find((value) => value.id === target)
     const binding = state.conversation.binding
-    const body = { sessionId, expectedRevision: state.conversation.revision, mode, agent: mode === "resume" ? binding.agent : instance?.agent ?? target as AgentKind, instanceId: mode === "resume" ? binding.instanceId : instance?.id ?? "default", message }
+    const body = { sessionId, expectedRevision: state.conversation.revision, mode, agent: mode === "resume" ? binding.agent : targetAgent, instanceId: mode === "resume" ? binding.instanceId : instance?.id ?? "default", message,
+      ...(mode === "handoff" && { model: selectedModel || undefined, effort: selectedEffort || undefined }),
+    }
     const payload = JSON.stringify(body)
     if (!attempt.current || attempt.current.payload !== payload) attempt.current = { id: randomUUID(), payload }
     setBusy(true); setError(null)
@@ -76,8 +88,26 @@ export function ConversationActions({ sessionId, onOpen, open, onOpenChange }: {
     {state.pendingTransition && <Alert><AlertDescription className="flex flex-col gap-2"><p>{t("A provider handoff needs reconciliation. Inspect the target provider’s history before choosing a recovery action.")}</p><Input aria-label={t("Recovered session ID")} placeholder={state.pendingTransition.sessionId || t("Native session ID found in history")} value={recoveredSessionId} onChange={(event) => setRecoveredSessionId(event.target.value)} /><Button size="xs" disabled={busy || !(recoveredSessionId || state.pendingTransition.sessionId)} onClick={() => void resolveHandoff()}>{t("Attach recovered session")}</Button><Button size="xs" variant="outline" disabled={busy} onClick={() => void resolveHandoff(true)}>{t("Confirm no session was created")}</Button></AlertDescription></Alert>}
     <Dialog open={open} onOpenChange={(next) => { if (next) setCloseCompleted(false); onOpenChange(next) }} onOpenChangeComplete={(isOpen) => {
       setCloseCompleted(!isOpen)
-    }}><DialogContent><DialogHeader><DialogTitle>{t("Continue this conversation")}</DialogTitle><DialogDescription>{t("Native resume keeps the current provider and account. Context handoff starts a new native session with up to 12 recent turns and 24,000 characters of text context. Files remain in the same project.")}</DialogDescription></DialogHeader><FieldDescription>{t("Conversation: ")}{state.conversation?.id || t("Loading…")}</FieldDescription>{error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}<FieldGroup>
-      <Field><FieldLabel>{t("Target provider or account")}</FieldLabel><Select value={target} onValueChange={(value) => value && setTarget(value)}><SelectTrigger aria-label={t("Handoff provider")}><SelectValue>{instances.find((instance) => instance.id === target)?.label || descriptorFor(target as AgentKind)?.displayName}</SelectValue></SelectTrigger><SelectContent><SelectGroup>{AGENT_KINDS.map((kind) => <SelectItem key={kind} value={kind}>{descriptorFor(kind).displayName} {t(" · Default profile")}</SelectItem>)}{instances.map((instance) => <SelectItem key={instance.id} value={instance.id}>{instance.label}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
+    }}><DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto"><DialogHeader><DialogTitle>{t("Continue this conversation")}</DialogTitle><DialogDescription>{t("Native resume keeps the current provider and account. Context handoff starts a new native session with up to 12 recent turns and 24,000 characters of text context. Files remain in the same project.")}</DialogDescription></DialogHeader><FieldDescription>{t("Conversation: ")}{state.conversation?.id || t("Loading…")}</FieldDescription>{error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}<FieldGroup>
+      <Field><FieldLabel>{t("Target provider or account")}</FieldLabel><Select value={target} onValueChange={(value) => {
+        if (!value) return
+        setTarget(value); setModel(""); setEffort("")
+      }}><SelectTrigger aria-label={t("Handoff provider")}><SelectValue>{targetInstance?.label || descriptorFor(targetAgent).displayName}</SelectValue></SelectTrigger><SelectContent><SelectGroup>{AGENT_KINDS.map((kind) => <SelectItem key={kind} value={kind}>{descriptorFor(kind).displayName} {t(" · Default profile")}</SelectItem>)}{instances.map((instance) => <SelectItem key={instance.id} value={instance.id}>{instance.label}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
+      <Field>
+        <FieldLabel>{t("Model")}</FieldLabel>
+        <Select value={selectedModel} onValueChange={(value) => { if (value !== null) { setModel(value); setEffort("") } }}>
+          <SelectTrigger aria-label={t("Model")}><SelectValue>{selectedModel ? modelOptions.find((option) => option.value === selectedModel)?.label : t(modelOptions.find((option) => option.value === "")?.label || "Default")}</SelectValue></SelectTrigger>
+          <SelectContent><SelectGroup>{modelOptions.map((option) => <SelectItem key={option.value || "default"} value={option.value}>{option.value ? option.label : t(option.label)}</SelectItem>)}</SelectGroup></SelectContent>
+        </Select>
+        <FieldDescription>{t("Model and effort apply to the next request in the new session.")}</FieldDescription>
+      </Field>
+      {effortOptions.length > 0 && <Field>
+        <FieldLabel>{t("Reasoning effort")}</FieldLabel>
+        <Select value={selectedEffort} onValueChange={(value) => { if (value !== null) setEffort(value) }}>
+          <SelectTrigger aria-label={t("Reasoning effort")}><SelectValue>{t(effortOptions.find((option) => option.value === selectedEffort)?.label || "Default")}</SelectValue></SelectTrigger>
+          <SelectContent><SelectGroup><SelectItem value="">{t("Default")}</SelectItem>{effortOptions.map((option) => <SelectItem key={option.value} value={option.value}>{t(option.label)}</SelectItem>)}</SelectGroup></SelectContent>
+        </Select>
+      </Field>}
       <Field><FieldLabel htmlFor="handoff-message">{t("Next request")}</FieldLabel><Input id="handoff-message" value={message} onChange={(event) => setMessage(event.target.value)} /><FieldDescription>{t("Tool state and permissions are established by the new provider.")}</FieldDescription></Field>
       <Button disabled={busy || !state.conversation} onClick={() => void transition("handoff")}>{t("Start context handoff")}</Button><Button variant="outline" disabled={busy || !state.conversation} onClick={() => void transition("resume")}>{t("Keep current native session")}</Button>
     </FieldGroup></DialogContent></Dialog>

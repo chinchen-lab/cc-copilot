@@ -217,7 +217,7 @@ describe("sdk-session browser support", () => {
     const { registerPluginSkills } = await import("../plugins/skillContext")
     const unregister = registerPluginSkills(() => new Promise(resolve => { release = resolve }))
     try {
-      state = resumed ? sdk.sendSDKMessage(id, "must not start")! : sdk.createSDKSession({ sessionId: id, cwd: "/tmp", message: "must not start" })
+      state = resumed ? (await sdk.sendSDKMessage(id, "must not start"))! : sdk.createSDKSession({ sessionId: id, cwd: "/tmp", message: "must not start" })
       await waitUntil(() => !!release)
       const onResult = vi.fn()
       state.onResult = onResult
@@ -230,7 +230,7 @@ describe("sdk-session browser support", () => {
       expect(state.pluginSkillLoading).toBe(false)
       expect(onResult).toHaveBeenCalledOnce()
       unregister()
-      sdk.sendSDKMessage(id, "after interruption")
+      await sdk.sendSDKMessage(id, "after interruption")
       release("Old instructions must not start the old prompt")
       await waitUntil(() => !state!.running)
       expect(captured).toHaveLength(before + 1)
@@ -495,9 +495,9 @@ describe("sdk-session turn completion", () => {
     await waitUntil(() => releaseHeldQuery !== null)
     const state = sdkSessions.get("queued-results")!
     const second = observeSDKResult(state)
-    sendSDKMessage(state.sessionId, "B")
+    await sendSDKMessage(state.sessionId, "B")
     const third = observeSDKResult(state)
-    sendSDKMessage(state.sessionId, "C")
+    await sendSDKMessage(state.sessionId, "C")
     releaseHeldQuery!()
     expect((await second.completion).result).toBe("B")
     expect((await third.completion).result).toBe("C")
@@ -518,9 +518,9 @@ describe("sdk-session turn completion", () => {
     await waitUntil(() => releaseHeldQuery !== null)
     const state = sdkSessions.get("taken-send")!
     const joined = observeSDKResult(state)
-    sendSDKMessage(state.sessionId, "B")
+    await sendSDKMessage(state.sessionId, "B")
     const next = observeSDKResult(state)
-    sendSDKMessage(state.sessionId, "C")
+    await sendSDKMessage(state.sessionId, "C")
     const [a, b, c] = await sentUuids(3)
     scriptedMessages = [
       lifecycle(a!, "queued"), lifecycle(a!, "started"), lifecycle(b!, "queued"), lifecycle(c!, "queued"), lifecycle(b!, "started"),
@@ -539,8 +539,8 @@ describe("sdk-session turn completion", () => {
     holdQueryOpen = true
     createSDKSession({ sessionId: "notice-send", cwd: "/tmp", message: "A" })
     await waitUntil(() => releaseHeldQuery !== null)
-    sendSDKMessage("notice-send", "Crew notice", undefined, undefined, { startsTurn: false })
-    sendSDKMessage("notice-send", "Follow-up")
+    await sendSDKMessage("notice-send", "Crew notice", undefined, undefined, { startsTurn: false })
+    await sendSDKMessage("notice-send", "Follow-up")
     const input = captured[0]!.prompt as AsyncIterator<Record<string, unknown>>
     const sent = [(await input.next()).value, (await input.next()).value, (await input.next()).value]
     expect(sent.map((message) => message.shouldQuery)).toEqual([undefined, false, undefined])
@@ -556,7 +556,7 @@ describe("sdk-session turn completion", () => {
     await waitUntil(() => releaseHeldQuery !== null)
     const state = sdkSessions.get("late-send")!
     const late = observeSDKResult(state)
-    sendSDKMessage(state.sessionId, "B")
+    await sendSDKMessage(state.sessionId, "B")
     const [a, b] = await sentUuids(2)
     scriptedMessages = [
       lifecycle(a!, "queued"), lifecycle(a!, "started"),
@@ -580,9 +580,9 @@ describe("sdk-session turn completion", () => {
     await waitUntil(() => releaseHeldQuery !== null)
     const state = sdkSessions.get("absorbed-send")!
     const absorbed = observeSDKResult(state)
-    sendSDKMessage(state.sessionId, "B")
+    await sendSDKMessage(state.sessionId, "B")
     const queued = observeSDKResult(state)
-    sendSDKMessage(state.sessionId, "C")
+    await sendSDKMessage(state.sessionId, "C")
     releaseHeldQuery!()
     expect((await absorbed.completion).result).toBe("A+B")
     expect((await queued.completion).result).toBe("C")
@@ -673,7 +673,7 @@ describe("sdk-session send resilience", () => {
     // Model the SDK aborting the query after a failed write to a dead process.
     state.abort!.abort()
 
-    sendSDKMessage("aborted-send", "two", undefined, {})
+    await sendSDKMessage("aborted-send", "two", undefined, {})
 
     await waitUntil(() => captured.length === 2)
     expect(captured[1].options.resume).toBe("aborted-send")
@@ -1009,13 +1009,13 @@ describe("sdk-session subagent watcher lifecycle", () => {
     await waitUntil(() => !state.running)
     state.jsonlPath = "/tmp/watch-repeat.jsonl"
 
-    sendSDKMessage("watch-repeat", "second")
+    await sendSDKMessage("watch-repeat", "second")
     expect(state.subagentWatcher).not.toBeNull()
     await captured[1].completed
     await waitUntil(() => state.subagentWatcher === null)
     expect(firstClose).toHaveBeenCalledTimes(1)
 
-    sendSDKMessage("watch-repeat", "third")
+    await sendSDKMessage("watch-repeat", "third")
     expect(state.subagentWatcher).not.toBeNull()
     await captured[2].completed
     await waitUntil(() => state.subagentWatcher === null)
@@ -1069,7 +1069,7 @@ describe("sdk-session effort propagation", () => {
       message: { content: [{ type: "text", text: "first" }] },
     })
 
-    sendSDKMessage("persistent-input", "follow-up")
+    await sendSDKMessage("persistent-input", "follow-up")
     const second = await messages.next()
 
     expect(second.done).toBe(false)
@@ -1139,7 +1139,7 @@ describe("sdk-session effort propagation", () => {
 
     // Simulate the frontend posting a follow-up message WITH a new effort
     // while state.running is still true (mid-turn).
-    sendSDKMessage("s3", "follow-up", undefined, { effort: "high" })
+    await sendSDKMessage("s3", "follow-up", undefined, { effort: "high" })
 
     const state = sdkSessions.get("s3")
     expect(state?.effort).toBe("high")
@@ -1157,7 +1157,7 @@ describe("sdk-session effort propagation", () => {
     await waitUntil(() => captured.length === 1)
     expect(applyFlagSettingsSpy).not.toBeNull()
 
-    sendSDKMessage("s4", "follow-up", undefined, { effort: "high" })
+    await sendSDKMessage("s4", "follow-up", undefined, { effort: "high" })
 
     // Give the mid-turn update a tick to dispatch
     await Promise.resolve()
@@ -1166,6 +1166,165 @@ describe("sdk-session effort propagation", () => {
     expect(applyFlagSettingsSpy).toHaveBeenCalledWith(
       expect.objectContaining({ effortLevel: "high" }),
     )
+  })
+
+  it("waits for the effort acknowledgement before delivering the next prompt", async () => {
+    holdQueryOpen = true
+    const { createSDKSession, sendSDKMessage } = await loadModule()
+    createSDKSession({ sessionId: "effort-before-input", cwd: "/tmp", message: "first", effort: "medium" })
+    await waitUntil(() => captured.length === 1)
+    const input = captured[0].prompt as AsyncIterableIterator<unknown>
+    await input.next()
+    let acknowledge!: () => void
+    applyFlagSettingsSpy!.mockImplementationOnce(() => new Promise<void>(resolve => { acknowledge = resolve }))
+    let delivered = false
+    const next = input.next().then(message => { delivered = true; return message })
+    const sending = Promise.resolve(sendSDKMessage("effort-before-input", "second", undefined, { effort: "xhigh" }))
+    try {
+      await waitUntil(() => !!acknowledge)
+      await Promise.resolve()
+      expect(delivered).toBe(false)
+      acknowledge()
+      await sending
+      expect(await next).toMatchObject({ done: false, value: { message: { content: [{ text: "second" }] } } })
+    } finally { acknowledge?.(); releaseHeldQuery?.() }
+  })
+
+  it("retries a selected effort on send after a live settings request failed", async () => {
+    holdQueryOpen = true
+    const { createSDKSession, updateSDKSession, sendSDKMessage } = await loadModule()
+    createSDKSession({ sessionId: "retry-effort", cwd: "/tmp", message: "first", effort: "medium" })
+    await waitUntil(() => captured.length === 1)
+    applyFlagSettingsSpy!.mockRejectedValueOnce(new Error("control unavailable"))
+    await updateSDKSession("retry-effort", { effort: "xhigh" })
+    await sendSDKMessage("retry-effort", "second", undefined, { effort: "xhigh" })
+    expect(applyFlagSettingsSpy).toHaveBeenCalledTimes(2)
+    expect(applyFlagSettingsSpy).toHaveBeenLastCalledWith({ effortLevel: "xhigh" })
+    releaseHeldQuery?.()
+  })
+
+  it("does not deliver a prompt with the old effort when the settings control fails", async () => {
+    holdQueryOpen = true
+    const { createSDKSession, sendSDKMessage } = await loadModule()
+    createSDKSession({ sessionId: "reject-effort", cwd: "/tmp", message: "first", effort: "medium" })
+    await waitUntil(() => captured.length === 1)
+    const input = captured[0].prompt as AsyncIterableIterator<unknown>
+    await input.next()
+    const accepted = vi.fn()
+    applyFlagSettingsSpy!.mockRejectedValueOnce(new Error("effort control failed"))
+    await expect(sendSDKMessage("reject-effort", "must not send", undefined, { effort: "xhigh" }, { onAccepted: accepted }))
+      .rejects.toThrow("effort control failed")
+    expect(accepted).not.toHaveBeenCalled()
+    const next = input.next()
+    await sendSDKMessage("reject-effort", "retry", undefined, { effort: "xhigh" })
+    expect(await next).toMatchObject({ value: { message: { content: [{ text: "retry" }] } } })
+    releaseHeldQuery?.()
+  })
+
+  it("fails an undelivered settings request and lets the durable queue deliver the next prompt", async () => {
+    holdQueryOpen = true
+    const { createSDKSession } = await loadModule()
+    const { claudeRuntime } = await import("../agents/claudeRuntime")
+    const { OrchestrationStore } = await import("../orchestration/store")
+    const { CommandDispatcher } = await import("../orchestration/dispatcher")
+    const id = "durable-effort-failure"
+    const state = createSDKSession({ sessionId: id, cwd: "/tmp", message: "initial", effort: "medium" })
+    await waitUntil(() => captured.length === 1)
+    state.running = false // A persistent query idle between turns.
+    const input = captured[0].prompt as AsyncIterableIterator<unknown>
+    await input.next()
+    applyFlagSettingsSpy!.mockRejectedValueOnce(new Error("settings control unavailable"))
+    const store = new OrchestrationStore(":memory:")
+    const dispatcher = new CommandDispatcher(store)
+    try {
+      dispatcher.start()
+      const conversation = store.ensureConversation({ hostId: "local", agent: "claude", instanceId: "default", sessionId: id })
+      store.admit("owner", "settings-failed", conversation.id, { message: "must not send", effort: "high" }, "queue")
+      store.admit("owner", "next-prompt", conversation.id, { message: "next", effort: "high" }, "queue")
+      dispatcher.attach("owner", conversation.id, {
+        authorize: async () => true,
+        activity: () => claudeRuntime.activity(id),
+        deliver: command => claudeRuntime.send(id, { ...command.payload, commandId: command.receipt.nativeMessageId, deliveryIntent: command.receipt.intent }),
+      })
+      await dispatcher.tick()
+      await vi.waitFor(() => {
+        expect(store.command("owner", "settings-failed")?.receipt).toMatchObject({ state: "failed", error: expect.stringContaining("settings control unavailable") })
+        expect(store.command("owner", "next-prompt")?.receipt.state).toBe("delivered")
+      })
+      expect(await input.next()).toMatchObject({ value: { message: { content: [{ text: "next" }] } } })
+      expect(applyFlagSettingsSpy).toHaveBeenCalledTimes(2)
+      expect(applyFlagSettingsSpy).toHaveBeenLastCalledWith({ effortLevel: "high" })
+      scriptedMessages = [
+        { type: "result", is_error: false, queued_turn_count: 1 },
+        { type: "result", is_error: false, queued_turn_count: 0 },
+      ]
+      releaseHeldQuery?.()
+      expect((await dispatcher.wait("owner", "next-prompt", 1000))?.state).toBe("completed")
+    } finally {
+      dispatcher.close()
+      store.close()
+      releaseHeldQuery?.()
+    }
+  })
+
+  it("serializes a live settings update and concurrent sends with different efforts", async () => {
+    holdQueryOpen = true
+    const { createSDKSession, updateSDKSession, sendSDKMessage, observeSDKResult, sdkSessions } = await loadModule()
+    createSDKSession({ sessionId: "ordered-efforts", cwd: "/tmp", message: "first", effort: "medium" })
+    await waitUntil(() => captured.length === 1)
+    const input = captured[0].prompt as AsyncIterableIterator<unknown>
+    await input.next()
+    let acknowledge!: () => void
+    applyFlagSettingsSpy!.mockImplementationOnce(() => new Promise<void>(resolve => { acknowledge = resolve }))
+    const setting = updateSDKSession("ordered-efforts", { effort: "xhigh" })
+    const observations: ReturnType<typeof observeSDKResult>[] = []
+    const accepted: string[] = []
+    const second = sendSDKMessage("ordered-efforts", "second", undefined, { effort: "xhigh" }, {
+      onAccepted: () => {
+        accepted.push("second")
+        observations.push(observeSDKResult(sdkSessions.get("ordered-efforts")!))
+      },
+    })
+    const third = sendSDKMessage("ordered-efforts", "third", undefined, { effort: "high" }, {
+      onAccepted: () => {
+        accepted.push("third")
+        observations.push(observeSDKResult(sdkSessions.get("ordered-efforts")!))
+      },
+    })
+    await Promise.resolve()
+    expect(accepted).toEqual([])
+    expect(applyFlagSettingsSpy).toHaveBeenCalledTimes(1)
+    acknowledge()
+    await Promise.all([setting, second, third])
+    expect(accepted).toEqual(["second", "third"])
+    expect(applyFlagSettingsSpy!.mock.calls.map(([settings]) => settings.effortLevel)).toEqual(["xhigh", "xhigh", "high"])
+    expect(await input.next()).toMatchObject({ value: { message: { content: [{ text: "second" }] } } })
+    expect(await input.next()).toMatchObject({ value: { message: { content: [{ text: "third" }] } } })
+    scriptedMessages = [
+      { type: "result", is_error: false, result: "first" },
+      { type: "result", is_error: false, result: "second" },
+      { type: "result", is_error: false, result: "third" },
+    ]
+    releaseHeldQuery?.()
+    expect((await observations[0].completion).result).toBe("second")
+    expect((await observations[1].completion).result).toBe("third")
+  })
+
+  it("does not revive a stopped session while an effort acknowledgement is pending", async () => {
+    holdQueryOpen = true
+    const { createSDKSession, sendSDKMessage, stopSDKSession } = await loadModule()
+    createSDKSession({ sessionId: "stopped-effort", cwd: "/tmp", message: "first", effort: "medium" })
+    await waitUntil(() => captured.length === 1)
+    let acknowledge!: () => void
+    applyFlagSettingsSpy!.mockImplementationOnce(() => new Promise<void>(resolve => { acknowledge = resolve }))
+    const accepted = vi.fn()
+    const sending = sendSDKMessage("stopped-effort", "second", undefined, { effort: "xhigh" }, { onAccepted: accepted })
+    expect(stopSDKSession("stopped-effort")).toBe(true)
+    acknowledge()
+    expect(await sending).toBeNull()
+    expect(accepted).not.toHaveBeenCalled()
+    expect(captured).toHaveLength(1)
+    releaseHeldQuery?.()
   })
 
   it("sendSDKMessage applies Max live — applyFlagSettings accepts it session-scoped", async () => {
@@ -1179,7 +1338,7 @@ describe("sdk-session effort propagation", () => {
     })
     await waitUntil(() => captured.length === 1)
 
-    sendSDKMessage("s4-max", "follow-up", undefined, { effort: "max" })
+    await sendSDKMessage("s4-max", "follow-up", undefined, { effort: "max" })
 
     await Promise.resolve()
     await Promise.resolve()
@@ -1238,7 +1397,7 @@ describe("sdk-session effort propagation", () => {
     await waitUntil(() => captured.length === 1)
     expect(setModelSpy).not.toBeNull()
 
-    sendSDKMessage("s5", "follow-up", undefined, { model: "claude-opus-4-7" })
+    await sendSDKMessage("s5", "follow-up", undefined, { model: "claude-opus-4-7" })
 
     await Promise.resolve()
     await Promise.resolve()
@@ -1264,7 +1423,7 @@ describe("sdk-session effort propagation", () => {
     state.running = true
     expect(await interruptSDKTurn("empty-send-settings")).toBe(true)
 
-    sendSDKMessage("empty-send-settings", "again", undefined, { model: "", effort: "" })
+    await sendSDKMessage("empty-send-settings", "again", undefined, { model: "", effort: "" })
     await Promise.resolve()
     await Promise.resolve()
 
@@ -1430,7 +1589,7 @@ describe("sdk-session effort propagation", () => {
     await waitUntil(() => captured.length === 1)
     expect(applyFlagSettingsSpy).not.toBeNull()
 
-    sendSDKMessage("u3", "follow-up", undefined, { ultracode: true })
+    await sendSDKMessage("u3", "follow-up", undefined, { ultracode: true })
 
     await Promise.resolve()
     await Promise.resolve()

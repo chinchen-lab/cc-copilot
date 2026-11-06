@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { AgentMessageNotSentError } from "../agents/runtimeTypes"
 import type { CommandReceipt } from "../../shared/contracts/orchestration"
 import { OrchestrationStore, settlesOnDelivery, type DispatcherLease, type StoredCommand } from "./store"
 
@@ -100,7 +101,8 @@ export class CommandDispatcher {
       if (this.closed) return
       const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 0
       const errorCode = status === 400 && typeof error === "object" && error && "code" in error && error.code === "MODEL_REJECTED" ? "MODEL_REJECTED" : undefined
-      this.store.finish(command, lease, [400, 403, 404].includes(status) ? "failed" : "unknown", { error: error instanceof Error ? error.message : "Agent delivery failed", errorCode })
+      const notSent = error instanceof AgentMessageNotSentError
+      this.store.finish(command, lease, notSent || [400, 403, 404].includes(status) ? "failed" : "unknown", { error: error instanceof Error ? error.message : "Agent delivery failed", errorCode })
     }
     void this.tick()
   }

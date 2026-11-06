@@ -24,7 +24,7 @@ import { claudeCliPath } from "./agents/claudeExecutable"
 import { appendToSystemPrompt, withControlQuery } from "./agents/sdk"
 import { pluginSkillContext } from "./plugins/skillContext"
 import { readSdkRateLimit } from "./agents/rateLimit"
-import type { UserQuestionAnswers } from "./agents/runtimeTypes"
+import { AgentMessageNotSentError, type UserQuestionAnswers } from "./agents/runtimeTypes"
 import { BROWSER_CONTEXT_APPEND, BROWSER_HOOK_TOOL, browserPreToolUseHook } from "./browser/agentContext"
 import { cogpitAgentEnv, browserPluginPaths, browserShimInstalled } from "./browser/agentEnv"
 import * as streamBus from "./lib/streamBus"
@@ -146,6 +146,22 @@ export interface SDKSessionState {
 }
 
 export const sdkSessions = new Map<string, SDKSessionState>()
+
+// Settings controls and sends share one order. A prompt must not overtake an
+// in-flight settings acknowledgement, or a later send overtake an earlier one.
+const sessionOperations = new WeakMap<SDKSessionState, Promise<void>>()
+
+function inSessionOrder<T>(state: SDKSessionState, operation: () => Promise<T>): Promise<T> {
+  const previous = sessionOperations.get(state)
+  const result = previous ? previous.then(operation) : operation()
+  // A rejected operation fails its caller, while the next one may retry.
+  const settled = result.then(() => {}, () => {})
+  sessionOperations.set(state, settled)
+  void settled.then(() => {
+    if (sessionOperations.get(state) === settled) sessionOperations.delete(state)
+  })
+  return result
+}
 
 const NO_BACKGROUND_AGENTS: ReadonlySet<string> = new Set()
 
@@ -1104,25 +1120,27 @@ export async function updateSDKSession(
 ): Promise<SDKSessionUpdateResult> {
   const state = sdkSessions.get(sessionId)
   if (!state) return { found: false, appliedLive: [], staged: Object.keys(updates), permissionChange: null }
-  const permissionsBefore = JSON.stringify(permissionSettingsOf(state))
-  const changes = applySessionUpdates(state, updates)
-  const autoApproved = autoResolvePendingForMode(state, changes)
-  const permissionsAfter = permissionSettingsOf(state)
-  let appliedLive: string[] = []
-  try {
-    appliedLive = await pushSessionUpdates(state, changes)
-  } catch {
-    // The query may finish between checking `running` and sending a control
-    // request. State is still updated, so the next resume applies the values.
-  }
-  return {
-    found: true,
-    appliedLive,
-    staged: Object.keys(updates).filter((key) => !appliedLive.includes(key)),
-    permissionChange: JSON.stringify(permissionsAfter) === permissionsBefore
-      ? null
-      : { ...permissionsAfter, autoApproved },
-  }
+  return inSessionOrder(state, async () => {
+    const permissionsBefore = JSON.stringify(permissionSettingsOf(state))
+    const changes = applySessionUpdates(state, updates)
+    const autoApproved = autoResolvePendingForMode(state, changes)
+    const permissionsAfter = permissionSettingsOf(state)
+    let appliedLive: string[] = []
+    try {
+      appliedLive = await pushSessionUpdates(state, changes)
+    } catch {
+      // The query may finish between checking `running` and sending a control
+      // request. State is still updated, so the next resume applies the values.
+    }
+    return {
+      found: true,
+      appliedLive,
+      staged: Object.keys(updates).filter((key) => !appliedLive.includes(key)),
+      permissionChange: JSON.stringify(permissionsAfter) === permissionsBefore
+        ? null
+        : { ...permissionsAfter, autoApproved },
+    }
+  })
 }
 
 type LiveSDKSessionState = SDKSessionState & {
@@ -1156,35 +1174,49 @@ function sendOverrides(updates?: SDKSessionUpdates): SDKSessionUpdates | undefin
   return { ...rest, ...(model ? { model } : {}), ...(effort ? { effort } : {}) }
 }
 
-export function sendSDKMessage(
+export async function sendSDKMessage(
   sessionId: string,
   message: string,
   images?: ImageAttachment[],
   updates?: SDKSessionUpdates,
-  { startsTurn = true }: { startsTurn?: boolean } = {},
-): SDKSessionState | null {
+  { startsTurn = true, onAccepted }: { startsTurn?: boolean; onAccepted?: () => void } = {},
+): Promise<SDKSessionState | null> {
   const state = sdkSessions.get(sessionId)
   if (!state) return null
+  const wasLive = isSDKQueryLive(state)
 
-  const changes = applySessionUpdates(state, sendOverrides(updates))
-  autoResolvePendingForMode(state, changes)
+  return inSessionOrder(state, async () => {
+    // A queued operation may have outlived a stop or replacement of this state.
+    if (sdkSessions.get(sessionId) !== state) return null
+    if (wasLive && !isSDKQueryLive(state)) return null
+    const changes = applySessionUpdates(state, sendOverrides(updates))
+    autoResolvePendingForMode(state, changes)
 
-  if (isSDKQueryLive(state)) {
-    const input = buildUserMessage(message, images, startsTurn)
-    if (!state.messageStream.enqueue(input)) return null
-    const turns = inputTurns.get(state)
-    if (turns) turns.sent.push(input.uuid!)
-    state.running = true
+    if (isSDKQueryLive(state)) {
+      const queryHandle = state.activeQuery
+      // Reassert an explicit choice even if state already holds it: a prior
+      // live control request may have failed after staging that same value.
+      if (updates?.effort) changes.effortChanged = true
+      try {
+        await pushSessionUpdates(state, changes)
+      } catch (error) {
+        throw new AgentMessageNotSentError(`Message was not sent because session settings could not be applied: ${error instanceof Error ? error.message : String(error)}`)
+      }
+      if (!isSDKQueryLive(state) || state.activeQuery !== queryHandle) return null
+      const input = buildUserMessage(message, images, startsTurn)
+      onAccepted?.()
+      if (!state.messageStream.enqueue(input)) return null
+      const turns = inputTurns.get(state)
+      if (turns) turns.sent.push(input.uuid!)
+      state.running = true
 
-    // Best-effort: the setting is already persisted on `state`, so a failed
-    // control request still applies on the next resume.
-    void pushSessionUpdates(state, changes).catch(() => {})
+      return state
+    }
+
+    // Session idle — start a new resume query with the freshly-updated state
+    runQuery(state, message, { isResume: true, mcpConfig: state.mcpConfig, images })
     return state
-  }
-
-  // Session idle — start a new resume query with the freshly-updated state
-  runQuery(state, message, { isResume: true, mcpConfig: state.mcpConfig, images })
-  return state
+  })
 }
 
 // ── Resume a dead SDK session (creates fresh state + runs resume query) ──

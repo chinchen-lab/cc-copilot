@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { OrchestrationStore } from "../../orchestration/store"
 import { CommandDispatcher } from "../../orchestration/dispatcher"
+import { AgentMessageNotSentError } from "../../agents/runtimeTypes"
 
 const stores: OrchestrationStore[] = []
 const roots: string[] = []
@@ -14,6 +15,35 @@ const binding = { hostId: "local", agent: "codex" as const, instanceId: "default
 afterEach(() => { for (const store of stores.splice(0)) store.close(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 
 describe("durable orchestration", () => {
+  it.each([true, false])("only unblocks a failed send when non-delivery is certain (certain: %s)", async (certain) => {
+    const store = open()
+    const dispatcher = new CommandDispatcher(store)
+    dispatcher.start()
+    try {
+      const conversation = store.ensureConversation(binding)
+      const deliver = vi.fn(async (command: { receipt: { id: string } }) => {
+        if (command.receipt.id === "first-command") {
+          if (certain) throw new AgentMessageNotSentError("Settings failed before message delivery")
+          throw new Error("Connection lost after a possible delivery")
+        }
+        return { delivery: "started" as const, completion: Promise.resolve({ isError: false }) }
+      })
+      dispatcher.attach("owner", conversation.id, { authorize: async () => true, activity: () => ({ live: true, running: false }), deliver })
+      store.admit("owner", "first-command", conversation.id, { message: "first" }, "queue")
+      store.admit("owner", "next-command", conversation.id, { message: "next" }, "queue")
+      await dispatcher.tick()
+      expect((await dispatcher.wait("owner", "first-command", 1000))?.state).toBe(certain ? "failed" : "unknown")
+      await dispatcher.tick()
+      if (certain) {
+        expect((await dispatcher.wait("owner", "next-command", 1000))?.state).toBe("completed")
+        expect(deliver).toHaveBeenCalledTimes(2)
+      } else {
+        expect(store.command("owner", "next-command")?.receipt.state).toBe("queued")
+        expect(deliver).toHaveBeenCalledOnce()
+      }
+    } finally { dispatcher.close() }
+  })
+
   it("reads only queued commands in FIFO order on an idle dispatcher tick", () => {
     const store = open()
     const lease = store.acquire("host")!

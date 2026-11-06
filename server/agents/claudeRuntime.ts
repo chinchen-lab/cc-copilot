@@ -33,6 +33,7 @@ import { findJsonlPath } from "../sessionPaths"
 import { resolveSessionCwd } from "./sessionCwd"
 import { withTimeout } from "./timeout"
 import {
+  AgentMessageNotSentError,
   AgentRuntimeError,
   reportSessionId,
   resolvedApproval,
@@ -242,21 +243,29 @@ export const claudeRuntime: AgentRuntime = {
       // liveness test.
       const joinsTurn = live.running
       if (joinsTurn && req.deliveryIntent === "queue") return { delivery: "busy" }
-      const observed = req.commandId ? observeSDKResult(live) : null
-      const state = sendSDKMessage(sessionId, req.message ?? "", req.images, {
-        model: req.model,
-        effort: req.effort,
-        fastMode: req.fastMode,
-        ultracode: req.ultracode,
-        mcpConfig: req.mcpConfig,
-      }, req.onlyWhileRunning ? { startsTurn: false } : undefined)
+      const observation: { current: ReturnType<typeof observeSDKResult> | null } = { current: null }
+      let state: SDKSessionState | null
+      try {
+        state = await sendSDKMessage(sessionId, req.message ?? "", req.images, {
+          model: req.model,
+          effort: req.effort,
+          fastMode: req.fastMode,
+          ultracode: req.ultracode,
+          mcpConfig: req.mcpConfig,
+        }, {
+          startsTurn: !req.onlyWhileRunning,
+          onAccepted: () => {
+            if (req.commandId) observation.current = observeSDKResult(live)
+          },
+        })
+      } catch (error) {
+        observation.current?.cancel()
+        throw error
+      }
+      const observed = observation.current
       if (!state) {
         observed?.cancel()
-        throw new AgentRuntimeError(
-          500,
-          "INTERNAL_ERROR",
-          "Failed to send message to running session",
-        )
+        throw new AgentMessageNotSentError("Message was not sent because the session stopped accepting input")
       }
       return { delivery: joinsTurn ? "enqueued" : "started", ...(observed ? { completion: observed.completion.then(turnResultFrom) } : {}) }
     }

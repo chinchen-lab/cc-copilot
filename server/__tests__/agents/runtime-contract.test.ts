@@ -360,7 +360,7 @@ describe("a follow-up to a live Claude query", () => {
     const state = { running }
     sdk.sdkSessions.set("session-1", state)
     sdk.isSDKQueryLive.mockReturnValue(true)
-    vi.mocked(sendSDKMessage).mockImplementationOnce(() => {
+    vi.mocked(sendSDKMessage).mockImplementationOnce(async () => {
       state.running = true
       return state as unknown as SDKSessionState
     })
@@ -383,7 +383,7 @@ describe("a follow-up to a live Claude query", () => {
   it("sends an informational notice so it can join the running turn but never open one", async () => {
     liveQuery(true)
     await expect(runtimeFor("claude").send("session-1", { message: "Crew notice", onlyWhileRunning: true })).resolves.toEqual({ delivery: "enqueued" })
-    expect(sendSDKMessage).toHaveBeenCalledWith("session-1", "Crew notice", undefined, expect.anything(), { startsTurn: false })
+    expect(sendSDKMessage).toHaveBeenCalledWith("session-1", "Crew notice", undefined, expect.anything(), expect.objectContaining({ startsTurn: false }))
   })
   it("keeps an idle query idle for an informational notice", async () => {
     liveQuery(false)

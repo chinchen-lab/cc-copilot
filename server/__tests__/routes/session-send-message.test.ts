@@ -478,7 +478,7 @@ describe("/api/send-message SDK resume cwd", () => {
       messageStream: {},
     }
     mockSdkSessions.set("sess-1", liveState)
-    mockSendSDKMessage.mockReturnValue(liveState)
+    mockSendSDKMessage.mockResolvedValue(liveState)
 
     const handler = getHandler("/api/send-message")
     const { req, res, next, sendBody } = createMockReqRes(
@@ -494,7 +494,7 @@ describe("/api/send-message SDK resume cwd", () => {
       "new direction",
       undefined,
       expect.objectContaining({ ultracode: true }),
-      undefined,
+      expect.objectContaining({ startsTurn: true, onAccepted: expect.any(Function) }),
     )
     expect(mockResumeSDKSession).not.toHaveBeenCalled()
     expect(res._getData()).toEqual({ success: true })

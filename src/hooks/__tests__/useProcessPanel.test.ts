@@ -119,8 +119,8 @@ describe("useProcessPanel", () => {
 
     act(() => {
       result.current.handleServersChanged([
-        { id: "s1", outputPath: "/out/s1", title: "Server 1" },
-        { id: "s2", outputPath: "/out/s2", title: "Server 2" },
+        { id: "s1", outputPath: "/out/s1", title: "Server 1", status: "running" as const },
+        { id: "s2", outputPath: "/out/s2", title: "Server 2", status: "running" as const },
       ])
     })
 
@@ -134,6 +134,7 @@ describe("useProcessPanel", () => {
   it("preserves unknown and completed command status as discovery updates", () => {
     const { result } = renderHook(() => useProcessPanel("session-1"))
     const task = { id: "build", outputPath: "/out/build", title: "Build" }
+    act(() => result.current.handleServersChanged([{ ...task, status: "running" }]))
     act(() => result.current.handleServersChanged([{ ...task, status: "unknown" }]))
     expect(result.current.processes.get("build")?.status).toBe("unknown")
     act(() => result.current.handleServersChanged([{ ...task, status: "completed" }]))
@@ -142,19 +143,88 @@ describe("useProcessPanel", () => {
     expect(result.current.processes.get("build")?.status).toBe("completed")
   })
 
+  it.each(["completed", "stopped", "errored", "unknown", undefined] as const)(
+    "does not automatically open a discovered task with status %s",
+    (status) => {
+      const { result } = renderHook(() => useProcessPanel("session-1"))
+      act(() => result.current.handleServersChanged([
+        { id: "build", outputPath: "/out/build", title: "Build", status },
+      ]))
+      expect(result.current.processes.size).toBe(0)
+      expect(result.current.activeProcessId).toBeNull()
+      expect(result.current.collapsed).toBe(true)
+    },
+  )
+
+  it("keeps a closed task hidden through status changes, missing polls and session switches", () => {
+    const { result, rerender } = renderHook(
+      ({ sessionId }) => useProcessPanel(sessionId),
+      { initialProps: { sessionId: "session-1" } },
+    )
+    const task = { id: "build", outputPath: "/out/build", title: "Build", status: "running" as const }
+    act(() => result.current.handleServersChanged([task]))
+    act(() => result.current.removeProcess(task.id))
+    act(() => result.current.handleServersChanged([{ ...task, title: "New output" }]))
+    expect(result.current.processes.has(task.id)).toBe(false)
+    act(() => result.current.handleServersChanged([{ ...task, status: "completed" }]))
+    expect(result.current.processes.has(task.id)).toBe(false)
+    act(() => result.current.handleServersChanged([]))
+    rerender({ sessionId: "session-2" })
+    act(() => result.current.handleServersChanged([task]))
+    rerender({ sessionId: "session-1" })
+    act(() => result.current.handleServersChanged([task]))
+    expect(result.current.processes.has(task.id)).toBe(false)
+  })
+
+  it("lets the user reopen completed output and close it again without discovery undoing either action", () => {
+    const { result } = renderHook(() => useProcessPanel("session-1"))
+    const task = { id: "build", outputPath: "/out/build", title: "Build", status: "completed" as const }
+    act(() => result.current.handleServersChanged([task]))
+    act(() => result.current.handleToggleServer(task.id, task.outputPath, task.title))
+    expect(result.current.processes.get(task.id)?.status).toBe("completed")
+    expect(result.current.activeProcessId).toBe(task.id)
+    expect(result.current.collapsed).toBe(false)
+    act(() => result.current.removeProcess(task.id))
+    act(() => result.current.handleServersChanged([task]))
+    expect(result.current.processes.has(task.id)).toBe(false)
+    act(() => result.current.handleToggleServer(task.id, task.outputPath, task.title))
+    act(() => result.current.handleServersChanged([task]))
+    expect(result.current.processes.get(task.id)?.status).toBe("completed")
+  })
+
+  it("does not hide a new running task that reuses a closed task's id with another output path", () => {
+    const { result } = renderHook(() => useProcessPanel("session-1"))
+    const task = { id: "build", outputPath: "/out/session-1/build", title: "Build", status: "running" as const }
+    act(() => result.current.handleServersChanged([task]))
+    act(() => result.current.removeProcess(task.id))
+    act(() => result.current.handleServersChanged([{ ...task, outputPath: "/out/session-2/build" }]))
+    expect(result.current.processes.get(task.id)?.outputPath).toBe("/out/session-2/build")
+  })
+
+  it("lets the user reopen a dismissed running task and keeps it as the task completes", () => {
+    const { result } = renderHook(() => useProcessPanel("session-1"))
+    const task = { id: "build", outputPath: "/out/build", title: "Build", status: "running" as const }
+    act(() => result.current.handleServersChanged([task]))
+    act(() => result.current.removeProcess(task.id))
+    act(() => result.current.handleToggleServer(task.id, task.outputPath, task.title))
+    expect(result.current.processes.get(task.id)?.status).toBe("running")
+    act(() => result.current.handleServersChanged([{ ...task, status: "completed" }]))
+    expect(result.current.processes.get(task.id)?.status).toBe("completed")
+  })
+
   it("handleServersChanged removes old task entries not in new list", () => {
     const { result } = renderHook(() => useProcessPanel("session-1"))
 
     act(() => {
       result.current.handleServersChanged([
-        { id: "s1", outputPath: "/out/s1", title: "Server 1" },
-        { id: "s2", outputPath: "/out/s2", title: "Server 2" },
+        { id: "s1", outputPath: "/out/s1", title: "Server 1", status: "running" as const },
+        { id: "s2", outputPath: "/out/s2", title: "Server 2", status: "running" as const },
       ])
     })
 
     act(() => {
       result.current.handleServersChanged([
-        { id: "s1", outputPath: "/out/s1", title: "Server 1" },
+        { id: "s1", outputPath: "/out/s1", title: "Server 1", status: "running" as const },
       ])
     })
 
@@ -171,7 +241,7 @@ describe("useProcessPanel", () => {
 
     act(() => {
       result.current.handleServersChanged([
-        { id: "s1", outputPath: "/out/s1", title: "Server 1" },
+        { id: "s1", outputPath: "/out/s1", title: "Server 1", status: "running" as const },
       ])
     })
 
@@ -183,7 +253,7 @@ describe("useProcessPanel", () => {
   it("handleServersChanged does not trigger update when data is identical", () => {
     const { result } = renderHook(() => useProcessPanel("session-1"))
 
-    const servers = [{ id: "s1", outputPath: "/out/s1", title: "Server 1" }]
+    const servers = [{ id: "s1", outputPath: "/out/s1", title: "Server 1", status: "running" as const }]
 
     act(() => {
       result.current.handleServersChanged(servers)

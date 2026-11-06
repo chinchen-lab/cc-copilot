@@ -197,6 +197,14 @@ export class AgentRuntimeError extends Error {
   }
 }
 
+/** A send failed before the runtime handed its message to the agent. */
+export class AgentMessageNotSentError extends AgentRuntimeError {
+  constructor(message: string) {
+    super(502, "MESSAGE_NOT_SENT", message)
+    this.name = "AgentMessageNotSentError"
+  }
+}
+
 /** What a runtime knows about a session's work, from the process it holds. */
 export interface RuntimeActivity {
   /** A connection exists that can take a follow-up without a resume. */

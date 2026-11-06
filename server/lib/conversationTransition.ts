@@ -10,15 +10,23 @@ import { commandScope } from "./durableSend"
 import { readTranscriptText } from "../agents/transcriptFile"
 import { orchestrationStore } from "../orchestration/storage"
 import { fingerprint, OrchestrationError } from "../orchestration/store"
+import { sessionConfigKey } from "./sessionConfigStore"
+import { writeSessionConfig } from "./sessionSettings"
 
-export interface TransitionInput { sessionId: string; commandId: string; expectedRevision: number; mode: "resume" | "handoff"; agent: AgentKind; instanceId?: string; targetSessionId?: string; message?: string }
+export interface TransitionInput { sessionId: string; commandId: string; expectedRevision: number; mode: "resume" | "handoff"; agent: AgentKind; instanceId?: string; targetSessionId?: string; message?: string; model?: string; effort?: string }
 export interface TransitionResolution { sessionId: string; commandId: string; targetSessionId?: string; confirmNotCreated?: boolean }
+async function storeHandoffSettings(req: IncomingMessage, sessionId: string, input: TransitionInput) {
+  // Seed the destination before clients open it, so the source composer's
+  // settings cannot overwrite this choice on the next turn. Empty is default.
+  await writeSessionConfig(req, sessionConfigKey(sessionId), sessionId, { model: input.model || "", effort: input.effort || "" })
+}
 async function authorized(req: IncomingMessage, sessionId: string) {
   const level = await accessLevelOf(req, sessionId)
   if (!level || !accessAtLeast(level, "interact")) throw new OrchestrationError(403, "Session access is required for this transition")
 }
 export async function transitionConversation(req: IncomingMessage, input: TransitionInput) {
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(input.commandId) || !AGENT_KINDS.includes(input.agent) || !Number.isSafeInteger(input.expectedRevision) || !["resume", "handoff"].includes(input.mode)) throw new OrchestrationError(400, "Choose a transition policy and a stable commandId")
+  if ((input.model !== undefined && typeof input.model !== "string") || (input.effort !== undefined && typeof input.effort !== "string")) throw new OrchestrationError(400, "Model and effort must be strings")
   await authorized(req, input.sessionId)
   const source = await resolveSessionAgent(input.sessionId)
   const store = orchestrationStore()
@@ -60,7 +68,8 @@ export async function transitionConversation(req: IncomingMessage, input: Transi
     if (operation.result) return operation.result
     throw new OrchestrationError(409, "Handoff delivery is uncertain. Inspect provider history before starting another handoff.")
   }
-  const started = await startTurn(req, Date.now(), targetRuntime, { dirName: descriptorFor(input.agent).dirName.encode(cwd), cwd, message, onSessionId: (sessionId) => store.recordOperationIdentity(scope, id, sessionId) })
+  const started = await startTurn(req, Date.now(), targetRuntime, { dirName: descriptorFor(input.agent).dirName.encode(cwd), cwd, message, model: input.model || undefined, effort: input.effort || undefined, onSessionId: (sessionId) => store.recordOperationIdentity(scope, id, sessionId) })
+  await storeHandoffSettings(req, started.sessionId, input)
   return store.completeTransition(scope, id, conversation.id, input.expectedRevision, await nativeBinding(started.sessionId, input.agent, started.filePath, cwd), { mode: input.mode, dirName: started.dirName, fileName: started.fileName, sessionId: started.sessionId })
 }
 
@@ -89,5 +98,6 @@ export async function resolveConversationTransition(req: IncomingMessage, resolu
   const parsed = parseSession(await readTranscriptText(target.filePath))
   const descriptor = descriptorFor(target.kind)
   const { instanceDirName } = await import("../../shared/session/instances")
+  await storeHandoffSettings(req, targetId, input)
   return store.completeTransition(scope, id, conversation.id, input.expectedRevision, await nativeBinding(targetId, target.kind, target.filePath, parsed.cwd), { mode: "handoff", sessionId: targetId, dirName: instanceDirName(target.instanceId ?? "default", descriptor.dirName.encode(parsed.cwd || "")), fileName: descriptor.sessionFile.name(splitInstanceSessionId(targetId).nativeId) })
 }

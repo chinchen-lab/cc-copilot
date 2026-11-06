@@ -32,6 +32,10 @@ export function useProcessPanel(sessionId: string | null | undefined) {
   const [collapsed, setCollapsed] = useState(true)
   const cacheRef = useRef<Map<string, PanelCache>>(new Map())
   const prevSessionIdRef = useRef<string | null>(null)
+  const discoveredTasksRef = useRef<Map<string, DiscoveredTask>>(new Map())
+  // An output path identifies the task across polls and session switches;
+  // task ids alone may be reused by another session in the same project.
+  const dismissedTaskOutputsRef = useRef<Set<string>>(new Set())
 
   // Save/restore state when switching sessions
   useEffect(() => {
@@ -70,6 +74,10 @@ export function useProcessPanel(sessionId: string | null | undefined) {
   }, [])
 
   const removeProcess = useCallback((id: string) => {
+    const entry = processes.get(id)
+    if (entry?.type === "task" && entry.outputPath) {
+      dismissedTaskOutputsRef.current.add(entry.outputPath)
+    }
     setProcesses((prev) => {
       const next = new Map(prev)
       next.delete(id)
@@ -83,7 +91,7 @@ export function useProcessPanel(sessionId: string | null | undefined) {
 
       return next
     })
-  }, [])
+  }, [processes])
 
   const setActive = useCallback((id: string) => {
     setActiveProcessId(id)
@@ -102,6 +110,8 @@ export function useProcessPanel(sessionId: string | null | undefined) {
 
   // Bridge: handle servers discovered by BackgroundServers component (type='task')
   const handleServersChanged = useCallback((servers: DiscoveredTask[]) => {
+    discoveredTasksRef.current = new Map(servers.map((task) => [task.id, task]))
+    const dismissed = new Set(dismissedTaskOutputsRef.current)
     setProcesses((prev) => {
       let changed = false
       const next = new Map(prev)
@@ -117,9 +127,13 @@ export function useProcessPanel(sessionId: string | null | undefined) {
 
       // Add/update task entries
       for (const s of servers) {
-        const status = s.status ?? "running"
+        const status = s.status ?? "unknown"
         const existing = next.get(s.id)
         if (!existing) {
+          // Finished output remains available from the background-task list.
+          // Only confirmed running tasks open tabs automatically, and a poll
+          // must never undo the user's decision to close one.
+          if (status !== "running" || dismissed.has(s.outputPath)) continue
           next.set(s.id, {
             id: s.id,
             name: s.title,
@@ -141,6 +155,9 @@ export function useProcessPanel(sessionId: string | null | undefined) {
   // Bridge: handle toggle from BackgroundServers/StatsPanel click
   const handleToggleServer = useCallback((id: string, outputPath?: string, title?: string) => {
     if (outputPath && title) {
+      dismissedTaskOutputsRef.current.delete(outputPath)
+      const discovered = discoveredTasksRef.current.get(id)
+      const status = discovered?.outputPath === outputPath ? discovered.status ?? "unknown" : "unknown"
       setProcesses((prev) => {
         if (prev.has(id)) return prev
         const next = new Map(prev)
@@ -148,7 +165,7 @@ export function useProcessPanel(sessionId: string | null | undefined) {
           id,
           name: title,
           type: "task",
-          status: "unknown",
+          status,
           outputPath,
         })
         return next
